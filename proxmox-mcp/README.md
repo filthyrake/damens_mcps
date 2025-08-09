@@ -1,5 +1,19 @@
 # Proxmox MCP Server 🖥️
 
+⚠️ **⚠️ WARNING: UNTESTED PROJECT ⚠️**
+
+**This Proxmox MCP server has NOT been tested in production environments. Use at your own risk!**
+
+- 🔴 **No real-world testing** has been performed
+- 🔴 **API compatibility** may not be fully verified
+- 🔴 **Error handling** may be incomplete
+- 🔴 **Security validation** is pending
+- 🔴 **Virtual machine operations** may not work as expected
+
+**Consider this project as a starting point for development rather than production-ready software.**
+
+---
+
 A comprehensive Model Context Protocol (MCP) server for Proxmox VE management, providing AI assistants with direct access to Proxmox virtualization platform capabilities. This enables AI tools to manage virtual machines, containers, storage, networking, and system administration tasks on Proxmox VE servers.
 
 ## 🚀 Key Features
