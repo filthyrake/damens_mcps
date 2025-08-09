@@ -135,7 +135,7 @@ async def login(username: str, password: str):
     
     # Check credentials
     expected_username = os.getenv("MCP_USERNAME", "admin")
-    expected_password = os.getenv("MCP_PASSWORD", "admin")
+    expected_password = os.getenv("MCP_PASSWORD", "admin-change-this")
     
     if username == expected_username and password == expected_password:
         token = auth_manager.create_access_token({"sub": username})

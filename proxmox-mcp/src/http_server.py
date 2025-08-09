@@ -196,7 +196,7 @@ async def create_token(request: TokenRequest):
     auth_mgr = get_auth_manager()
     
     # Validate admin token (you might want to implement proper admin token validation)
-    if request.admin_token != os.getenv("ADMIN_TOKEN", "admin-token"):
+    if request.admin_token != os.getenv("ADMIN_TOKEN", "admin-token-change-this"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin token"

@@ -307,7 +307,7 @@ class JWTAuthManager:
             email="admin@truenas-mcp.local",
             full_name="Administrator",
             disabled=False,
-            hashed_password=pwd_context.hash("admin123")  # Change in production!
+            hashed_password=pwd_context.hash("admin123")  # TODO: Change in production!
         )
         self.users_db[admin_user.username] = admin_user
     
