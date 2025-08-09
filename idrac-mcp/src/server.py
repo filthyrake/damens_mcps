@@ -4,22 +4,41 @@ import asyncio
 import os
 from typing import Dict, Any, List
 
-from mcp import Server, StdioServerParameters
-from mcp.server import Session
-from mcp.server.models import InitializationOptions
+from mcp.server import Server
+from mcp.server.session import ServerSession
+from mcp.server.session import InitializationOptions
 
-from .idrac_client import IDracClient
-from .auth import AuthManager
-from .utils.logging import setup_logging, get_logger
-from .resources import (
-    SystemResource,
-    PowerResource,
-    UsersResource,
-    NetworkResource,
-    StorageResource,
-    FirmwareResource,
-    VirtualMediaResource
-)
+# Try relative import first, fall back to absolute
+try:
+    from .idrac_client import IDracClient
+    from .auth import AuthManager
+    from .utils.logging import setup_logging, get_logger
+    from .resources import (
+        SystemResource,
+        PowerResource,
+        UsersResource,
+        NetworkResource,
+        StorageResource,
+        FirmwareResource,
+        VirtualMediaResource
+    )
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    import os
+    sys.path.append(os.path.dirname(__file__))
+    from idrac_client import IDracClient
+    from auth import AuthManager
+    from utils.logging import setup_logging, get_logger
+    from resources import (
+        SystemResource,
+        PowerResource,
+        UsersResource,
+        NetworkResource,
+        StorageResource,
+        FirmwareResource,
+        VirtualMediaResource
+    )
 
 logger = get_logger(__name__)
 
@@ -30,10 +49,8 @@ class IDracMCPServer(Server):
     def __init__(self):
         """Initialize the iDRAC MCP server."""
         super().__init__(
-            StdioServerParameters(
-                name="idrac-mcp",
-                version="1.0.0"
-            )
+            name="idrac-mcp",
+            version="1.0.0"
         )
         
         # Setup logging
@@ -132,9 +149,11 @@ class IDracMCPServer(Server):
 
 async def main():
     """Main entry point."""
+    from mcp.server.stdio import stdio_server
+    
     server = IDracMCPServer()
-    async with server.run_stdio() as stream:
-        await stream.wait_closed()
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(read_stream, write_stream)
 
 
 if __name__ == "__main__":
