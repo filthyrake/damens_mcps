@@ -1,0 +1,214 @@
+2025-08-08 16:01:42,553 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:01:42,553 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:01:42,554 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:01:43,196 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:01:43,196 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:02:03,909 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:02:08,083 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:02:08,083 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:02:08,085 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:02:08,281 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:02:08,281 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:02:15,957 - src.truenas_client - ERROR - API request failed: 404 - 404: Not Found
+2025-08-08 16:02:15,957 - src.truenas_client - ERROR - Request error: API request failed: 404 - 404: Not Found
+2025-08-08 16:02:15,957 - src.http_server - ERROR - Health check failed: API request failed: 404 - 404: Not Found
+2025-08-08 16:02:54,760 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:02:58,453 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:02:58,453 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:02:58,455 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:02:58,658 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:02:58,658 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:03:26,448 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:03:29,941 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:03:29,941 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:03:29,943 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:03:30,148 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:03:30,148 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:03:48,141 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:03:51,885 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:03:51,885 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:03:51,886 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:03:52,082 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:03:52,082 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:04:14,113 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:04:17,805 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:04:17,806 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:04:17,807 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:04:18,003 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:04:18,004 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:04:39,129 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:04:43,430 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:04:43,430 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:04:43,431 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:04:43,628 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:04:43,628 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:06:08,817 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:06:13,094 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:06:13,094 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:06:13,095 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:06:13,292 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:06:13,292 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:06:29,298 - src.http_server - ERROR - MCP call tool error: 1 validation error for CallToolRequest
+params
+  Field required [type=missing, input_value={'name': 'truenas_system_... 'method': 'tools/call'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-08-08 16:06:45,109 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:06:49,190 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:06:49,190 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:06:49,191 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:06:49,387 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:06:49,387 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:06:56,184 - src.http_server - ERROR - MCP call tool error: 1 validation error for CallToolRequest
+params
+  Field required [type=missing, input_value={'method': 'tools/call', ..._info', 'arguments': {}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-08-08 16:07:16,767 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:07:21,033 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:07:21,033 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:07:21,034 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:07:21,230 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:07:21,230 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:07:28,110 - src.http_server - ERROR - MCP call tool error: 'CallToolRequest' object has no attribute 'name'
+2025-08-08 16:07:46,916 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:07:51,239 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:07:51,239 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:07:51,240 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:07:51,443 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:07:51,443 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:07:58,014 - src.truenas_client - ERROR - API request failed: 404 - 404: Not Found
+2025-08-08 16:07:58,014 - src.truenas_client - ERROR - Request error: API request failed: 404 - 404: Not Found
+2025-08-08 16:08:07,583 - src.truenas_client - ERROR - API request failed: 404 - 404: Not Found
+2025-08-08 16:08:07,584 - src.truenas_client - ERROR - Request error: API request failed: 404 - 404: Not Found
+2025-08-08 16:08:07,584 - src.http_server - ERROR - Health check failed: API request failed: 404 - 404: Not Found
+2025-08-08 16:09:55,779 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:09:55,779 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:09:55,780 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:09:55,972 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:09:55,973 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:10:11,433 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:10:14,277 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:10:14,277 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:10:14,279 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:10:14,471 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:10:14,471 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:14:14,441 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:35:15,427 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:35:15,427 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:35:15,429 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/truenas-mcp/.venv/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:35:16,138 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:35:16,138 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:35:18,005 - src.truenas_client - ERROR - API request failed: 404 - 404: Not Found
+2025-08-08 16:35:18,006 - src.truenas_client - ERROR - Request error: API request failed: 404 - 404: Not Found
+2025-08-08 16:35:18,006 - src.http_server - ERROR - Health check failed: API request failed: 404 - 404: Not Found
+2025-08-08 16:35:21,697 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:35:41,539 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:35:41,539 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:35:41,541 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/truenas-mcp/.venv/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:35:41,738 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:35:41,738 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:35:54,776 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...
+2025-08-08 16:35:58,470 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:35:58,470 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:35:58,472 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/truenas-mcp/.venv/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:35:58,670 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:35:58,670 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:36:03,711 - src.truenas_client - ERROR - API request failed: 404 - 404: Not Found
+2025-08-08 16:36:03,711 - src.truenas_client - ERROR - Request error: API request failed: 404 - 404: Not Found
+2025-08-08 16:36:03,711 - src.http_server - ERROR - Health check failed: API request failed: 404 - 404: Not Found
+2025-08-08 16:36:06,554 - src.http_server - INFO - Received admin token: rcuNjj4jO35drCfVGuIcOr_7623Lt10-tLLPfmsB_8w
+2025-08-08 16:36:06,554 - src.http_server - INFO - Expected admin token: rcuNjj4jO35drCfVGuIcOr_7623Lt10-tLLPfmsB_8w
+2025-08-08 16:36:06,554 - src.http_server - INFO - Tokens match: True
+2025-08-08 16:43:14,070 - src.utils.logging - INFO - Logging configured with level: INFO
+2025-08-08 16:43:14,070 - src.utils.logging - INFO - Log file: logs/truenas-mcp.log
+2025-08-08 16:43:14,073 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/damenknight/.pyenv/versions/3.12.5/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-08-08 16:43:14,278 - src.http_server - INFO - Starting TrueNAS MCP HTTP server...
+2025-08-08 16:43:14,278 - src.http_server - INFO - Successfully connected to TrueNAS
+2025-08-08 16:44:57,836 - src.truenas_client - ERROR - API request failed: 404 - 404: Not Found
+2025-08-08 16:44:57,836 - src.truenas_client - ERROR - Request error: API request failed: 404 - 404: Not Found
+2025-08-08 16:44:57,836 - src.http_server - ERROR - Health check failed: API request failed: 404 - 404: Not Found
+2025-08-09 05:22:42,277 - src.http_server - INFO - Shutting down TrueNAS MCP HTTP server...

@@ -1,0 +1,7 @@
+{
+  "host": "your-truenas-host.example.com",
+  "port": 443,
+  "api_key": "your-api-key-here",
+  "verify_ssl": true,
+  "token_file": "~/.truenas-mcp/token.txt"
+}

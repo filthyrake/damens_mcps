@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  proxmox-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: proxmox-mcp
+    ports:
+      - "8000:8000"
+    environment:
+      - PROXMOX_HOST=${PROXMOX_HOST}
+      - PROXMOX_PORT=${PROXMOX_PORT:-8006}
+      - PROXMOX_PROTOCOL=${PROXMOX_PROTOCOL:-https}
+      - PROXMOX_USERNAME=${PROXMOX_USERNAME}
+      - PROXMOX_PASSWORD=${PROXMOX_PASSWORD}
+      - PROXMOX_API_TOKEN=${PROXMOX_API_TOKEN}
+      - PROXMOX_REALM=${PROXMOX_REALM:-pve}
+      - PROXMOX_SSL_VERIFY=${PROXMOX_SSL_VERIFY:-true}
+      - SECRET_KEY=${SECRET_KEY}
+      - SERVER_PORT=8000
+      - SERVER_HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - MCP_USERNAME=${MCP_USERNAME:-admin}
+      - MCP_PASSWORD=${MCP_PASSWORD:-admin}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+    volumes:
+      - ../logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
