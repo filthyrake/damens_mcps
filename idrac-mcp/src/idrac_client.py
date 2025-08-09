@@ -10,10 +10,36 @@ import aiohttp
 import requests
 from requests.auth import HTTPBasicAuth
 
-from .utils.logging import get_logger
-from .utils.validation import validate_idrac_config, validate_power_operation, validate_user_config
+# Try relative imports first, fall back to absolute
+try:
+    from .utils.logging import get_logger
+    from .utils.validation import validate_idrac_config, validate_power_operation, validate_user_config
+except ImportError:
+    # Fallback for direct execution
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    def validate_idrac_config(config):
+        """Basic config validation."""
+        required_keys = ['host', 'port', 'protocol', 'username', 'password']
+        for key in required_keys:
+            if key not in config:
+                raise ValueError(f"Missing required config key: {key}")
+        return config
+    
+    def validate_power_operation(operation):
+        """Basic power operation validation."""
+        return operation
+    
+    def validate_user_config(config):
+        """Basic user config validation."""
+        return config
 
-logger = get_logger(__name__)
+# Initialize logger
+try:
+    logger = get_logger(__name__)
+except NameError:
+    logger = logging.getLogger(__name__)
 
 
 class IDracClient:
@@ -99,9 +125,26 @@ class IDracClient:
         """
         try:
             result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
+            
+            # Extract actual fields from Redfish response
+            system_info = {
+                "model": result.get('Model', 'N/A'),
+                "manufacturer": result.get('Manufacturer', 'N/A'),
+                "serial_number": result.get('SerialNumber', 'N/A'),
+                "part_number": result.get('PartNumber', 'N/A'),
+                "sku": result.get('SKU', 'N/A'),
+                "system_type": result.get('SystemType', 'N/A'),
+                "bios_version": result.get('BiosVersion', 'N/A'),
+                "power_state": result.get('PowerState', 'N/A'),
+                "health": result.get('Status', {}).get('Health', 'N/A'),
+                "state": result.get('Status', {}).get('State', 'N/A'),
+                "hostname": result.get('HostName', 'N/A'),
+                "description": result.get('Description', 'N/A')
+            }
+            
             return {
                 "status": "success",
-                "data": result,
+                "data": system_info,
                 "message": "System information retrieved successfully"
             }
         except Exception as e:
@@ -137,23 +180,52 @@ class IDracClient:
             Hardware inventory information
         """
         try:
-            # Get system information
-            system_info = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
-            
             # Get processor information
-            processors = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Processors')
+            processors_result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Processors')
+            processors = processors_result.get('Members', [])
             
             # Get memory information
-            memory = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Memory')
+            memory_result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Memory')
+            memory_modules = memory_result.get('Members', [])
             
             # Get storage information
-            storage = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Storage')
+            storage_result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Storage')
+            storage_controllers = storage_result.get('Members', [])
+            
+            # Get detailed processor info
+            processor_details = []
+            for proc in processors:
+                try:
+                    proc_id = proc.get('@odata.id', '').split('/')[-1]
+                    proc_detail = await self._make_request('GET', f'/redfish/v1/Systems/System.Embedded.1/Processors/{proc_id}')
+                    processor_details.append({
+                        "id": proc_id,
+                        "name": proc_detail.get('Name', 'Unknown'),
+                        "model": proc_detail.get('Model', 'N/A'),
+                        "manufacturer": proc_detail.get('Manufacturer', 'N/A'),
+                        "architecture": proc_detail.get('ProcessorArchitecture', 'N/A'),
+                        "cores": proc_detail.get('TotalCores', 'N/A'),
+                        "threads": proc_detail.get('TotalThreads', 'N/A'),
+                        "health": proc_detail.get('Status', {}).get('Health', 'N/A'),
+                        "state": proc_detail.get('Status', {}).get('State', 'N/A')
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to get processor details for {proc.get('@odata.id', 'unknown')}: {e}")
+                    processor_details.append({"id": proc.get('@odata.id', 'unknown'), "error": str(e)})
             
             inventory = {
-                "system": system_info,
-                "processors": processors,
-                "memory": memory,
-                "storage": storage
+                "processors": {
+                    "count": len(processors),
+                    "details": processor_details
+                },
+                "memory_modules": {
+                    "count": len(memory_modules),
+                    "modules": memory_modules
+                },
+                "storage_controllers": {
+                    "count": len(storage_controllers),
+                    "controllers": storage_controllers
+                }
             }
             
             return {
@@ -262,9 +334,47 @@ class IDracClient:
         try:
             result = await self._make_request('GET', '/redfish/v1/Chassis/System.Embedded.1/Thermal')
             
+            temperatures = result.get('Temperatures', [])
+            fans = result.get('Fans', [])
+            
+            # Extract temperature data
+            temp_data = []
+            for temp in temperatures:
+                temp_data.append({
+                    "name": temp.get('Name', 'Unknown'),
+                    "reading_celsius": temp.get('ReadingCelsius', 'N/A'),
+                    "health": temp.get('Status', {}).get('Health', 'N/A'),
+                    "state": temp.get('Status', {}).get('State', 'N/A'),
+                    "upper_critical": temp.get('UpperThresholdCritical', 'N/A'),
+                    "upper_warning": temp.get('UpperThresholdNonCritical', 'N/A')
+                })
+            
+            # Extract fan data
+            fan_data = []
+            for fan in fans:
+                fan_data.append({
+                    "name": fan.get('Name', 'Unknown'),
+                    "reading_rpm": fan.get('Reading', 'N/A'),
+                    "health": fan.get('Status', {}).get('Health', 'N/A'),
+                    "state": fan.get('Status', {}).get('State', 'N/A'),
+                    "min_rpm": fan.get('MinReadingRange', 'N/A'),
+                    "max_rpm": fan.get('MaxReadingRange', 'N/A')
+                })
+            
+            thermal_info = {
+                "temperatures": {
+                    "count": len(temperatures),
+                    "sensors": temp_data
+                },
+                "fans": {
+                    "count": len(fans),
+                    "fans": fan_data
+                }
+            }
+            
             return {
                 "status": "success",
-                "data": result,
+                "data": thermal_info,
                 "message": "Thermal status retrieved successfully"
             }
         except Exception as e:

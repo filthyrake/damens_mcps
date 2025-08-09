@@ -88,15 +88,35 @@ cp env.example .env
 ```
 
 3. **Start the server:**
-```bash
-python -m src.http_server
-```
+   ```bash
+   python -m src.http_server
+   ```
+
+4. **For fleet management (multiple servers):**
+   ```bash
+   # Use the secure fleet CLI (recommended)
+   python secure_fleet_cli.py init
+   python secure_fleet_cli.py add server_name host username
+   
+   # Or use the basic fleet CLI (less secure)
+   python fleet_cli.py init
+   python fleet_cli.py add server_name host username password
+   ```
 
 ### Docker Deployment
 
 ```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
+
+## 🔐 Security
+
+**IMPORTANT:** This project now includes secure password encryption for fleet management. See [SECURITY_WARNING.md](SECURITY_WARNING.md) for details.
+
+- ✅ Passwords are encrypted using Fernet (AES-128-CBC)
+- ✅ Encryption keys are stored separately
+- ✅ All sensitive files are in `.gitignore`
+- ✅ Secure CLI prompts for passwords
 
 ### Kubernetes Deployment
 
