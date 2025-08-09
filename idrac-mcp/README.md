@@ -94,6 +94,10 @@ cp env.example .env
 
 4. **Test the server:**
    ```bash
+   # For direct testing
+   python mcp_server.py
+   
+   # For module testing
    python -m src.http_server
    ```
 
@@ -122,6 +126,10 @@ docker-compose -f docker/docker-compose.yml up -d
 ## 🔐 Security
 
 **IMPORTANT:** This project now includes secure password encryption for fleet management. See [SECURITY_WARNING.md](SECURITY_WARNING.md) for details.
+
+## 🖥️ Claude Desktop Integration
+
+This MCP server is configured to work with Claude Desktop. The `mcp_server.py` script provides a direct entry point that avoids import issues when run by Claude Desktop.
 
 - ✅ Passwords are encrypted using Fernet (AES-128-CBC)
 - ✅ Encryption keys are stored separately
