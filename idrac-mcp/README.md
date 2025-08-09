@@ -92,7 +92,12 @@ cp env.example .env
    python -m src.http_server
    ```
 
-4. **For fleet management (multiple servers):**
+4. **Quick test everything:**
+   ```bash
+   python quick_test.py
+   ```
+
+5. **For fleet management (multiple servers):**
    ```bash
    # Use the secure fleet CLI (recommended)
    python secure_fleet_cli.py init
@@ -108,6 +113,12 @@ cp env.example .env
 ```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
+
+## 📚 Documentation
+
+- **[Usage Guide](USAGE_GUIDE.md)** - Comprehensive guide for using all features
+- **[Testing Guide](TESTING_GUIDE.md)** - How to test and validate the system
+- **[Security Warning](SECURITY_WARNING.md)** - Critical security information
 
 ## 🔐 Security
 
