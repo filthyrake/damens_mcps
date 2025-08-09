@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: truenas-mcp-service
+  labels:
+    app: truenas-mcp
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: truenas-mcp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: truenas-mcp-service-nodeport
+  labels:
+    app: truenas-mcp
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 8000
+    nodePort: 30080
+    protocol: TCP
+    name: http
+  selector:
+    app: truenas-mcp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: truenas-mcp-service-loadbalancer
+  labels:
+    app: truenas-mcp
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: truenas-mcp

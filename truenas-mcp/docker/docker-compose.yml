@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  truenas-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: truenas-mcp-server
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      # TrueNAS Configuration
+      - TRUENAS_HOST=${TRUENAS_HOST:-your-truenas-host.example.com}
+      - TRUENAS_PORT=${TRUENAS_PORT:-443}
+      - TRUENAS_API_KEY=${TRUENAS_API_KEY}
+      - TRUENAS_USERNAME=${TRUENAS_USERNAME}
+      - TRUENAS_PASSWORD=${TRUENAS_PASSWORD}
+      - TRUENAS_VERIFY_SSL=${TRUENAS_VERIFY_SSL:-true}
+      
+      # Server Configuration
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+      - DEBUG=${DEBUG:-false}
+      - RELOAD=${RELOAD:-false}
+      
+      # Authentication Configuration
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here-minimum-32-characters}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      
+      # Logging Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=/app/logs/truenas-mcp.log
+      - LOG_MAX_SIZE=${LOG_MAX_SIZE:-10485760}
+      - LOG_BACKUP_COUNT=${LOG_BACKUP_COUNT:-5}
+      
+      # CORS Configuration
+      - CORS_ORIGINS=["*"]
+      - CORS_ALLOW_CREDENTIALS=true
+      - CORS_ALLOW_METHODS=["*"]
+      - CORS_ALLOW_HEADERS=["*"]
+      
+      # Rate Limiting
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+    volumes:
+      - ../logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - truenas-mcp-network
+
+networks:
+  truenas-mcp-network:
+    driver: bridge
