@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxmox-mcp
+  namespace: proxmox-mcp
+  labels:
+    app: proxmox-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxmox-mcp
+  template:
+    metadata:
+      labels:
+        app: proxmox-mcp
+    spec:
+      containers:
+      - name: proxmox-mcp
+        image: proxmox-mcp:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PROXMOX_HOST
+          valueFrom:
+            secretKeyRef:
+              name: proxmox-mcp-secrets
+              key: proxmox_host
+        - name: PROXMOX_PORT
+          value: "8006"
+        - name: PROXMOX_PROTOCOL
+          value: "https"
+        - name: PROXMOX_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: proxmox-mcp-secrets
+              key: proxmox_username
+        - name: PROXMOX_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: proxmox-mcp-secrets
+              key: proxmox_password
+        - name: PROXMOX_REALM
+          value: "pve"
+        - name: PROXMOX_SSL_VERIFY
+          value: "true"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: proxmox-mcp-secrets
+              key: secret_key
+        - name: SERVER_PORT
+          value: "8000"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: MCP_USERNAME
+          value: "admin"
+        - name: MCP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: proxmox-mcp-secrets
+              key: mcp_password
+        - name: ADMIN_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: proxmox-mcp-secrets
+              key: admin_token
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "idrac": {
+      "url": "http://localhost:8000/mcp/",
+      "headers": {
+        "Authorization": "Bearer your-jwt-token-here"
+      }
+    }
+  }
+}

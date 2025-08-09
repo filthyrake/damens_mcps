@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "pfsense": {
+      "command": "/path/to/pfsense-mcp/.venv/bin/python",
+      "args": [
+        "/path/to/pfsense-mcp/src/http_pfsense_server.py"
+      ],
+      "env": {
+        "PFSENSE_HOST": "192.168.1.1",
+        "PFSENSE_PORT": "443",
+        "PFSENSE_API_KEY": "your-api-key-here",
+        "PFSENSE_SSL_VERIFY": "false"
+      }
+    }
+  }
+}

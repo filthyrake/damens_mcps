@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: truenas-mcp
+  labels:
+    app: truenas-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: truenas-mcp
+  template:
+    metadata:
+      labels:
+        app: truenas-mcp
+    spec:
+      containers:
+      - name: truenas-mcp
+        image: truenas-mcp:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        # TrueNAS Configuration
+        - name: TRUENAS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: truenas_host
+        - name: TRUENAS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: truenas_port
+        - name: TRUENAS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: truenas-mcp-secrets
+              key: truenas_api_key
+        - name: TRUENAS_VERIFY_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: truenas_verify_ssl
+        
+        # Server Configuration
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8000"
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: debug
+        
+        # Authentication Configuration
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: truenas-mcp-secrets
+              key: secret_key
+        - name: JWT_ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: jwt_algorithm
+        - name: ACCESS_TOKEN_EXPIRE_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: access_token_expire_minutes
+        - name: ADMIN_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: truenas-mcp-secrets
+              key: admin_token
+        
+        # Logging Configuration
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: log_level
+        - name: LOG_FILE
+          value: "/app/logs/truenas-mcp.log"
+        
+        # CORS Configuration
+        - name: CORS_ORIGINS
+          value: '["*"]'
+        - name: CORS_ALLOW_CREDENTIALS
+          value: "true"
+        - name: CORS_ALLOW_METHODS
+          value: '["*"]'
+        - name: CORS_ALLOW_HEADERS
+          value: '["*"]'
+        
+        # Rate Limiting
+        - name: RATE_LIMIT_REQUESTS
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: rate_limit_requests
+        - name: RATE_LIMIT_WINDOW
+          valueFrom:
+            configMapKeyRef:
+              name: truenas-mcp-config
+              key: rate_limit_window
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      
+      volumes:
+      - name: logs
+        emptyDir: {}
+      
+      restartPolicy: Always
