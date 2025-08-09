@@ -1,5 +1,7 @@
 # Damen's MCP Servers Collection 🚀
 
+> **Note:** These MCP servers were generated using [Cursor](https://cursor.sh/) AI tools. While functional, they may benefit from human review and refinement for production use.
+
 A comprehensive collection of Model Context Protocol (MCP) servers for managing various infrastructure components. These servers enable AI assistants to directly interact with and manage your infrastructure through standardized MCP interfaces.
 
 ## 📋 Project Overview
