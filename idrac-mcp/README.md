@@ -92,9 +92,9 @@ cp env.example .env
    python -m src.http_server
    ```
 
-4. **Quick test everything:**
+4. **Test the server:**
    ```bash
-   python quick_test.py
+   python -m src.http_server
    ```
 
 5. **For fleet management (multiple servers):**
@@ -117,7 +117,6 @@ docker-compose -f docker/docker-compose.yml up -d
 ## 📚 Documentation
 
 - **[Usage Guide](USAGE_GUIDE.md)** - Comprehensive guide for using all features
-- **[Testing Guide](TESTING_GUIDE.md)** - How to test and validate the system
 - **[Security Warning](SECURITY_WARNING.md)** - Critical security information
 
 ## 🔐 Security
