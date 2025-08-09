@@ -9,9 +9,19 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from .server import IDracMCPServer
-from .auth import AuthManager
-from .utils.logging import setup_logging, get_logger
+# Try relative import first, fall back to absolute
+try:
+    from .server import IDracMCPServer
+    from .auth import AuthManager
+    from .utils.logging import setup_logging, get_logger
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    import os
+    sys.path.append(os.path.dirname(__file__))
+    from server import IDracMCPServer
+    from auth import AuthManager
+    from utils.logging import setup_logging, get_logger
 
 logger = get_logger(__name__)
 
