@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Working iDRAC MCP Server - Based on working pfSense production server pattern
+Working iDRAC MCP Server - Manual JSON-RPC handling to bypass MCP framework validation
 """
 
 import json
@@ -8,7 +8,6 @@ import sys
 from typing import Any, Dict
 
 import anyio
-import mcp.server.stdio
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolRequest,
@@ -125,26 +124,61 @@ class WorkingIDracMCPServer:
                 "isError": True
             }
     
+    async def _send_response(self, write_stream, request_id: int, result: Dict[str, Any]):
+        """Manually send a JSON-RPC response."""
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": result
+        }
+        await write_stream.send(json.dumps(response))
+    
+    async def _send_error(self, write_stream, request_id: int, error_code: int, error_message: str):
+        """Manually send a JSON-RPC error response."""
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {
+                "code": error_code,
+                "message": error_message
+            }
+        }
+        await write_stream.send(json.dumps(response))
+    
     async def run(self, read_stream, write_stream, init_options):
         """Run the server."""
         async for request in read_stream:
-            if isinstance(request, ListToolsRequest):
-                await mcp.server.stdio.list_tools(write_stream, request, self.tools)
-            elif isinstance(request, CallToolRequest):
-                result = await self._call_tool(request.name, request.arguments)
-                await mcp.server.stdio.call_tool(write_stream, request, result)
-            elif isinstance(request, InitializeRequest):
-                await mcp.server.stdio.initialize(write_stream, request, {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {},
+            if isinstance(request, InitializeRequest):
+                # Handle initialization request
+                await self._send_response(write_stream, request.id, {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {
+                        "experimental": {},
+                        "tools": {
+                            "listChanged": False
+                        }
+                    },
                     "serverInfo": {
                         "name": "idrac-mcp",
-                        "version": "1.0.0"
+                        "version": "0.1.0"
                     }
                 })
+                
+            elif isinstance(request, ListToolsRequest):
+                # Manually send tools list response
+                await self._send_response(write_stream, request.id, {"tools": self.tools})
+                
+            elif isinstance(request, CallToolRequest):
+                # Manually handle tool call
+                result = await self._call_tool(request.name, request.arguments)
+                await self._send_response(write_stream, request.id, result)
+                
             elif isinstance(request, SessionMessage):
                 # Session messages are handled automatically by the MCP library
                 pass
+            else:
+                # Unknown request type
+                await self._send_error(write_stream, getattr(request, 'id', None), -32601, "Method not found")
 
 
 async def create_my_server():
