@@ -5,7 +5,10 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
-from src.idrac_client import IDracClient
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+from idrac_client import IDracClient
 
 # Load environment variables
 load_dotenv()

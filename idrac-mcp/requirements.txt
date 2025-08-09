@@ -16,6 +16,7 @@ aiohttp>=3.9.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.6
+cryptography>=3.4.0
 
 # Configuration and environment
 python-dotenv>=1.0.0

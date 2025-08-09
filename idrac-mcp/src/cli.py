@@ -53,7 +53,7 @@ def init():
     # Authentication
     config["MCP_USERNAME"] = Prompt.ask("MCP Username", default="admin")
     config["MCP_PASSWORD"] = Prompt.ask("MCP Password", default="admin-change-this")
-config["ADMIN_TOKEN"] = Prompt.ask("Admin Token", default="admin-token-change-this")
+    config["ADMIN_TOKEN"] = Prompt.ask("Admin Token", default="admin-token-change-this")
     
     # Logging
     config["LOG_LEVEL"] = Prompt.ask("Log Level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")
