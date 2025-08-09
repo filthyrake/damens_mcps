@@ -89,7 +89,7 @@ def init():
     config = {}
     
     console.print("\n[bold]Proxmox Connection Settings:[/bold]")
-    config["PROXMOX_HOST"] = click.prompt("Proxmox host", default="192.168.1.100")
+    config["PROXMOX_HOST"] = click.prompt("Proxmox host", default="192.168.1.100")  # Change this to your Proxmox IP
     config["PROXMOX_PORT"] = click.prompt("Proxmox port", default="8006", type=int)
     config["PROXMOX_PROTOCOL"] = click.prompt("Protocol", default="https", type=click.Choice(["http", "https"]))
     
@@ -115,7 +115,7 @@ def init():
     
     # MCP authentication
     config["MCP_USERNAME"] = click.prompt("MCP username", default="admin")
-    config["MCP_PASSWORD"] = click.prompt("MCP password", default="admin", hide_input=True)
+    config["MCP_PASSWORD"] = click.prompt("MCP password", default="admin-change-this", hide_input=True)
     config["ADMIN_TOKEN"] = click.prompt("Admin token", default=secrets.token_urlsafe(16))
     
     console.print("\n[bold]Logging Settings:[/bold]")
