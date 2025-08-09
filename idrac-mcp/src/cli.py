@@ -36,7 +36,7 @@ def init():
     config = {}
     
     # iDRAC settings
-    config["IDRAC_HOST"] = Prompt.ask("iDRAC Host", default="192.168.1.100")
+    config["IDRAC_HOST"] = Prompt.ask("iDRAC Host", default="192.168.1.100")  # Change this to your iDRAC IP
     config["IDRAC_PORT"] = Prompt.ask("iDRAC Port", default="443")
     config["IDRAC_PROTOCOL"] = Prompt.ask("iDRAC Protocol", choices=["http", "https"], default="https")
     config["IDRAC_USERNAME"] = Prompt.ask("iDRAC Username", default="root")
@@ -48,12 +48,12 @@ def init():
     
     # Server settings
     config["SERVER_PORT"] = Prompt.ask("Server Port", default="8000")
-    config["SECRET_KEY"] = Prompt.ask("Secret Key", default="your-secret-key-here")
+    config["SECRET_KEY"] = Prompt.ask("Secret Key", default="your-secret-key-here-change-this")
     
     # Authentication
     config["MCP_USERNAME"] = Prompt.ask("MCP Username", default="admin")
-    config["MCP_PASSWORD"] = Prompt.ask("MCP Password", default="admin")
-    config["ADMIN_TOKEN"] = Prompt.ask("Admin Token", default="admin-token-change-this")
+    config["MCP_PASSWORD"] = Prompt.ask("MCP Password", default="admin-change-this")
+config["ADMIN_TOKEN"] = Prompt.ask("Admin Token", default="admin-token-change-this")
     
     # Logging
     config["LOG_LEVEL"] = Prompt.ask("Log Level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")

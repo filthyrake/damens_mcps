@@ -20,7 +20,7 @@ async def test_pfsense_connection():
     print("🔌 Testing pfSense connection...")
     
     config = {
-        "host": os.getenv("PFSENSE_HOST", "192.168.1.1"),
+        "host": os.getenv("PFSENSE_HOST", "192.168.1.1"),  # Change this to your pfSense IP
         "port": os.getenv("PFSENSE_PORT", "443"),
         "protocol": os.getenv("PFSENSE_PROTOCOL", "https"),
         "api_key": os.getenv("PFSENSE_API_KEY"),
@@ -68,7 +68,7 @@ async def demonstrate_firewall_management():
     print("\n🔥 Demonstrating firewall management...")
     
     config = {
-        "host": os.getenv("PFSENSE_HOST", "192.168.1.1"),
+        "host": os.getenv("PFSENSE_HOST", "192.168.1.1"),  # Change this to your pfSense IP
         "port": os.getenv("PFSENSE_PORT", "443"),
         "protocol": os.getenv("PFSENSE_PROTOCOL", "https"),
         "api_key": os.getenv("PFSENSE_API_KEY"),
@@ -106,7 +106,7 @@ async def demonstrate_system_management():
     print("\n⚙️ Demonstrating system management...")
     
     config = {
-        "host": os.getenv("PFSENSE_HOST", "192.168.1.1"),
+        "host": os.getenv("PFSENSE_HOST", "192.168.1.1"),  # Change this to your pfSense IP
         "port": os.getenv("PFSENSE_PORT", "443"),
         "protocol": os.getenv("PFSENSE_PROTOCOL", "https"),
         "api_key": os.getenv("PFSENSE_API_KEY"),

@@ -15,7 +15,7 @@ class TestIDracClient:
     def test_client_initialization(self):
         """Test client initialization with valid config."""
         config = {
-            "host": "192.168.1.100",
+            "host": "192.168.1.100",  # Test IP - change in production
             "port": 443,
             "protocol": "https",
             "username": "root",
@@ -90,7 +90,7 @@ class TestValidation:
     def test_validate_idrac_config(self):
         """Test iDRAC configuration validation."""
         valid_config = {
-            "host": "192.168.1.100",
+            "host": "192.168.1.100",  # Test IP - change in production
             "port": 443,
             "protocol": "https",
             "username": "root",
