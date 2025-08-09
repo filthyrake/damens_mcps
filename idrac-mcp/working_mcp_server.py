@@ -30,6 +30,23 @@ logging.getLogger().handlers.clear()
 logging.getLogger().addHandler(logging.NullHandler())
 logging.getLogger().setLevel(logging.CRITICAL)
 
+# Create a filtered stdout that only allows JSON-RPC messages
+class FilteredStdout:
+    def __init__(self):
+        self.original_stdout = sys.__stdout__
+    
+    def write(self, text):
+        # Only allow JSON-RPC messages to pass through
+        if text.strip().startswith('{"jsonrpc":'):
+            self.original_stdout.write(text)
+            self.original_stdout.flush()
+    
+    def flush(self):
+        self.original_stdout.flush()
+
+# Replace stdout with filtered version
+sys.stdout = FilteredStdout()
+
 
 class WorkingIDracMCPServer:
     """Working MCP server for iDRAC integration."""
