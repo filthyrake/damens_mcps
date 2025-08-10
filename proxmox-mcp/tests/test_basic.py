@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch
 # Add the parent directory to the path so we can import our modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from working_proxmox_server import ProxmoxMCPServer
+from working_proxmox_server import WorkingProxmoxMCPServer
 from src.proxmox_client import ProxmoxClient
 from src.utils.validation import validate_vm_config, validate_container_config
 
@@ -57,11 +57,11 @@ class TestProxmoxClient(unittest.TestCase):
         self.assertIn('data', result)
 
 class TestProxmoxMCPServer(unittest.TestCase):
-    """Test cases for the ProxmoxMCPServer class."""
+    """Test cases for the WorkingProxmoxMCPServer class."""
     
     def setUp(self):
         """Set up test fixtures."""
-        self.server = ProxmoxMCPServer()
+        self.server = WorkingProxmoxMCPServer()
     
     def test_server_initialization(self):
         """Test that the server can be initialized."""
