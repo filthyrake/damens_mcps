@@ -306,12 +306,341 @@ class ProxmoxClient:
     def get_version(self) -> Dict[str, Any]:
         """Get Proxmox version information."""
         try:
-            response = self._make_request('GET', '/version')
-            version_data = response.json()
-            return version_data.get('data', {})
+            response = self._make_request("GET", "/version")
+            if response.status_code == 200:
+                version_data = response.json()
+                return {
+                    "status": "success",
+                    "version": version_data.get("data", {}),
+                    "message": "Version information retrieved successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to get version: {response.status_code}"
+                }
         except Exception as e:
-            debug_print(f"Failed to get version: {e}")
-            return {}
+            return {
+                "status": "error",
+                "message": f"Exception getting version: {str(e)}"
+            }
+
+    def get_node_status(self, node: str) -> Dict[str, Any]:
+        """Get detailed status and resource usage for a specific node."""
+        try:
+            response = self._make_request("GET", f"/nodes/{node}/status")
+            if response.status_code == 200:
+                status_data = response.json()
+                return {
+                    "status": "success",
+                    "node_status": status_data.get("data", {}),
+                    "message": f"Node status retrieved for {node}"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to get node status: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception getting node status: {str(e)}"
+            }
+
+    def get_vm_status(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Get current status and resource usage of a VM."""
+        try:
+            response = self._make_request("GET", f"/nodes/{node}/qemu/{vmid}/status/current")
+            if response.status_code == 200:
+                status_data = response.json()
+                return {
+                    "status": "success",
+                    "vm_status": status_data.get("data", {}),
+                    "message": f"VM status retrieved for {vmid} on {node}"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to get VM status: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception getting VM status: {str(e)}"
+            }
+
+    def create_vm(self, node: str, name: str, vmid: str = None, cores: str = "1", memory: str = "512") -> Dict[str, Any]:
+        """Create a new virtual machine."""
+        try:
+            # Get next available VMID if not specified
+            if not vmid:
+                vmid = self._get_next_vmid(node)
+            
+            # Basic VM configuration
+            config = {
+                "name": name,
+                "cores": cores,
+                "memory": memory,
+                "sockets": "1"
+            }
+            
+            response = self._make_request("POST", f"/nodes/{node}/qemu", data=config)
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "vmid": vmid,
+                    "message": f"VM {name} created successfully with ID {vmid}"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to create VM: {response.status_code} - {response.text}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception creating VM: {str(e)}"
+            }
+
+    def _get_next_vmid(self, node: str) -> str:
+        """Get the next available VMID."""
+        try:
+            response = self._make_request("GET", f"/nodes/{node}/qemu")
+            if response.status_code == 200:
+                vms = response.json().get("data", [])
+                if vms:
+                    # Find the highest VMID and add 1
+                    max_vmid = max(int(vm.get("vmid", 0)) for vm in vms)
+                    return str(max_vmid + 1)
+                else:
+                    return "100"  # Default starting VMID
+            else:
+                return "100"  # Fallback
+        except:
+            return "100"  # Fallback
+
+    def suspend_vm(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Suspend a running virtual machine."""
+        try:
+            response = self._make_request("POST", f"/nodes/{node}/qemu/{vmid}/status/suspend")
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"VM {vmid} suspended successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to suspend VM: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception suspending VM: {str(e)}"
+            }
+
+    def resume_vm(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Resume a suspended virtual machine."""
+        try:
+            response = self._make_request("POST", f"/nodes/{node}/qemu/{vmid}/status/resume")
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"VM {vmid} resumed successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to resume VM: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception resuming VM: {str(e)}"
+            }
+
+    def delete_vm(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Delete a virtual machine."""
+        try:
+            response = self._make_request("DELETE", f"/nodes/{node}/qemu/{vmid}")
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"VM {vmid} deleted successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to delete VM: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception deleting VM: {str(e)}"
+            }
+
+    def start_container(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Start a container."""
+        try:
+            response = self._make_request("POST", f"/nodes/{node}/lxc/{vmid}/status/start")
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Container {vmid} started successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to start container: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception starting container: {str(e)}"
+            }
+
+    def stop_container(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Stop a container."""
+        try:
+            response = self._make_request("POST", f"/nodes/{node}/lxc/{vmid}/status/stop")
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Container {vmid} stopped successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to stop container: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception stopping container: {str(e)}"
+            }
+
+    def get_storage_usage(self, node: str = None) -> Dict[str, Any]:
+        """Get storage usage and capacity information."""
+        try:
+            if node:
+                response = self._make_request("GET", f"/nodes/{node}/storage")
+            else:
+                # Get storage from all nodes
+                nodes = self.list_nodes()
+                all_storage = []
+                for node_info in nodes:
+                    node_name = node_info.get("node")
+                    if node_name:
+                        node_response = self._make_request("GET", f"/nodes/{node_name}/storage")
+                        if node_response.status_code == 200:
+                            node_storage = node_response.json().get("data", [])
+                            for storage in node_storage:
+                                storage["node"] = node_name
+                            all_storage.extend(node_storage)
+                
+                return {
+                    "status": "success",
+                    "storage": all_storage,
+                    "count": len(all_storage),
+                    "message": "Storage usage retrieved from all nodes"
+                }
+            
+            if response.status_code == 200:
+                storage_data = response.json()
+                return {
+                    "status": "success",
+                    "storage": storage_data.get("data", []),
+                    "count": len(storage_data.get("data", [])),
+                    "message": f"Storage usage retrieved for node {node}"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to get storage usage: {response.status_code}"
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception getting storage usage: {str(e)}"
+            }
+
+    def create_snapshot(self, node: str, vmid: int, snapname: str, description: str = "") -> Dict[str, Any]:
+        """Create a snapshot of a VM or container."""
+        try:
+            # Try VM first, then container
+            try:
+                response = self._make_request("POST", f"/nodes/{node}/qemu/{vmid}/snapshot", 
+                                           data={"snapname": snapname, "description": description})
+                if response.status_code == 200:
+                    return {
+                        "status": "success",
+                        "message": f"VM snapshot {snapname} created successfully for VM {vmid}"
+                    }
+            except:
+                pass
+            
+            # Try container if VM failed
+            try:
+                response = self._make_request("POST", f"/nodes/{node}/lxc/{vmid}/snapshot", 
+                                           data={"snapname": snapname, "description": description})
+                if response.status_code == 200:
+                    return {
+                        "status": "success",
+                        "message": f"Container snapshot {snapname} created successfully for container {vmid}"
+                    }
+            except:
+                pass
+            
+            return {
+                "status": "error",
+                "message": f"Failed to create snapshot for {vmid} on {node}"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception creating snapshot: {str(e)}"
+            }
+
+    def list_snapshots(self, node: str, vmid: int) -> Dict[str, Any]:
+        """List snapshots for a VM or container."""
+        try:
+            # Try VM first, then container
+            try:
+                response = self._make_request("GET", f"/nodes/{node}/qemu/{vmid}/snapshot")
+                if response.status_code == 200:
+                    snapshot_data = response.json()
+                    return {
+                        "status": "success",
+                        "snapshots": snapshot_data.get("data", []),
+                        "count": len(snapshot_data.get("data", [])),
+                        "message": f"VM snapshots retrieved for VM {vmid}"
+                    }
+            except:
+                pass
+            
+            # Try container if VM failed
+            try:
+                response = self._make_request("GET", f"/nodes/{node}/lxc/{vmid}/snapshot")
+                if response.status_code == 200:
+                    snapshot_data = response.json()
+                    return {
+                        "status": "success",
+                        "snapshots": snapshot_data.get("data", []),
+                        "count": len(snapshot_data.get("data", [])),
+                        "message": f"Container snapshots retrieved for container {vmid}"
+                    }
+            except:
+                pass
+            
+            return {
+                "status": "error",
+                "message": f"Failed to list snapshots for {vmid} on {node}"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Exception listing snapshots: {str(e)}"
+            }
 
 
 class WorkingProxmoxMCPServer:
@@ -376,6 +705,20 @@ class WorkingProxmoxMCPServer:
                     }
                 },
                 {
+                    "name": "proxmox_get_node_status", 
+                    "description": "Get detailed status and resource usage for a specific node",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            }
+                        },
+                        "required": ["node"]
+                    }
+                },
+                {
                     "name": "proxmox_list_vms", 
                     "description": "List all virtual machines",
                     "inputSchema": {
@@ -405,6 +748,54 @@ class WorkingProxmoxMCPServer:
                             }
                         },
                         "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_get_vm_status", 
+                    "description": "Get current status and resource usage of a VM",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_create_vm", 
+                    "description": "Create a new virtual machine",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID (optional, auto-assigned if not specified)"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "VM name"
+                            },
+                            "cores": {
+                                "type": "string",
+                                "description": "Number of CPU cores (default: 1)"
+                            },
+                            "memory": {
+                                "type": "string",
+                                "description": "Memory in MB (default: 512)"
+                            }
+                        },
+                        "required": ["node", "name"]
                     }
                 },
                 {
@@ -444,6 +835,60 @@ class WorkingProxmoxMCPServer:
                     }
                 },
                 {
+                    "name": "proxmox_suspend_vm", 
+                    "description": "Suspend a running virtual machine",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_resume_vm", 
+                    "description": "Resume a suspended virtual machine",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_delete_vm", 
+                    "description": "Delete a virtual machine",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
                     "name": "proxmox_list_containers", 
                     "description": "List all containers",
                     "inputSchema": {
@@ -455,6 +900,42 @@ class WorkingProxmoxMCPServer:
                             }
                         },
                         "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_start_container", 
+                    "description": "Start a container",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "Container ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_stop_container", 
+                    "description": "Stop a container",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "Container ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
                     }
                 },
                 {
@@ -472,6 +953,64 @@ class WorkingProxmoxMCPServer:
                     }
                 },
                 {
+                    "name": "proxmox_get_storage_usage", 
+                    "description": "Get storage usage and capacity information",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name (optional)"
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_create_snapshot", 
+                    "description": "Create a snapshot of a VM or container",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM/Container ID"
+                            },
+                            "snapname": {
+                                "type": "string",
+                                "description": "Snapshot name"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Snapshot description (optional)"
+                            }
+                        },
+                        "required": ["node", "vmid", "snapname"]
+                    }
+                },
+                {
+                    "name": "proxmox_list_snapshots", 
+                    "description": "List snapshots for a VM or container",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM/Container ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
                     "name": "proxmox_get_version", 
                     "description": "Get Proxmox version information",
                     "inputSchema": {
@@ -484,7 +1023,9 @@ class WorkingProxmoxMCPServer:
         }
 
     def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Call a specific tool with arguments."""
+        """Call a tool by name."""
+        debug_print(f"Calling tool: {name} with arguments: {arguments}")
+        
         # Check if Proxmox client is available
         if self.proxmox_client is None:
             return {
@@ -503,6 +1044,19 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_list_nodes":
                 nodes = self.proxmox_client.list_nodes()
                 result = {"nodes": nodes, "count": len(nodes)}
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_get_node_status":
+                node = arguments.get('node')
+                if not node:
+                    return {
+                        "content": [{"type": "text", "text": "Error: 'node' parameter is required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.get_node_status(node)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -527,6 +1081,37 @@ class WorkingProxmoxMCPServer:
                     }
                 vm_info = self.proxmox_client.get_vm_info(node, int(vmid))
                 result_text = json.dumps(vm_info, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_get_vm_status":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.get_vm_status(node, int(vmid))
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_create_vm":
+                node = arguments.get('node')
+                name = arguments.get('name')
+                if not node or not name:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'name' are required"}],
+                        "isError": True
+                    }
+                vmid = arguments.get('vmid')
+                cores = arguments.get('cores', '1')
+                memory = arguments.get('memory', '512')
+                result = self.proxmox_client.create_vm(node, name, vmid, cores, memory)
+                result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
                     "isError": False
@@ -559,6 +1144,48 @@ class WorkingProxmoxMCPServer:
                     "content": [{"type": "text", "text": result_text}],
                     "isError": False
                 }
+            elif name == "proxmox_suspend_vm":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.suspend_vm(node, int(vmid))
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_resume_vm":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.resume_vm(node, int(vmid))
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_delete_vm":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.delete_vm(node, int(vmid))
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_list_containers":
                 node = arguments.get('node')
                 containers = self.proxmox_client.list_containers(node)
@@ -568,10 +1195,76 @@ class WorkingProxmoxMCPServer:
                     "content": [{"type": "text", "text": result_text}],
                     "isError": False
                 }
+            elif name == "proxmox_start_container":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.start_container(node, int(vmid))
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_stop_container":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.stop_container(node, int(vmid))
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_list_storage":
                 node = arguments.get('node')
                 storage = self.proxmox_client.list_storage(node)
                 result = {"storage": storage, "count": len(storage)}
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_get_storage_usage":
+                node = arguments.get('node')
+                result = self.proxmox_client.get_storage_usage(node)
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_create_snapshot":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                snapname = arguments.get('snapname')
+                if not node or not vmid or not snapname:
+                    return {
+                        "content": [{"type": "text", "text": "Error: 'node', 'vmid', and 'snapname' are required"}],
+                        "isError": True
+                    }
+                description = arguments.get('description', '')
+                result = self.proxmox_client.create_snapshot(node, int(vmid), snapname, description)
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
+            elif name == "proxmox_list_snapshots":
+                node = arguments.get('node')
+                vmid = arguments.get('vmid')
+                if not node or not vmid:
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.list_snapshots(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
