@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warewulf-mcp-server
+  labels:
+    app: warewulf-mcp-server
+    version: v0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: warewulf-mcp-server
+  template:
+    metadata:
+      labels:
+        app: warewulf-mcp-server
+        version: v0.1.0
+    spec:
+      containers:
+      - name: warewulf-mcp
+        image: warewulf-mcp:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        # Warewulf Connection Settings
+        - name: WAREWULF_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: warewulf.host
+        - name: WAREWULF_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: warewulf.port
+        - name: WAREWULF_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: warewulf.protocol
+        - name: WAREWULF_SSL_VERIFY
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: warewulf.ssl_verify
+        - name: WAREWULF_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: warewulf.timeout
+        
+        # Authentication
+        - name: WAREWULF_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: warewulf-mcp-secrets
+              key: username
+        - name: WAREWULF_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: warewulf-mcp-secrets
+              key: password
+        
+        # Server Settings
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8000"
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: server.log_level
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              name: warewulf-mcp-config
+              key: server.log_format
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      
+      volumes:
+      - name: logs
+        emptyDir: {}
+      
+      restartPolicy: Always
