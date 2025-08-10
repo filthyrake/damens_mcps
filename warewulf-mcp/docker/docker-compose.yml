@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  warewulf-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: warewulf-mcp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Warewulf Connection Settings
+      - WAREWULF_HOST=${WAREWULF_HOST:-localhost}
+      - WAREWULF_PORT=${WAREWULF_PORT:-9873}
+      - WAREWULF_PROTOCOL=${WAREWULF_PROTOCOL:-http}
+      
+      # Authentication (choose one method)
+      - WAREWULF_USERNAME=${WAREWULF_USERNAME}
+      - WAREWULF_PASSWORD=${WAREWULF_PASSWORD}
+      # - WAREWULF_API_TOKEN=${WAREWULF_API_TOKEN}
+      
+      # SSL Settings
+      - WAREWULF_SSL_VERIFY=${WAREWULF_SSL_VERIFY:-false}
+      - WAREWULF_TIMEOUT=${WAREWULF_TIMEOUT:-30}
+      
+      # Server Settings
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      # Mount config file if you prefer file-based configuration
+      - ../config.json:/app/config.json:ro
+      # Mount logs directory for persistence
+      - ../logs:/app/logs
+    networks:
+      - warewulf-mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  warewulf-mcp-network:
+    driver: bridge

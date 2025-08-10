@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: warewulf-mcp-config
+  labels:
+    app: warewulf-mcp-server
+data:
+  # Warewulf Connection Settings
+  warewulf.host: "localhost"
+  warewulf.port: "9873"
+  warewulf.protocol: "http"
+  warewulf.ssl_verify: "false"
+  warewulf.timeout: "30"
+  
+  # Server Settings
+  server.log_level: "INFO"
+  server.log_format: "json"
+  
+  # Note: Authentication credentials are stored in secrets, not configmaps
+  # for security reasons
