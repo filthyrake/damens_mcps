@@ -98,11 +98,24 @@ class ProxmoxClient:
     def _authenticate(self):
         """Authenticate with Proxmox and get ticket."""
         try:
+            # If no realm is specified, just use the username
+            if self.realm:
+                username = f"{self.username}@{self.realm}"
+            else:
+                username = self.username
+                
             auth_data = {
-                'username': f"{self.username}@{self.realm}",
+                'username': username,
                 'password': self.password
             }
-            response = self.session.post(self.auth_url, data=auth_data)
+            
+            # For authentication, we need to send form data, not JSON
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            }
+            
+            response = self.session.post(self.auth_url, data=auth_data, headers=headers)
             response.raise_for_status()
             auth_result = response.json()
             if auth_result['data']:
