@@ -306,20 +306,26 @@ class WorkingProxmoxMCPServer:
 
     def __init__(self):
         """Initialize the server."""
-        self.proxmox_client = ProxmoxClient(
-            host=config['host'],
-            port=config['port'],
-            protocol=config['protocol'],
-            username=config['username'],
-            password=config['password'],
-            realm=config.get('realm', 'pve'),
-            ssl_verify=config.get('ssl_verify', False)
-        )
-        connection_result = self.proxmox_client.test_connection()
-        if connection_result['status'] == 'success':
-            debug_print("Proxmox connection successful")
-        else:
-            debug_print(f"Proxmox connection failed: {connection_result['error']}")
+        try:
+            self.proxmox_client = ProxmoxClient(
+                host=config['host'],
+                port=config['port'],
+                protocol=config['protocol'],
+                username=config['username'],
+                password=config['password'],
+                realm=config.get('realm', 'pve'),
+                ssl_verify=config.get('ssl_verify', False)
+            )
+            connection_result = self.proxmox_client.test_connection()
+            if connection_result['status'] == 'success':
+                debug_print("Proxmox connection successful")
+            else:
+                debug_print(f"Proxmox connection failed: {connection_result['error']}")
+                debug_print("Server will continue but Proxmox operations may fail")
+        except Exception as e:
+            debug_print(f"Failed to initialize Proxmox client: {e}")
+            debug_print("Server will continue but Proxmox operations will fail")
+            self.proxmox_client = None
 
     def _list_tools(self) -> Dict[str, Any]:
         """List all available tools."""
@@ -339,6 +345,12 @@ class WorkingProxmoxMCPServer:
 
     def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a specific tool with arguments."""
+        # Check if Proxmox client is available
+        if self.proxmox_client is None:
+            return {
+                "error": "Proxmox client not available. Please check your configuration and ensure the Proxmox server is reachable."
+            }
+
         try:
             if name == "proxmox_test_connection":
                 return self.proxmox_client.test_connection()
