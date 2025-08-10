@@ -357,15 +357,129 @@ class WorkingProxmoxMCPServer:
         """List all available tools."""
         return {
             "tools": [
-                {"name": "proxmox_test_connection", "description": "Test connection to Proxmox server"},
-                {"name": "proxmox_list_nodes", "description": "List all nodes in the cluster"},
-                {"name": "proxmox_list_vms", "description": "List all virtual machines"},
-                {"name": "proxmox_get_vm_info", "description": "Get detailed information about a specific VM"},
-                {"name": "proxmox_start_vm", "description": "Start a virtual machine"},
-                {"name": "proxmox_stop_vm", "description": "Stop a virtual machine"},
-                {"name": "proxmox_list_containers", "description": "List all containers"},
-                {"name": "proxmox_list_storage", "description": "List all storage pools"},
-                {"name": "proxmox_get_version", "description": "Get Proxmox version information"}
+                {
+                    "name": "proxmox_test_connection", 
+                    "description": "Test connection to Proxmox server",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_list_nodes", 
+                    "description": "List all nodes in the cluster",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_list_vms", 
+                    "description": "List all virtual machines",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name (optional)"
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_get_vm_info", 
+                    "description": "Get detailed information about a specific VM",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_start_vm", 
+                    "description": "Start a virtual machine",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_stop_vm", 
+                    "description": "Stop a virtual machine",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name"
+                            },
+                            "vmid": {
+                                "type": "string",
+                                "description": "VM ID"
+                            }
+                        },
+                        "required": ["node", "vmid"]
+                    }
+                },
+                {
+                    "name": "proxmox_list_containers", 
+                    "description": "List all containers",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name (optional)"
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_list_storage", 
+                    "description": "List all storage pools",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node": {
+                                "type": "string",
+                                "description": "Node name (optional)"
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
+                    "name": "proxmox_get_version", 
+                    "description": "Get Proxmox version information",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
             ]
         }
 
@@ -374,56 +488,113 @@ class WorkingProxmoxMCPServer:
         # Check if Proxmox client is available
         if self.proxmox_client is None:
             return {
-                "error": "Proxmox client not available. Please check your configuration and ensure the Proxmox server is reachable."
+                "content": [{"type": "text", "text": "Proxmox client not available. Please check your configuration and ensure the Proxmox server is reachable."}],
+                "isError": True
             }
 
         try:
             if name == "proxmox_test_connection":
-                return self.proxmox_client.test_connection()
+                result = self.proxmox_client.test_connection()
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_list_nodes":
                 nodes = self.proxmox_client.list_nodes()
-                return {"nodes": nodes, "count": len(nodes)}
+                result = {"nodes": nodes, "count": len(nodes)}
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_list_vms":
                 node = arguments.get('node')
                 vms = self.proxmox_client.list_vms(node)
-                return {"vms": vms, "count": len(vms)}
+                result = {"vms": vms, "count": len(vms)}
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_get_vm_info":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
                 if not node or not vmid:
-                    return {"error": "Both 'node' and 'vmid' are required"}
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
                 vm_info = self.proxmox_client.get_vm_info(node, int(vmid))
-                return {"vm_info": vm_info}
+                result_text = json.dumps(vm_info, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_start_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
                 if not node or not vmid:
-                    return {"error": "Both 'node' and 'vmid' are required"}
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.start_vm(node, int(vmid))
-                return result
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_stop_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
                 if not node or not vmid:
-                    return {"error": "Both 'node' and 'vmid' are required"}
+                    return {
+                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.stop_vm(node, int(vmid))
-                return result
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_list_containers":
                 node = arguments.get('node')
                 containers = self.proxmox_client.list_containers(node)
-                return {"containers": containers, "count": len(containers)}
+                result = {"containers": containers, "count": len(containers)}
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_list_storage":
                 node = arguments.get('node')
                 storage = self.proxmox_client.list_storage(node)
-                return {"storage": storage, "count": len(storage)}
+                result = {"storage": storage, "count": len(storage)}
+                result_text = json.dumps(result, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             elif name == "proxmox_get_version":
                 version = self.proxmox_client.get_version()
-                return {"version": version}
+                result_text = json.dumps(version, indent=2, default=str)
+                return {
+                    "content": [{"type": "text", "text": result_text}],
+                    "isError": False
+                }
             else:
-                return {"error": f"Unknown tool: {name}"}
+                return {
+                    "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
+                    "isError": True
+                }
         except Exception as e:
             debug_print(f"Tool execution failed: {e}")
-            return {"error": str(e)}
+            return {
+                "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                "isError": True
+            }
 
     def _send_response(self, request_id: int, result: Dict[str, Any]):
         """Send a response to the client."""
