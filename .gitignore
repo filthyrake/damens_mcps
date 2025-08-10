@@ -25,7 +25,6 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -191,3 +190,11 @@ yarn-error.log*
 
 # Project specific
 # Add any project-specific files that should be ignored
+
+# Configuration files with credentials
+config.json
+.env
+fleet_servers.json
+
+# Example configs are fine to commit
+!config.example.json

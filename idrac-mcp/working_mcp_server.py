@@ -1,26 +1,56 @@
 #!/usr/bin/env python3
 """
-Working iDRAC MCP Server - Manual JSON-RPC handling to bypass MCP framework validation
+Working iDRAC MCP Server - Pure JSON-RPC implementation with real iDRAC functionality
 """
 
 import json
 import os
 import sys
+import requests
 from typing import Any, Dict
+from urllib3.exceptions import InsecureRequestWarning
+from requests.auth import HTTPBasicAuth
 
-import anyio
-from mcp.server.stdio import stdio_server
-from mcp.types import (
-    CallToolRequest,
-    ListToolsRequest,
-    InitializeRequest,
-    Tool,
-)
-from mcp.shared.message import SessionMessage
+def debug_print(message: str):
+    """Print debug messages to stderr to avoid interfering with MCP protocol."""
+    print(f"DEBUG: {message}", file=sys.stderr)
 
-# Enable debug output to stderr
-def debug_print(msg):
-    print(f"DEBUG: {msg}", file=sys.stderr)
+def load_config() -> Dict[str, Any]:
+    """Load configuration from JSON file."""
+    # Try multiple possible config file locations
+    possible_paths = [
+        'config.json',  # Current directory
+        os.path.join(os.path.dirname(__file__), 'config.json'),  # Same directory as script
+        os.path.expanduser('~/.idrac-mcp/config.json'),  # User home directory
+        '/etc/idrac-mcp/config.json'  # System-wide config
+    ]
+    
+    config_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            config_path = path
+            break
+    
+    if not config_path:
+        raise FileNotFoundError(f"Configuration file not found. Tried: {', '.join(possible_paths)}")
+    
+    debug_print(f"Using config file: {config_path}")
+    
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        debug_print(f"Configuration loaded successfully from: {config_path}")
+        return config
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in config file {config_path}: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load config file {config_path}: {e}")
+
+# Load configuration
+config = load_config()
+
+# Suppress SSL warnings for self-signed certificates
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 debug_print("Server starting...")
 
@@ -30,22 +60,320 @@ logging.getLogger().handlers.clear()
 logging.getLogger().addHandler(logging.NullHandler())
 logging.getLogger().setLevel(logging.CRITICAL)
 
-# Create a filtered stdout that only allows JSON-RPC messages
-class FilteredStdout:
-    def __init__(self):
-        self.original_stdout = sys.__stdout__
-    
-    def write(self, text):
-        # Only allow JSON-RPC messages to pass through
-        if text.strip().startswith('{"jsonrpc":'):
-            self.original_stdout.write(text)
-            self.original_stdout.flush()
-    
-    def flush(self):
-        self.original_stdout.flush()
 
-# Replace stdout with filtered version
-sys.stdout = FilteredStdout()
+class IDracClient:
+    """Client for interacting with iDRAC server."""
+    
+    def __init__(self, host: str, port: int, protocol: str, username: str, password: str, ssl_verify: bool = False):
+        self.host = host
+        self.port = port
+        self.protocol = protocol
+        self.username = username
+        self.password = password
+        self.ssl_verify = ssl_verify
+        self.base_url = f"{protocol}://{host}:{port}"
+        self.session = requests.Session()
+        
+        # Use explicit HTTPBasicAuth for better compatibility
+        self.auth = HTTPBasicAuth(username, password)
+        self.session.auth = self.auth
+        self.session.verify = ssl_verify
+        
+        # Set headers for iDRAC API
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'iDRAC-MCP-Server/1.0'
+        })
+        
+        # Debug: Print session info
+        debug_print(f"Created iDRAC client for {self.base_url}")
+        debug_print(f"Username: {username}")
+        debug_print(f"SSL Verify: {ssl_verify}")
+        debug_print(f"Session headers: {dict(self.session.headers)}")
+        debug_print(f"Auth type: {type(self.auth)}")
+    
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """Make a request with proper error handling and debugging."""
+        url = f"{self.base_url}{endpoint}"
+        debug_print(f"Making {method} request to: {url}")
+        debug_print(f"Session auth: {self.session.auth}")
+        debug_print(f"Session cookies: {dict(self.session.cookies)}")
+        debug_print(f"Session headers: {dict(self.session.headers)}")
+        
+        try:
+            if method.upper() == 'GET':
+                response = self.session.get(url, timeout=10, **kwargs)
+            elif method.upper() == 'POST':
+                response = self.session.post(url, timeout=10, **kwargs)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+            
+            debug_print(f"Response status: {response.status_code}")
+            debug_print(f"Response headers: {dict(response.headers)}")
+            debug_print(f"Response cookies: {dict(response.cookies)}")
+            
+            if response.status_code == 401:
+                debug_print("401 Unauthorized - attempting to re-authenticate")
+                # Clear any existing cookies and re-authenticate
+                self.session.cookies.clear()
+                self.session.auth = self.auth
+                debug_print(f"Re-authenticated with: {self.session.auth}")
+                debug_print(f"Cleared cookies, new cookies: {dict(self.session.cookies)}")
+                
+                # Retry the request
+                if method.upper() == 'GET':
+                    response = self.session.get(url, timeout=10, **kwargs)
+                elif method.upper() == 'POST':
+                    response = self.session.post(url, timeout=10, **kwargs)
+                
+                debug_print(f"Retry response status: {response.status_code}")
+                debug_print(f"Retry response cookies: {dict(response.cookies)}")
+            
+            return response
+            
+        except Exception as e:
+            debug_print(f"Request error: {e}")
+            raise
+    
+    def test_connection(self) -> Dict[str, Any]:
+        """Test connection to iDRAC server."""
+        try:
+            # Try to access the iDRAC login page or API endpoint
+            response = self._make_request('GET', '/redfish/v1/')
+            if response.status_code == 200:
+                return {
+                    "status": "connected",
+                    "host": self.host,
+                    "port": self.port,
+                    "message": f"Successfully connected to iDRAC at {self.host}:{self.port}",
+                    "response_code": response.status_code
+                }
+            else:
+                return {
+                    "status": "error",
+                    "host": self.host,
+                    "port": self.port,
+                    "message": f"Connection failed with status code: {response.status_code}",
+                    "response_code": response.status_code
+                }
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "error",
+                "host": self.host,
+                "port": self.port,
+                "message": "Connection refused - server may be unreachable or port blocked",
+                "response_code": None
+            }
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "host": self.host,
+                "port": self.port,
+                "message": "Connection timeout - server took too long to respond",
+                "response_code": None
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "host": self.host,
+                "port": self.port,
+                "message": f"Connection error: {str(e)}",
+                "response_code": None
+            }
+    
+    def get_system_info(self) -> Dict[str, Any]:
+        """Get system information from iDRAC."""
+        try:
+            # Get system information from Redfish API
+            response = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "host": self.host,
+                    "protocol": self.protocol,
+                    "ssl_verify": self.ssl_verify,
+                    "system_info": {
+                        "manufacturer": data.get('Manufacturer', 'Unknown'),
+                        "model": data.get('Model', 'Unknown'),
+                        "serial_number": data.get('SerialNumber', 'Unknown'),
+                        "power_state": data.get('PowerState', 'Unknown'),
+                        "health": data.get('Status', {}).get('Health', 'Unknown')
+                    },
+                    "message": "System information retrieved successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "protocol": self.protocol,
+                    "ssl_verify": self.ssl_verify,
+                    "error": f"Failed to get system info: HTTP {response.status_code}",
+                    "message": "Failed to retrieve system information"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "protocol": self.protocol,
+                "ssl_verify": self.ssl_verify,
+                "error": str(e),
+                "message": f"Error retrieving system information: {str(e)}"
+            }
+    
+    def get_power_status(self) -> Dict[str, Any]:
+        """Get current power status of the server."""
+        try:
+            # Get power status from Redfish API
+            response = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
+            if response.status_code == 200:
+                data = response.json()
+                power_state = data.get('PowerState', 'Unknown')
+                
+                # Get additional power information if available
+                power_response = self._make_request('GET', '/redfish/v1/Chassis/System.Embedded.1/Power')
+                power_info = {}
+                if power_response.status_code == 200:
+                    power_data = power_response.json()
+                    power_info = {
+                        "total_consumption": power_data.get('PowerControl', [{}])[0].get('PowerConsumedWatts', 'Unknown'),
+                        "power_supplies": len(power_data.get('PowerSupplies', []))
+                    }
+                
+                return {
+                    "host": self.host,
+                    "power_status": power_state,
+                    "power_info": power_info,
+                    "message": f"Power status: {power_state}"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "power_status": "unknown",
+                    "error": f"Failed to get power status: HTTP {response.status_code}",
+                    "message": "Failed to retrieve power status"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "power_status": "unknown",
+                "error": str(e),
+                "message": f"Error retrieving power status: {str(e)}"
+            }
+    
+    def power_on(self) -> Dict[str, Any]:
+        """Power on the server."""
+        try:
+            payload = {"ResetType": "On"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "power_on",
+                    "status": "success",
+                    "message": "Power on command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "power_on",
+                    "status": "error",
+                    "error": f"Failed to power on: HTTP {response.status_code}",
+                    "message": "Failed to send power on command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "power_on",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending power on command: {str(e)}"
+            }
+    
+    def power_off(self) -> Dict[str, Any]:
+        """Power off the server gracefully."""
+        try:
+            payload = {"ResetType": "GracefulShutdown"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "power_off",
+                    "status": "success",
+                    "message": "Power off command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "power_off",
+                    "status": "error",
+                    "error": f"Failed to power off: HTTP {response.status_code}",
+                    "message": "Failed to send power off command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "power_off",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending power off command: {str(e)}"
+            }
+    
+    def force_power_off(self) -> Dict[str, Any]:
+        """Force power off the server."""
+        try:
+            payload = {"ResetType": "ForceOff"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "force_power_off",
+                    "status": "success",
+                    "message": "Force power off command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "force_power_off",
+                    "status": "error",
+                    "error": f"Failed to force power off: HTTP {response.status_code}",
+                    "message": "Failed to send force power off command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "force_power_off",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending force power off command: {str(e)}"
+            }
+    
+    def restart(self) -> Dict[str, Any]:
+        """Restart the server gracefully."""
+        try:
+            payload = {"ResetType": "GracefulRestart"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "restart",
+                    "status": "success",
+                    "message": "Restart command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "restart",
+                    "status": "error",
+                    "error": f"Failed to restart: HTTP {response.status_code}",
+                    "message": "Failed to send restart command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "restart",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending restart command: {str(e)}"
+            }
 
 
 class WorkingIDracMCPServer:
@@ -53,71 +381,206 @@ class WorkingIDracMCPServer:
     
     def __init__(self):
         debug_print("Initializing server...")
-        # Load iDRAC config from environment
-        self.config = {
-            "host": os.getenv("IDRAC_HOST", "192.168.1.100"),
-            "port": int(os.getenv("IDRAC_PORT", "443")),
-            "protocol": os.getenv("IDRAC_PROTOCOL", "https"),
-            "username": os.getenv("IDRAC_USERNAME", "root"),
-            "password": os.getenv("IDRAC_PASSWORD", ""),
-            "ssl_verify": os.getenv("IDRAC_SSL_VERIFY", "false").lower() == "true"
-        }
+        
+        # Load configuration from JSON file
+        config_data = config.get('idrac_servers', {})
+        default_server = config.get('default_server')
+        
+        if not config_data:
+            raise ValueError("No iDRAC servers configured in config.json")
+        
+        if default_server and default_server not in config_data:
+            raise ValueError(f"Default server '{default_server}' not found in configuration")
+        
+        # Store server configurations
+        self.servers = {}
+        for server_id, server_config in config_data.items():
+            # Validate required configuration
+            required_fields = ['host', 'port', 'username', 'password']
+            for field in required_fields:
+                if field not in server_config:
+                    raise ValueError(f"Missing required configuration field '{field}' for server '{server_id}'")
+            
+            self.servers[server_id] = {
+                "name": server_config.get("name", server_id),
+                "host": server_config["host"],
+                "port": int(server_config["port"]),
+                "protocol": server_config.get("protocol", "https"),
+                "username": server_config["username"],
+                "password": server_config["password"],
+                "ssl_verify": server_config.get("ssl_verify", False)
+            }
+            
+            debug_print(f"Configured server '{server_id}': {self.servers[server_id]['name']} at {self.servers[server_id]['protocol']}://{self.servers[server_id]['host']}:{self.servers[server_id]['port']}")
+        
+        # Set default server
+        self.default_server = default_server or list(self.servers.keys())[0]
+        debug_print(f"Default server: {self.default_server}")
+        
+        # Initialize iDRAC clients for all servers
+        self.idrac_clients = {}
+        for server_id, server_config in self.servers.items():
+            self.idrac_clients[server_id] = IDracClient(
+                host=server_config["host"],
+                port=server_config["port"],
+                protocol=server_config["protocol"],
+                username=server_config["username"],
+                password=server_config["password"],
+                ssl_verify=server_config["ssl_verify"]
+            )
         
         self.tools = [
-            Tool(
-                name="test_connection",
-                description="Test connection to iDRAC server",
-                inputSchema={
+            {
+                "name": "list_servers",
+                "description": "List all available iDRAC servers",
+                "inputSchema": {
                     "type": "object",
                     "properties": {},
                     "required": []
                 }
-            ),
-            Tool(
-                name="get_system_info",
-                description="Get iDRAC system information",
-                inputSchema={
+            },
+            {
+                "name": "test_connection",
+                "description": "Test connection to iDRAC server",
+                "inputSchema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to test (optional, uses default if not specified)"
+                        }
+                    },
                     "required": []
                 }
-            ),
-            Tool(
-                name="get_power_status",
-                description="Get server power status",
-                inputSchema={
+            },
+            {
+                "name": "get_system_info",
+                "description": "Get iDRAC system information",
+                "inputSchema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to query (optional, uses default if not specified)"
+                        }
+                    },
                     "required": []
                 }
-            ),
+            },
+            {
+                "name": "get_power_status",
+                "description": "Get server power status",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to query (optional, uses default if not specified)"
+                        }
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "power_on",
+                "description": "Power on the server",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to control (optional, uses default if not specified)"
+                        }
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "power_off",
+                "description": "Power off the server gracefully",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to control (optional, uses default if not specified)"
+                        }
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "force_power_off",
+                "description": "Force power off the server",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to control (optional, uses default if not specified)"
+                        }
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "restart",
+                "description": "Restart the server gracefully",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "ID of the server to control (optional, uses default if not specified)"
+                        }
+                    },
+                    "required": []
+                }
+            }
         ]
         debug_print(f"Created {len(self.tools)} tools")
     
-    async def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool by name."""
         debug_print(f"Calling tool: {name}")
         try:
-            if name == "test_connection":
-                result = {
-                    "status": "connected", 
-                    "host": self.config["host"],
-                    "port": self.config["port"],
-                    "message": f"iDRAC MCP server connected to {self.config['host']}:{self.config['port']}"
-                }
+            if name == "list_servers":
+                result = {"servers": list(self.servers.keys())}
+            elif name == "test_connection":
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].test_connection()
             elif name == "get_system_info":
-                result = {
-                    "host": self.config["host"],
-                    "protocol": self.config["protocol"],
-                    "ssl_verify": self.config["ssl_verify"],
-                    "message": "iDRAC system information retrieved"
-                }
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].get_system_info()
             elif name == "get_power_status":
-                result = {
-                    "host": self.config["host"],
-                    "power_status": "unknown",
-                    "message": "Power status check initiated"
-                }
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].get_power_status()
+            elif name == "power_on":
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].power_on()
+            elif name == "power_off":
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].power_off()
+            elif name == "force_power_off":
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].force_power_off()
+            elif name == "restart":
+                server_id = arguments.get("server_id", self.default_server)
+                if server_id not in self.idrac_clients:
+                    return {"error": f"Server with ID '{server_id}' not found."}
+                result = self.idrac_clients[server_id].restart()
             else:
                 result = {"error": f"Unknown tool: {name}"}
             
@@ -134,7 +597,7 @@ class WorkingIDracMCPServer:
                 "isError": True
             }
     
-    async def _send_response(self, write_stream, request_id: int, result: Dict[str, Any]):
+    def _send_response(self, request_id: int, result: Dict[str, Any]):
         """Manually send a JSON-RPC response."""
         response = {
             "jsonrpc": "2.0",
@@ -142,9 +605,9 @@ class WorkingIDracMCPServer:
             "result": result
         }
         debug_print(f"Sending response: {json.dumps(response)}")
-        await write_stream.send(json.dumps(response))
+        print(json.dumps(response), flush=True)
     
-    async def _send_error(self, write_stream, request_id: int, error_code: int, error_message: str):
+    def _send_error(self, request_id: int, error_code: int, error_message: str):
         """Manually send a JSON-RPC error response."""
         response = {
             "jsonrpc": "2.0",
@@ -155,77 +618,103 @@ class WorkingIDracMCPServer:
             }
         }
         debug_print(f"Sending error: {json.dumps(response)}")
-        await write_stream.send(json.dumps(response))
+        print(json.dumps(response), flush=True)
     
-    async def run(self, read_stream, write_stream, init_options):
-        """Run the server."""
-        debug_print("Server run method called")
+    def run(self):
+        """Run the server using pure JSON-RPC over stdin/stdout."""
+        debug_print("Server run method called - reading from stdin")
         
-        async for request in read_stream:
-            debug_print(f"Received request: {type(request).__name__}")
-            
-            try:
-                if isinstance(request, InitializeRequest):
-                    debug_print("Handling InitializeRequest")
-                    # Handle initialization request
-                    await self._send_response(write_stream, request.id, {
-                        "protocolVersion": "2025-06-18",
-                        "capabilities": {
-                            "experimental": {},
-                            "tools": {
-                                "listChanged": False
+        try:
+            for line in sys.stdin:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                debug_print(f"Received line: {line}")
+                
+                try:
+                    request = json.loads(line)
+                    debug_print(f"Parsed request: {request}")
+                    
+                    method = request.get("method")
+                    request_id = request.get("id")
+                    params = request.get("params", {})
+                    
+                    if method == "initialize":
+                        debug_print("Handling initialize")
+                        self._send_response(request_id, {
+                            "protocolVersion": "2025-06-18",
+                            "capabilities": {
+                                "experimental": {},
+                                "tools": {
+                                    "listChanged": False
+                                }
+                            },
+                            "serverInfo": {
+                                "name": "idrac-mcp",
+                                "version": "0.1.0"
                             }
-                        },
-                        "serverInfo": {
-                            "name": "idrac-mcp",
-                            "version": "0.1.0"
-                        }
-                    })
-                    debug_print("InitializeRequest handled")
+                        })
+                        
+                    elif method == "notifications/initialized":
+                        debug_print("Handling notifications/initialized")
+                        # This is a notification, no response needed
+                        pass
+                        
+                    elif method == "tools/list":
+                        debug_print("Handling tools/list")
+                        self._send_response(request_id, {"tools": self.tools})
+                        
+                    elif method == "tools/call":
+                        debug_print(f"Handling tools/call: {params.get('name')}")
+                        tool_name = params.get("name")
+                        tool_arguments = params.get("arguments", {})
+                        result = self._call_tool(tool_name, tool_arguments)
+                        self._send_response(request_id, result)
+                        
+                    elif method == "resources/list":
+                        debug_print("Handling resources/list")
+                        # Return empty resources list
+                        self._send_response(request_id, {"resources": []})
+                        
+                    elif method == "prompts/list":
+                        debug_print("Handling prompts/list")
+                        # Return empty prompts list
+                        self._send_response(request_id, {"prompts": []})
+                        
+                    else:
+                        debug_print(f"Unknown method: {method}")
+                        # For unknown methods, send a proper error response
+                        if request_id is not None:
+                            self._send_error(request_id, -32601, f"Method not found: {method}")
+                        
+                except json.JSONDecodeError as e:
+                    debug_print(f"JSON decode error: {e}")
+                    # Only send error if we have a request ID
+                    if 'request_id' in locals() and request_id is not None:
+                        self._send_error(request_id, -32700, "Parse error")
+                except Exception as e:
+                    debug_print(f"Error handling request: {e}")
+                    import traceback
+                    traceback.print_exc(file=sys.stderr)
+                    # Only send error if we have a request ID
+                    if 'request_id' in locals() and request_id is not None:
+                        self._send_error(request_id, -32603, "Internal error")
                     
-                elif isinstance(request, ListToolsRequest):
-                    debug_print("Handling ListToolsRequest")
-                    # Manually send tools list response
-                    await self._send_response(write_stream, request.id, {"tools": self.tools})
-                    debug_print("ListToolsRequest handled")
-                    
-                elif isinstance(request, CallToolRequest):
-                    debug_print(f"Handling CallToolRequest: {request.name}")
-                    # Manually handle tool call
-                    result = await self._call_tool(request.name, request.arguments)
-                    await self._send_response(write_stream, request.id, result)
-                    debug_print("CallToolRequest handled")
-                    
-                elif isinstance(request, SessionMessage):
-                    debug_print("Handling SessionMessage")
-                    # Session messages are handled automatically by the MCP library
-                    pass
-                else:
-                    debug_print(f"Unknown request type: {type(request)}")
-                    # Unknown request type
-                    await self._send_error(write_stream, getattr(request, 'id', None), -32601, "Method not found")
-                    
-            except Exception as e:
-                debug_print(f"Error handling request: {e}")
-                import traceback
-                traceback.print_exc(file=sys.stderr)
+        except KeyboardInterrupt:
+            debug_print("Server interrupted")
+        except Exception as e:
+            debug_print(f"Server error: {e}")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
 
 
-async def create_my_server():
-    """Create the server instance."""
-    debug_print("Creating server instance...")
-    return WorkingIDracMCPServer()
-
-
-async def run_server():
-    """Run the server."""
-    debug_print("Creating stdio server...")
-    async with stdio_server() as (read_stream, write_stream):
-        debug_print("Server ready, waiting for requests...")
-        server = await create_my_server()
-        await server.run(read_stream, write_stream, {})
+def main():
+    """Main entry point."""
+    debug_print("Starting main...")
+    server = WorkingIDracMCPServer()
+    server.run()
 
 
 if __name__ == "__main__":
-    debug_print("Starting main...")
-    anyio.run(run_server)
+    main()
