@@ -22,7 +22,6 @@ def load_config() -> Dict[str, Any]:
         'config.json',  # Current directory
         os.path.join(os.path.dirname(__file__), 'config.json'),  # Same directory as script
         os.path.expanduser('~/.idrac-mcp/config.json'),  # User home directory
-        '/etc/idrac-mcp/config.json'  # System-wide config
     ]
     
     config_path = None
@@ -49,8 +48,10 @@ def load_config() -> Dict[str, Any]:
 # Load configuration
 config = load_config()
 
-# Suppress SSL warnings for self-signed certificates
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+# Suppress SSL warnings only for self-signed certificates when explicitly configured
+# This is more targeted than global suppression
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 debug_print("Server starting...")
 
@@ -86,9 +87,8 @@ class IDracClient:
             'User-Agent': 'iDRAC-MCP-Server/1.0'
         })
         
-        # Debug: Print session info
-        debug_print(f"Created iDRAC client for {self.base_url}")
-        debug_print(f"Username: {username}")
+        # Debug: Print session info (redacted to avoid sensitive details)
+        debug_print("Created iDRAC client (connection details redacted)")
         debug_print(f"SSL Verify: {ssl_verify}")
         debug_print(f"Session headers: {dict(self.session.headers)}")
         debug_print(f"Auth type: {type(self.auth)}")
@@ -632,6 +632,9 @@ class WorkingIDracMCPServer:
                     
                 debug_print(f"Received line: {line}")
                 
+                # Initialize request_id to None at the start of each iteration
+                request_id = None
+                
                 try:
                     request = json.loads(line)
                     debug_print(f"Parsed request: {request}")
@@ -691,14 +694,14 @@ class WorkingIDracMCPServer:
                 except json.JSONDecodeError as e:
                     debug_print(f"JSON decode error: {e}")
                     # Only send error if we have a request ID
-                    if 'request_id' in locals() and request_id is not None:
+                    if request_id is not None:
                         self._send_error(request_id, -32700, "Parse error")
                 except Exception as e:
                     debug_print(f"Error handling request: {e}")
                     import traceback
                     traceback.print_exc(file=sys.stderr)
                     # Only send error if we have a request ID
-                    if 'request_id' in locals() and request_id is not None:
+                    if request_id is not None:
                         self._send_error(request_id, -32603, "Internal error")
                     
         except KeyboardInterrupt:
