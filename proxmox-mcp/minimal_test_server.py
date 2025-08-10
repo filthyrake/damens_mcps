@@ -52,11 +52,21 @@ def main():
                             "tools": [
                                 {
                                     "name": "proxmox_test_connection",
-                                    "description": "Test connection to Proxmox server"
+                                    "description": "Test connection to Proxmox server",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {},
+                                        "required": []
+                                    }
                                 },
                                 {
                                     "name": "proxmox_get_version",
-                                    "description": "Get Proxmox version information"
+                                    "description": "Get Proxmox version information",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {},
+                                        "required": []
+                                    }
                                 }
                             ]
                         }
@@ -85,19 +95,18 @@ def main():
                     # Handle specific tools
                     if tool_name == "proxmox_test_connection":
                         result = {
-                            "status": "success",
-                            "message": "Connection test successful (minimal server)",
-                            "server": "minimal-test-server"
+                            "content": [{"type": "text", "text": "Connection test successful (minimal server)\nServer: minimal-test-server"}],
+                            "isError": False
                         }
                     elif tool_name == "proxmox_get_version":
                         result = {
-                            "version": "9.0.3",
-                            "release": "9.0",
-                            "message": "Version info from minimal server"
+                            "content": [{"type": "text", "text": "Version: 9.0.3\nRelease: 9.0\nMessage: Version info from minimal server"}],
+                            "isError": False
                         }
                     else:
                         result = {
-                            "error": f"Tool {tool_name} not implemented in minimal server"
+                            "content": [{"type": "text", "text": f"Tool {tool_name} not implemented in minimal server"}],
+                            "isError": True
                         }
 
                     response = {
