@@ -492,6 +492,10 @@ class WorkingProxmoxMCPServer:
                         result = self._call_tool(tool_name, tool_args)
                         self._send_response(request_id, result)
 
+                    elif method == "notifications/initialized":
+                        # Handle initialization notification (no response needed)
+                        continue
+
                     elif method == "notifications/cancel":
                         # Handle notification cancellation (no-op for now)
                         continue
