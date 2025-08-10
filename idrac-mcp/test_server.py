@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 import time
+import os
 
 def test_server():
     """Test the MCP server with various requests."""
@@ -19,7 +20,7 @@ def test_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        cwd="/Users/damenknight/damens_mcps/idrac-mcp"
+        cwd=os.path.dirname(os.path.abspath(__file__))
     )
     
     # Wait a moment for server to start
