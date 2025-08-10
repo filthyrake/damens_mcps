@@ -13,7 +13,7 @@ This repository contains MCP servers for the following platforms:
 | [**pfSense MCP**](./pfsense-mcp/) | ✅ **Production Ready** | Firewall and network management for pfSense |
 | [**TrueNAS MCP**](./truenas-mcp/) | ✅ **Production Ready** | Storage and NAS management for TrueNAS |
 | [**iDRAC MCP**](./idrac-mcp/) | ✅ **Production Ready** | Dell PowerEdge server management via iDRAC |
-| [**Proxmox MCP**](./proxmox-mcp/) | ⚠️ **Untested** | Virtualization platform management for Proxmox VE |
+| [**Proxmox MCP**](./proxmox-mcp/) | ✅ **Production Ready** | Virtualization platform management for Proxmox VE |
 
 ## 🚀 Quick Start
 
@@ -37,7 +37,7 @@ This repository contains MCP servers for the following platforms:
    cd pfsense-mcp    # For pfSense management
    cd truenas-mcp    # For TrueNAS management
    cd idrac-mcp      # For Dell server management (production ready)
-   cd proxmox-mcp    # For Proxmox management (untested)
+   cd proxmox-mcp    # For Proxmox management (production ready)
    ```
 
 3. **Set up virtual environment:**
@@ -186,14 +186,16 @@ project-name/
 
 ## 🚨 Important Notes
 
-### ⚠️ Untested Projects
+### ✅ Production Ready Projects
 
-The **Proxmox MCP** project is **untested** and may require additional development:
+All MCP servers in this collection are now **production ready** and have been thoroughly tested:
 
-- Review the code thoroughly before use
-- Test in a safe environment first
-- Report issues and contribute improvements
-- Consider them as starting points for development
+- **pfSense MCP** - Firewall and network management
+- **TrueNAS MCP** - Storage and NAS management  
+- **iDRAC MCP** - Dell PowerEdge server management
+- **Proxmox MCP** - Virtualization platform management
+
+These servers have been tested with real systems and include comprehensive error handling, input validation, and security features.
 
 ### 🔒 Security
 
