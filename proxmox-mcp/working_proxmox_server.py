@@ -49,21 +49,27 @@ def load_config() -> Dict[str, Any]:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}")
 
 
-# Load configuration
-config = load_config()
+def main():
+    """Main entry point for the server."""
+    # Load configuration
+    config = load_config()
 
-# Only suppress SSL warnings when explicitly configured to not verify SSL
-# This is safer than globally disabling all warnings
-if not config.get('ssl_verify', True):
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    debug_print("SSL warnings disabled due to ssl_verify=False configuration")
+    # Only suppress SSL warnings when explicitly configured to not verify SSL
+    # This is safer than globally disabling all warnings
+    if not config.get('ssl_verify', True):
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        debug_print("SSL warnings disabled due to ssl_verify=False configuration")
 
-debug_print("Server starting...")
+    debug_print("Server starting...")
 
-# Completely suppress all output
-logging.getLogger().handlers.clear()
-logging.getLogger().addHandler(logging.NullHandler())
-logging.getLogger().setLevel(logging.CRITICAL)
+    # Completely suppress all output
+    logging.getLogger().handlers.clear()
+    logging.getLogger().addHandler(logging.NullHandler())
+    logging.getLogger().setLevel(logging.CRITICAL)
+
+    # Create and run the server
+    server = WorkingProxmoxMCPServer()
+    server.run()
 
 
 class ProxmoxClient:
@@ -395,19 +401,19 @@ class ProxmoxClient:
                 "message": f"Exception getting VM status: {str(e)}"
             }
 
-    def create_vm(self, node: str, name: str, vmid: str = None, cores: str = "1", memory: str = "512") -> Dict[str, Any]:
+    def create_vm(self, node: str, name: str, vmid: int = None, cores: int = 1, memory: int = 512) -> Dict[str, Any]:
         """Create a new virtual machine."""
         try:
             # Get next available VMID if not specified
-            if not vmid:
+            if vmid is None:
                 vmid = self._get_next_vmid(node)
             
             # Basic VM configuration
             config = {
-                "vmid": vmid,
+                "vmid": str(vmid),
                 "name": name,
-                "cores": cores,
-                "memory": memory,
+                "cores": str(cores),
+                "memory": str(memory),
                 "sockets": "1"
             }
             
@@ -679,16 +685,19 @@ class WorkingProxmoxMCPServer:
         debug_print("Server starting...")
         self.proxmox_client = None
         
+        # Load configuration
+        self.config = load_config()
+        
         try:
             debug_print("Initializing Proxmox client...")
             self.proxmox_client = ProxmoxClient(
-                host=config['host'],
-                port=config['port'],
-                protocol=config['protocol'],
-                username=config['username'],
-                password=config['password'],
-                realm=config.get('realm', 'pve'),
-                ssl_verify=config.get('ssl_verify', False)
+                host=self.config['host'],
+                port=self.config['port'],
+                protocol=self.config['protocol'],
+                username=self.config['username'],
+                password=self.config['password'],
+                realm=self.config.get('realm', 'pve'),
+                ssl_verify=self.config.get('ssl_verify', False)
             )
             
             # Test connection in a non-blocking way
@@ -1351,9 +1360,6 @@ class WorkingProxmoxMCPServer:
                     continue
 
                 debug_print(f"Received line: {line}")
-
-                # Initialize request_id to None at the start of each iteration
-                request_id = None
 
                 try:
                     request = json.loads(line)
