@@ -490,11 +490,13 @@ class WorkingProxmoxMCPServer:
 
                     elif method == "tools/list":
                         # Handle tools listing
+                        debug_print("Handling tools/list request")
                         tools_result = self._list_tools()
                         self._send_response(request_id, tools_result)
 
                     elif method == "tools/call":
                         # Handle tool execution
+                        debug_print(f"Handling tools/call request: {params}")
                         tool_name = params.get("name")
                         tool_args = params.get("arguments", {})
 
@@ -507,14 +509,29 @@ class WorkingProxmoxMCPServer:
 
                     elif method == "notifications/initialized":
                         # Handle initialization notification (no response needed)
+                        debug_print("Handling notifications/initialized")
                         continue
 
                     elif method == "notifications/cancel":
                         # Handle notification cancellation (no-op for now)
+                        debug_print("Handling notifications/cancel")
+                        continue
+
+                    elif method == "resources/list":
+                        # Handle resources listing (not supported, return error)
+                        debug_print("Handling resources/list request (not supported)")
+                        self._send_error(request_id, -32601, "Method not found: resources/list")
+                        continue
+
+                    elif method == "prompts/list":
+                        # Handle prompts listing (not supported, return error)
+                        debug_print("Handling prompts/list request (not supported)")
+                        self._send_error(request_id, -32601, "Method not found: prompts/list")
                         continue
 
                     else:
                         # Unknown method
+                        debug_print(f"Unknown method requested: {method}")
                         self._send_error(request_id, -32601, f"Method not found: {method}")
 
                 except json.JSONDecodeError as e:
@@ -525,6 +542,9 @@ class WorkingProxmoxMCPServer:
 
                 except Exception as e:
                     debug_print(f"Request processing error: {e}")
+                    debug_print(f"Error type: {type(e).__name__}")
+                    import traceback
+                    debug_print(f"Traceback: {traceback.format_exc()}")
                     if request_id is not None:
                         self._send_error(request_id, -32603, f"Internal error: {str(e)}")
                     continue
@@ -533,7 +553,10 @@ class WorkingProxmoxMCPServer:
             debug_print("Server interrupted by user")
         except Exception as e:
             debug_print(f"Server error: {e}")
-            sys.exit(1)
+            import traceback
+            debug_print(f"Server traceback: {traceback.format_exc()}")
+            # Don't exit, just log the error and continue
+            debug_print("Server continuing despite error...")
 
 
 def main():
