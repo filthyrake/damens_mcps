@@ -1,0 +1,36 @@
+{
+  "idrac_servers": {
+    "server1": {
+      "name": "Production Server 1",
+      "host": "192.168.1.100",
+      "port": 443,
+      "protocol": "https",
+      "username": "root",
+      "password": "your_password_here",
+      "ssl_verify": false
+    },
+    "server2": {
+      "name": "Production Server 2", 
+      "host": "192.168.1.101",
+      "port": 443,
+      "protocol": "https",
+      "username": "root",
+      "password": "your_password_here",
+      "ssl_verify": false
+    },
+    "test_server": {
+      "name": "Test Environment",
+      "host": "10.0.10.11",
+      "port": 443,
+      "protocol": "https",
+      "username": "root",
+      "password": "your_password_here",
+      "ssl_verify": false
+    }
+  },
+  "default_server": "server1",
+  "server": {
+    "port": 8000,
+    "debug": true
+  }
+}
