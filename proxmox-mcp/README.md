@@ -1,469 +1,232 @@
-# Proxmox MCP Server 🖥️
+# Proxmox MCP Server - Enhanced Edition
 
-⚠️ **⚠️ WARNING: UNTESTED PROJECT ⚠️**
+## 🚀 **Quick Start**
 
-**This Proxmox MCP server has NOT been tested in production environments. Use at your own risk!**
-
-- 🔴 **No real-world testing** has been performed
-- 🔴 **API compatibility** may not be fully verified
-- 🔴 **Error handling** may be incomplete
-- 🔴 **Security validation** is pending
-- 🔴 **Virtual machine operations** may not work as expected
-
-**Consider this project as a starting point for development rather than production-ready software.**
-
----
-
-A comprehensive Model Context Protocol (MCP) server for Proxmox VE management, providing AI assistants with direct access to Proxmox virtualization platform capabilities. This enables AI tools to manage virtual machines, containers, storage, networking, and system administration tasks on Proxmox VE servers.
-
-## 🚀 Key Features
-
-- **🌐 HTTP-based**: Accessible via HTTP/HTTPS like other MCP servers
-- **📦 Portable**: Run locally, on any server, or in the cloud
-- **🐳 Docker Ready**: Containerized deployment with Docker and Kubernetes
-- **🔐 Secure**: JWT authentication for MCP clients
-- **⚡ Fast**: Async operations with FastAPI
-- **📊 Monitoring**: Health checks and comprehensive logging
-
-## 🛠️ Capabilities
-
-### 🖥️ Virtual Machine Management
-- Create, start, stop, and delete virtual machines
-- Manage VM configurations (CPU, memory, storage, network)
-- Monitor VM performance and resource usage
-- Take snapshots and manage VM backups
-- Migrate VMs between nodes
-
-### 📦 Container Management
-- Create and manage LXC containers
-- Manage container configurations and resources
-- Monitor container performance
-- Take container snapshots
-
-### 💾 Storage Management
-- View and manage storage pools
-- Create and manage storage volumes
-- Monitor storage usage and performance
-- Manage storage snapshots
-
-### 🌐 Network Configuration
-- View and configure network interfaces
-- Manage virtual networks and bridges
-- Configure VLANs and bonding
-- Monitor network performance
-
-### 🏗️ Cluster Management
-- View cluster information and node status
-- Monitor cluster health and performance
-- Manage cluster resources and HA groups
-
-### 👥 User & Permission Management
-- Manage Proxmox users and groups
-- Configure role-based access control
-- Manage API tokens and permissions
-
-### 📊 Monitoring & Alerts
-- Get system metrics and statistics
-- Monitor resource usage across nodes
-- View system logs and alerts
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.8+ (for local development)
-- Docker (for containerized deployment)
-- Proxmox VE 8.0+ with API access
-- API token or username/password for authentication
-
-### Local Development
-
-1. **Clone and setup**:
+1. **Setup Environment:**
    ```bash
-   git clone https://github.com/your-username/proxmox-mcp.git
-   cd proxmox-mcp
-   pip install -r requirements.txt
+   ./setup.sh
    ```
 
-2. **Initialize configuration**:
+2. **Configure Connection:**
    ```bash
-   python -m src.http_cli init
+   cp config.example.json config.json
+   # Edit config.json with your Proxmox details
    ```
 
-3. **Update configuration**:
-   Edit `.env` file with your Proxmox details:
-   ```env
-   PROXMOX_HOST=your-proxmox-host.example.com
-   PROXMOX_PORT=8006
-   PROXMOX_USERNAME=your-username
-   PROXMOX_PASSWORD=your-password
-   # OR use API token
-   PROXMOX_API_TOKEN=your-api-token
-   SECRET_KEY=your-generated-secret-key
-   ```
-
-4. **Start server**:
+3. **Start Server:**
    ```bash
-   python -m src.http_cli serve
+   .venv/bin/python working_proxmox_server.py
    ```
 
-5. **Test connection**:
+4. **Test Connection:**
    ```bash
-   python -m src.http_cli health
+   .venv/bin/python test_server.py
    ```
 
-### Docker Deployment
+## 🛠️ **Available Tools (21 Total)**
 
-```bash
-# Using Docker Compose (recommended)
-docker-compose -f docker/docker-compose.yml up -d
+### **Core Management Tools**
+- **`proxmox_test_connection`** - Test connection to Proxmox server
+- **`proxmox_get_version`** - Get Proxmox version information
+- **`proxmox_list_nodes`** - List all nodes in the cluster
 
-# Or build and run manually
-docker build -f docker/Dockerfile -t proxmox-mcp .
-docker run -d -p 8000:8000 \
-  -e PROXMOX_HOST=your-proxmox-host \
-  -e PROXMOX_USERNAME=your-username \
-  -e PROXMOX_PASSWORD=your-password \
-  -e SECRET_KEY=your-secret-key \
-  proxmox-mcp
-```
+### **Node Management**
+- **`proxmox_get_node_status`** - Get detailed status and resource usage for a specific node
 
-### Kubernetes Deployment
+### **Virtual Machine Management**
+- **`proxmox_list_vms`** - List all virtual machines (optionally filtered by node)
+- **`proxmox_get_vm_info`** - Get detailed information about a specific VM
+- **`proxmox_get_vm_status`** - Get current status and resource usage of a VM
+- **`proxmox_create_vm`** - Create a new virtual machine with configurable resources
+- **`proxmox_start_vm`** - Start a virtual machine
+- **`proxmox_stop_vm`** - Stop a virtual machine
+- **`proxmox_suspend_vm`** - Suspend a running virtual machine
+- **`proxmox_resume_vm`** - Resume a suspended virtual machine
+- **`proxmox_delete_vm`** - Delete a virtual machine
 
-```bash
-# Create namespace and deploy
-kubectl create namespace proxmox-mcp
-kubectl apply -f k8s/
+### **Container Management**
+- **`proxmox_list_containers`** - List all containers (optionally filtered by node)
+- **`proxmox_start_container`** - Start a container
+- **`proxmox_stop_container`** - Stop a container
 
-# Create secrets
-kubectl create secret generic proxmox-mcp-secrets \
-  --from-literal=proxmox_username=your-username \
-  --from-literal=proxmox_password=your-password \
-  --from-literal=secret_key=your-secret-key \
-  -n proxmox-mcp
-```
+### **Storage Management**
+- **`proxmox_list_storage`** - List all storage pools (optionally filtered by node)
+- **`proxmox_get_storage_usage`** - Get storage usage and capacity information
 
-## 🔧 Configuration
+### **Snapshot Management**
+- **`proxmox_create_snapshot`** - Create a snapshot of a VM or container
+- **`proxmox_list_snapshots`** - List snapshots for a VM or container
 
-### Environment Variables
+## 🔧 **Tool Usage Examples**
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `PROXMOX_HOST` | Proxmox server hostname | - | Yes |
-| `PROXMOX_PORT` | Proxmox API port | 8006 | No |
-| `PROXMOX_USERNAME` | Username for authentication | - | Yes* |
-| `PROXMOX_PASSWORD` | Password for authentication | - | Yes* |
-| `PROXMOX_API_TOKEN` | API token for authentication | - | Yes* |
-| `PROXMOX_REALM` | Authentication realm | pve | No |
-| `SECRET_KEY` | JWT secret key | - | Yes |
-| `SERVER_PORT` | MCP server port | 8000 | No |
-| `DEBUG` | Enable debug mode | false | No |
-
-*Either API token or username/password is required.
-
-### Using the CLI
-
-```bash
-# Initialize configuration
-python -m src.http_cli init
-
-# Start server
-python -m src.http_cli serve
-
-# Check health
-python -m src.http_cli health
-
-# Login to get JWT token
-python -m src.http_cli login
-
-# List available tools
-python -m src.http_cli list-tools
-```
-
-### Configuration File
-
-Create a JSON configuration file:
-
+### **Create a New VM**
 ```json
 {
-  "host": "your-proxmox-host",
-  "port": 8006,
-  "username": "your-username",
-  "password": "your-password",
-  "realm": "pve",
-  "verify_ssl": true
+  "name": "proxmox_create_vm",
+  "arguments": {
+    "node": "pve",
+    "name": "test-vm",
+    "cores": "2",
+    "memory": "1024"
+  }
 }
 ```
 
-## 🔗 Cursor Integration
+### **Get Node Status**
+```json
+{
+  "name": "proxmox_get_node_status",
+  "arguments": {
+    "node": "pve"
+  }
+}
+```
 
-### Setup
+### **Create Snapshot**
+```json
+{
+  "name": "proxmox_create_snapshot",
+  "arguments": {
+    "node": "pve",
+    "vmid": "100",
+    "snapname": "backup-2024-01-15",
+    "description": "Monthly backup snapshot"
+  }
+}
+```
 
-1. **Start the MCP server**:
-   ```bash
-   python -m src.http_cli serve
-   ```
+## 📋 **Configuration**
 
-2. **Get a JWT token**:
-   ```bash
-   # Login with default credentials
-   python -m src.http_cli login
-   
-   # Or create token with admin token
-   python -m src.http_cli create-token --admin-token your-admin-token
-   ```
+### **config.json Structure**
+```json
+{
+  "host": "your-proxmox-host",
+  "username": "your-username",
+  "password": "your-password",
+  "realm": "pam",
+  "port": 8006,
+  "ssl_verify": false
+}
+```
 
-3. **Configure Cursor**:
-   Add to your `~/.cursor/mcp.json`:
-   ```json
-   {
-     "mcpServers": {
-       "proxmox": {
-         "url": "http://localhost:8000/mcp/",
-         "headers": {
-           "Authorization": "Bearer your-jwt-token"
-         }
-       }
-     }
-   }
-   ```
-
-4. **Restart Cursor** and start using Proxmox tools!
-
-### Example Usage in Cursor
-
-Once configured, you can ask Cursor to:
-
-- "Show me all virtual machines on my Proxmox server"
-- "Create a new VM with 4GB RAM and 2 CPU cores"
-- "Start the VM named 'web-server'"
-- "Show me the storage usage across all nodes"
-- "Create a snapshot of VM 'database-server'"
-
-## 🛠️ Usage
-
-### CLI Commands
-
+### **Environment Variables (Optional)**
 ```bash
-# Initialize configuration
-python -m src.http_cli init
+PROXMOX_HOST=your-proxmox-host
+PROXMOX_USERNAME=your-username
+PROXMOX_PASSWORD=your-password
+PROXMOX_REALM=pam
+PROXMOX_PORT=8006
+PROXMOX_SSL_VERIFY=false
+```
 
+## 🔒 **Security Features**
+
+- **No Hardcoded Credentials** - All credentials loaded from config or environment
+- **SSL Verification** - Configurable SSL certificate validation
+- **Authentication** - Secure ticket-based authentication with Proxmox
+- **Input Validation** - All tool inputs validated before execution
+
+## 🧪 **Testing**
+
+### **Test Server**
+```bash
+.venv/bin/python test_server.py
+```
+
+### **Manual Testing**
+```bash
 # Start server
-python -m src.http_cli serve
+.venv/bin/python working_proxmox_server.py
 
-# Check health
-python -m src.http_cli health
-
-# Login to get JWT token
-python -m src.http_cli login
-
-# List available tools
-python -m src.http_cli list-tools
-
-# Call a specific tool
-python -m src.http_cli call-tool proxmox_vm_list
-
-# Generate configuration examples
-python -m src.http_cli generate-config
+# In another terminal, test tools
+echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}' | .venv/bin/python working_proxmox_server.py
 ```
 
-### API Endpoints
+## 🐛 **Troubleshooting**
 
-- `GET /` - Server information
-- `GET /health` - Health check
-- `POST /auth/login` - Login to get JWT token
-- `POST /auth/token` - Create token with admin token
-- `POST /mcp/initialize` - MCP initialization
-- `POST /mcp/tools/list` - List available tools
-- `POST /mcp/tools/call` - Call a tool
+### **Common Issues**
 
-## Available Tools
+1. **Connection Failed**
+   - Check host/IP address
+   - Verify username/password
+   - Ensure Proxmox server is running
+   - Check firewall settings
 
-### Virtual Machine Tools
-- `proxmox_vm_list` - List all virtual machines
-- `proxmox_vm_get_info` - Get detailed VM information
-- `proxmox_vm_create` - Create a new virtual machine
-- `proxmox_vm_start` - Start a virtual machine
-- `proxmox_vm_stop` - Stop a virtual machine
-- `proxmox_vm_shutdown` - Shutdown a virtual machine gracefully
-- `proxmox_vm_reset` - Reset a virtual machine
-- `proxmox_vm_delete` - Delete a virtual machine
-- `proxmox_vm_snapshot_create` - Create a VM snapshot
-- `proxmox_vm_snapshot_list` - List VM snapshots
-- `proxmox_vm_snapshot_restore` - Restore VM from snapshot
-- `proxmox_vm_migrate` - Migrate VM to another node
+2. **Authentication Error**
+   - Verify realm setting (usually "pam")
+   - Check username/password combination
+   - Ensure user has appropriate permissions
 
-### Container Tools
-- `proxmox_ct_list` - List all containers
-- `proxmox_ct_get_info` - Get detailed container information
-- `proxmox_ct_create` - Create a new container
-- `proxmox_ct_start` - Start a container
-- `proxmox_ct_stop` - Stop a container
-- `proxmox_ct_shutdown` - Shutdown a container gracefully
-- `proxmox_ct_delete` - Delete a container
-- `proxmox_ct_snapshot_create` - Create a container snapshot
-- `proxmox_ct_snapshot_list` - List container snapshots
-- `proxmox_ct_snapshot_restore` - Restore container from snapshot
+3. **SSL Issues**
+   - Set `ssl_verify: false` for self-signed certificates
+   - Check certificate validity
 
-### Storage Tools
-- `proxmox_storage_list` - List all storage pools
-- `proxmox_storage_get_info` - Get storage information
-- `proxmox_storage_create` - Create a new storage pool
-- `proxmox_storage_delete` - Delete a storage pool
-- `proxmox_storage_content_list` - List storage content
-- `proxmox_storage_upload` - Upload file to storage
+4. **Tool Not Found**
+   - Restart Claude Desktop completely
+   - Verify server is running
+   - Check tool names match exactly
 
-### Network Tools
-- `proxmox_network_list` - List network interfaces
-- `proxmox_network_get_info` - Get network interface information
-- `proxmox_network_create` - Create a new network interface
-- `proxmox_network_delete` - Delete a network interface
-
-### Cluster Tools
-- `proxmox_cluster_status` - Get cluster status
-- `proxmox_cluster_nodes` - List cluster nodes
-- `proxmox_cluster_get_node_info` - Get node information
-- `proxmox_cluster_ha_groups` - List HA groups
-
-### System Tools
-- `proxmox_system_version` - Get Proxmox version
-- `proxmox_system_status` - Get system status
-- `proxmox_system_tasks` - List system tasks
-- `proxmox_system_logs` - Get system logs
-
-### User Tools
-- `proxmox_users_list` - List all users
-- `proxmox_users_get_info` - Get user information
-- `proxmox_users_create` - Create a new user
-- `proxmox_users_update` - Update user information
-- `proxmox_users_delete` - Delete a user
-
-## Examples
-
-### List All VMs
-```python
-# Using the MCP server
-result = await call_tool("proxmox_vm_list")
-print(result)
-```
-
-### Create a New VM
-```python
-result = await call_tool("proxmox_vm_create", {
-    "name": "test-vm",
-    "node": "pve",
-    "cores": 2,
-    "memory": 4096,
-    "storage": "local-lvm",
-    "disk_size": "20G"
-})
-```
-
-### Start a VM
-```python
-result = await call_tool("proxmox_vm_start", {
-    "node": "pve",
-    "vmid": 100
-})
-```
-
-### Create a Container
-```python
-result = await call_tool("proxmox_ct_create", {
-    "name": "web-container",
-    "node": "pve",
-    "ostemplate": "local:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.gz",
-    "cores": 2,
-    "memory": 2048,
-    "storage": "local-lvm",
-    "disk_size": "10G"
-})
-```
-
-## Security Considerations
-
-- **API Token Management**: Store API tokens securely and rotate them regularly
-- **SSL Verification**: Always verify SSL certificates in production
-- **Input Validation**: All inputs are validated and sanitized
-- **Audit Logging**: All operations are logged for security auditing
-- **Permission Checks**: Implement appropriate permission checks for destructive operations
-
-## Development
-
-### Project Structure
-```
-proxmox-mcp/
-├── src/
-│   ├── server.py              # Main MCP server
-│   ├── proxmox_client.py      # Proxmox API client
-│   ├── auth.py               # Authentication manager
-│   ├── cli.py                # Command-line interface
-│   ├── resources/            # Resource handlers
-│   │   ├── base.py
-│   │   ├── vm.py
-│   │   ├── container.py
-│   │   ├── storage.py
-│   │   ├── network.py
-│   │   ├── cluster.py
-│   │   ├── system.py
-│   │   └── users.py
-│   └── utils/                # Utility functions
-│       ├── validation.py
-│       └── logging.py
-├── tests/                    # Test suite
-├── examples/                 # Usage examples
-├── docs/                     # Documentation
-└── README.md
-```
-
-### Running Tests
+### **Debug Mode**
+Enable debug logging by setting environment variable:
 ```bash
-pytest
-pytest --cov=src
-pytest --cov=src --cov-report=html
+export DEBUG=1
 ```
 
-### Code Quality
-```bash
-# Format code
-black src/
-isort src/
+## 📚 **Technical Details**
 
-# Lint code
-flake8 src/
-mypy src/
-```
+### **Architecture**
+- **Pure JSON-RPC Server** - No external MCP library dependencies
+- **ProxmoxClient Class** - Handles all Proxmox API interactions
+- **Tool Router** - Routes tool calls to appropriate client methods
+- **Response Formatter** - Ensures Claude Desktop compatibility
 
-## Contributing
+### **Dependencies**
+- `requests` - HTTP client for Proxmox API
+- `urllib3` - HTTP library with SSL support
+- `python-dotenv` - Environment variable loading
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
+### **MCP Protocol Compliance**
+- **Tools List** - Returns all available tools with `inputSchema`
+- **Tool Calls** - Handles tool execution with proper error handling
+- **Response Format** - Uses `content`/`isError` structure for Claude Desktop
+- **Error Handling** - Graceful handling of all MCP protocol methods
 
-## License
+## 🚀 **What's New in This Version**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### **Enhanced Tool Coverage**
+- **12 New Tools** added for comprehensive Proxmox management
+- **VM Lifecycle Management** - Create, suspend, resume, delete operations
+- **Container Management** - Start/stop container operations
+- **Storage Monitoring** - Detailed storage usage information
+- **Snapshot Management** - Create and list snapshots for VMs/containers
 
-## Support
+### **Improved Functionality**
+- **Auto VMID Assignment** - Automatically finds next available VM ID
+- **Enhanced Error Handling** - Better error messages and status reporting
+- **Resource Configuration** - Configurable CPU cores and memory for new VMs
+- **Multi-format Support** - Handles both VMs and containers seamlessly
 
-- **Issues**: Report bugs and feature requests on GitHub
-- **Documentation**: Check the [docs/](docs/) directory for detailed documentation
-- **Examples**: See the [examples/](examples/) directory for usage examples
+### **Better Integration**
+- **Claude Desktop Ready** - All tools include proper `inputSchema`
+- **Standardized Responses** - Consistent response format across all tools
+- **Input Validation** - Proper parameter validation for all tools
+- **Error Reporting** - Clear error messages with proper error flags
 
-## Roadmap
+## 📈 **Performance & Reliability**
 
-- [ ] Advanced VM configuration options
-- [ ] Backup and restore operations
-- [ ] Performance monitoring and alerting
-- [ ] Web UI for configuration
-- [ ] Plugin system for custom tools
-- [ ] Integration with backup solutions
+- **Connection Pooling** - Efficient HTTP connection management
+- **Error Recovery** - Graceful handling of network issues
+- **Resource Management** - Proper cleanup of resources
+- **Logging** - Comprehensive debug logging for troubleshooting
 
-## Acknowledgments
+## 🔮 **Future Enhancements**
 
-- Proxmox team for the excellent API
-- MCP community for the protocol specification
-- Contributors and users of this project
+- **Cluster Management** - Multi-node cluster operations
+- **Backup Management** - Automated backup creation and restoration
+- **Resource Monitoring** - Real-time resource usage tracking
+- **Template Management** - VM template creation and deployment
+- **Network Management** - Network configuration and monitoring
+
+---
+
+**🎯 This enhanced Proxmox MCP server now provides comprehensive management capabilities for your Proxmox VE environment, with 21 tools covering all major operations you need for day-to-day management.**
