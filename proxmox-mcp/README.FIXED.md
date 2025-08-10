@@ -1,206 +1,232 @@
-# 🔧 Proxmox MCP Server - FIXED VERSION
-
-## 🚨 **What Was Wrong with the Original Code**
-
-The original Proxmox MCP server had several critical issues that prevented it from working:
-
-### **1. Over-engineered Architecture**
-- **Problem**: Complex async patterns that don't work well with MCP
-- **Issue**: Mixed async Proxmox client with sync MCP server patterns
-- **Result**: Import errors and runtime failures
-
-### **2. Missing Dependencies**
-- **Problem**: No virtual environment, heavy dependency requirements
-- **Issue**: `mcp` module not available, complex auth libraries
-- **Result**: ModuleNotFoundError and dependency conflicts
-
-### **3. Authentication Overkill**
-- **Problem**: Complex JWT system with bcrypt, python-jose
-- **Issue**: Not needed for MCP server-to-client communication
-- **Result**: Unnecessary complexity and potential security issues
-
-### **4. Missing Working Server**
-- **Problem**: No simple, testable server implementation
-- **Issue**: Only had complex async server that couldn't run
-- **Result**: No way to test or use the server
-
-## ✅ **What I Fixed**
-
-### **1. Created Working Server (`working_proxmox_server.py`)**
-- **Pure JSON-RPC over stdin/stdout** - matches working iDRAC MCP pattern
-- **Simple, synchronous implementation** - no async complexity
-- **Real Proxmox API integration** - actual working functionality
-- **Proper error handling** - robust and reliable
-
-### **2. Simplified Dependencies (`requirements.simple.txt`)**
-- **Only essential packages**: `requests`, `urllib3`
-- **Removed heavy dependencies**: No more `mcp`, `fastapi`, `jwt`, etc.
-- **Lightweight and fast**: Quick setup and deployment
-
-### **3. Fixed Authentication**
-- **Direct Proxmox API authentication** - uses Proxmox's built-in auth
-- **No JWT complexity** - simple username/password with ticket
-- **Secure by default** - follows Proxmox security practices
-
-### **4. Added Testing & Setup**
-- **Test script** (`test_server.py`) - verifies server works
-- **Setup script** (`setup.sh`) - one-command environment setup
-- **Configuration examples** - easy to get started
+# Proxmox MCP Server - Enhanced Edition
 
 ## 🚀 **Quick Start**
 
-### **1. Setup Environment**
-```bash
-# Run the setup script
-./setup.sh
+1. **Setup Environment:**
+   ```bash
+   ./setup.sh
+   ```
 
-# Or manually:
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.simple.txt
-```
+2. **Configure Connection:**
+   ```bash
+   cp config.example.json config.json
+   # Edit config.json with your Proxmox details
+   ```
 
-### **2. Configure Server**
-```bash
-# Copy and edit config
-cp config.example.json config.json
-# Edit config.json with your Proxmox details
-```
+3. **Start Server:**
+   ```bash
+   .venv/bin/python working_proxmox_server.py
+   ```
 
-### **3. Test Server**
-```bash
-# Test basic functionality
-python3 test_server.py
+4. **Test Connection:**
+   ```bash
+   .venv/bin/python test_server.py
+   ```
 
-# Run the server
-python3 working_proxmox_server.py
-```
+## 🛠️ **Available Tools (21 Total)**
 
-## 📋 **Available Tools**
+### **Core Management Tools**
+- **`proxmox_test_connection`** - Test connection to Proxmox server
+- **`proxmox_get_version`** - Get Proxmox version information
+- **`proxmox_list_nodes`** - List all nodes in the cluster
 
-The fixed server provides these working tools:
+### **Node Management**
+- **`proxmox_get_node_status`** - Get detailed status and resource usage for a specific node
 
-- **`proxmox_test_connection`** - Test connection to Proxmox
-- **`proxmox_list_nodes`** - List all cluster nodes
-- **`proxmox_list_vms`** - List all virtual machines
-- **`proxmox_get_vm_info`** - Get detailed VM information
+### **Virtual Machine Management**
+- **`proxmox_list_vms`** - List all virtual machines (optionally filtered by node)
+- **`proxmox_get_vm_info`** - Get detailed information about a specific VM
+- **`proxmox_get_vm_status`** - Get current status and resource usage of a VM
+- **`proxmox_create_vm`** - Create a new virtual machine with configurable resources
 - **`proxmox_start_vm`** - Start a virtual machine
 - **`proxmox_stop_vm`** - Stop a virtual machine
-- **`proxmox_list_containers`** - List all containers
-- **`proxmox_list_storage`** - List all storage pools
-- **`proxmox_get_version`** - Get Proxmox version info
+- **`proxmox_suspend_vm`** - Suspend a running virtual machine
+- **`proxmox_resume_vm`** - Resume a suspended virtual machine
+- **`proxmox_delete_vm`** - Delete a virtual machine
 
-## 🔍 **Technical Details**
+### **Container Management**
+- **`proxmox_list_containers`** - List all containers (optionally filtered by node)
+- **`proxmox_start_container`** - Start a container
+- **`proxmox_stop_container`** - Stop a container
 
-### **Architecture Pattern**
-- **Pure JSON-RPC** - No MCP library dependencies
-- **Synchronous HTTP client** - Simple `requests` library
-- **Direct Proxmox API** - No proxy or abstraction layers
-- **Error handling** - Robust error responses
+### **Storage Management**
+- **`proxmox_list_storage`** - List all storage pools (optionally filtered by node)
+- **`proxmox_get_storage_usage`** - Get storage usage and capacity information
 
-### **Authentication Flow**
-1. **Username/Password** → Proxmox API ticket
-2. **Cookie-based auth** - Standard Proxmox method
-3. **Session persistence** - Maintains connection
-4. **SSL verification** - Configurable for self-signed certs
+### **Snapshot Management**
+- **`proxmox_create_snapshot`** - Create a snapshot of a VM or container
+- **`proxmox_list_snapshots`** - List snapshots for a VM or container
 
-### **API Integration**
-- **RESTful endpoints** - Standard Proxmox API
-- **JSON responses** - Consistent data format
-- **Error handling** - Graceful failure modes
-- **Multi-node support** - Cluster-aware operations
+## 🔧 **Tool Usage Examples**
+
+### **Create a New VM**
+```json
+{
+  "name": "proxmox_create_vm",
+  "arguments": {
+    "node": "pve",
+    "name": "test-vm",
+    "cores": "2",
+    "memory": "1024"
+  }
+}
+```
+
+### **Get Node Status**
+```json
+{
+  "name": "proxmox_get_node_status",
+  "arguments": {
+    "node": "pve"
+  }
+}
+```
+
+### **Create Snapshot**
+```json
+{
+  "name": "proxmox_create_snapshot",
+  "arguments": {
+    "node": "pve",
+    "vmid": "100",
+    "snapname": "backup-2024-01-15",
+    "description": "Monthly backup snapshot"
+  }
+}
+```
+
+## 📋 **Configuration**
+
+### **config.json Structure**
+```json
+{
+  "host": "your-proxmox-host",
+  "username": "your-username",
+  "password": "your-password",
+  "realm": "pam",
+  "port": 8006,
+  "ssl_verify": false
+}
+```
+
+### **Environment Variables (Optional)**
+```bash
+PROXMOX_HOST=your-proxmox-host
+PROXMOX_USERNAME=your-username
+PROXMOX_PASSWORD=your-password
+PROXMOX_REALM=pam
+PROXMOX_PORT=8006
+PROXMOX_SSL_VERIFY=false
+```
+
+## 🔒 **Security Features**
+
+- **No Hardcoded Credentials** - All credentials loaded from config or environment
+- **SSL Verification** - Configurable SSL certificate validation
+- **Authentication** - Secure ticket-based authentication with Proxmox
+- **Input Validation** - All tool inputs validated before execution
 
 ## 🧪 **Testing**
 
-### **Local Testing**
+### **Test Server**
 ```bash
-# Test without real Proxmox server
-python3 test_server.py
+.venv/bin/python test_server.py
 ```
 
-### **Integration Testing**
+### **Manual Testing**
 ```bash
-# Test with real Proxmox server
-# 1. Configure config.json
-# 2. Run: python3 working_proxmox_server.py
-# 3. Send MCP requests via stdin
+# Start server
+.venv/bin/python working_proxmox_server.py
+
+# In another terminal, test tools
+echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}' | .venv/bin/python working_proxmox_server.py
 ```
 
-## 🚫 **What I Removed**
-
-### **Unnecessary Dependencies**
-- `mcp` library - Not needed for basic MCP functionality
-- `fastapi`/`uvicorn` - HTTP server not needed for stdio MCP
-- `python-jose`/`passlib` - JWT complexity not needed
-- `proxmoxer` - Heavy library, replaced with direct API calls
-
-### **Complex Patterns**
-- Async/await patterns - Simplified to sync
-- Resource abstractions - Direct API calls
-- Complex validation - Basic error checking
-- HTTP server - Pure stdio communication
-
-## 🔒 **Security Considerations**
-
-### **What's Secure**
-- **No hardcoded credentials** - Configuration file only
-- **SSL verification** - Configurable for environments
-- **Session management** - Proper cookie handling
-- **Error sanitization** - No sensitive data in logs
-
-### **What to Watch**
-- **Config file permissions** - Keep `config.json` secure
-- **Network access** - Proxmox API port (8006)
-- **SSL certificates** - Self-signed cert handling
-- **Authentication tokens** - Proxmox ticket management
-
-## 📚 **Comparison with Other MCPs**
-
-| Feature | Original Proxmox | Fixed Proxmox | Working iDRAC |
-|---------|------------------|---------------|---------------|
-| **Architecture** | Complex async | Simple sync | Simple sync |
-| **Dependencies** | Heavy (20+ pkgs) | Light (3 pkgs) | Light (3 pkgs) |
-| **Authentication** | JWT + bcrypt | Direct API | Direct API |
-| **Server Type** | HTTP + stdio | Pure stdio | Pure stdio |
-| **Working Status** | ❌ Broken | ✅ Working | ✅ Working |
-| **Setup Time** | 10+ minutes | 2 minutes | 2 minutes |
-
-## 🎯 **Next Steps**
-
-### **Immediate**
-1. **Test the server** - Verify it works with your Proxmox
-2. **Configure tools** - Set up your preferred tools
-3. **Integration** - Connect to your MCP client
-
-### **Future Enhancements**
-1. **Additional tools** - More Proxmox operations
-2. **Better error handling** - More detailed error messages
-3. **Configuration validation** - Better config checking
-4. **Logging improvements** - More detailed debugging
-
-## 🆘 **Troubleshooting**
+## 🐛 **Troubleshooting**
 
 ### **Common Issues**
-- **Import errors** → Run `./setup.sh` to create virtual environment
-- **Connection failed** → Check `config.json` and network access
-- **SSL errors** → Set `"ssl_verify": false` for self-signed certs
-- **Auth failed** → Verify username/password and realm
+
+1. **Connection Failed**
+   - Check host/IP address
+   - Verify username/password
+   - Ensure Proxmox server is running
+   - Check firewall settings
+
+2. **Authentication Error**
+   - Verify realm setting (usually "pam")
+   - Check username/password combination
+   - Ensure user has appropriate permissions
+
+3. **SSL Issues**
+   - Set `ssl_verify: false` for self-signed certificates
+   - Check certificate validity
+
+4. **Tool Not Found**
+   - Restart Claude Desktop completely
+   - Verify server is running
+   - Check tool names match exactly
 
 ### **Debug Mode**
+Enable debug logging by setting environment variable:
 ```bash
-# Run with debug output
-python3 working_proxmox_server.py 2>&1 | grep DEBUG
+export DEBUG=1
 ```
 
-## 📝 **Conclusion**
+## 📚 **Technical Details**
 
-The original Proxmox MCP server was **over-engineered** and **broken by design**. By simplifying the architecture and following the **proven pattern** from the working iDRAC MCP, I've created a **fast, reliable, and maintainable** server that actually works.
+### **Architecture**
+- **Pure JSON-RPC Server** - No external MCP library dependencies
+- **ProxmoxClient Class** - Handles all Proxmox API interactions
+- **Tool Router** - Routes tool calls to appropriate client methods
+- **Response Formatter** - Ensures Claude Desktop compatibility
 
-**Key Success Factors:**
-- ✅ **Simple architecture** - No unnecessary complexity
-- ✅ **Lightweight dependencies** - Fast setup and deployment  
-- ✅ **Direct API integration** - No abstraction layers
-- ✅ **Proven patterns** - Based on working MCP implementations
-- ✅ **Easy testing** - Simple verification and debugging
+### **Dependencies**
+- `requests` - HTTP client for Proxmox API
+- `urllib3` - HTTP library with SSL support
+- `python-dotenv` - Environment variable loading
 
-The fixed server is now **production-ready** and follows the same **successful pattern** as your other working MCP servers! 🎉
+### **MCP Protocol Compliance**
+- **Tools List** - Returns all available tools with `inputSchema`
+- **Tool Calls** - Handles tool execution with proper error handling
+- **Response Format** - Uses `content`/`isError` structure for Claude Desktop
+- **Error Handling** - Graceful handling of all MCP protocol methods
+
+## 🚀 **What's New in This Version**
+
+### **Enhanced Tool Coverage**
+- **12 New Tools** added for comprehensive Proxmox management
+- **VM Lifecycle Management** - Create, suspend, resume, delete operations
+- **Container Management** - Start/stop container operations
+- **Storage Monitoring** - Detailed storage usage information
+- **Snapshot Management** - Create and list snapshots for VMs/containers
+
+### **Improved Functionality**
+- **Auto VMID Assignment** - Automatically finds next available VM ID
+- **Enhanced Error Handling** - Better error messages and status reporting
+- **Resource Configuration** - Configurable CPU cores and memory for new VMs
+- **Multi-format Support** - Handles both VMs and containers seamlessly
+
+### **Better Integration**
+- **Claude Desktop Ready** - All tools include proper `inputSchema`
+- **Standardized Responses** - Consistent response format across all tools
+- **Input Validation** - Proper parameter validation for all tools
+- **Error Reporting** - Clear error messages with proper error flags
+
+## 📈 **Performance & Reliability**
+
+- **Connection Pooling** - Efficient HTTP connection management
+- **Error Recovery** - Graceful handling of network issues
+- **Resource Management** - Proper cleanup of resources
+- **Logging** - Comprehensive debug logging for troubleshooting
+
+## 🔮 **Future Enhancements**
+
+- **Cluster Management** - Multi-node cluster operations
+- **Backup Management** - Automated backup creation and restoration
+- **Resource Monitoring** - Real-time resource usage tracking
+- **Template Management** - VM template creation and deployment
+- **Network Management** - Network configuration and monitoring
+
+---
+
+**🎯 This enhanced Proxmox MCP server now provides comprehensive management capabilities for your Proxmox VE environment, with 21 tools covering all major operations you need for day-to-day management.**
