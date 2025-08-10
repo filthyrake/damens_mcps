@@ -81,9 +81,8 @@ class ProxmoxClient:
         self.auth_url = f"{self.base_url}/access/ticket"
         self.session.verify = ssl_verify
 
-        # Set headers for Proxmox API
+        # Set headers for Proxmox API (excluding Content-Type to avoid conflicts)
         self.session.headers.update({
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
             'User-Agent': 'Proxmox-MCP-Server/1.0'
         })
@@ -131,17 +130,21 @@ class ProxmoxClient:
         """Make a request with proper error handling and debugging."""
         url = f"{self.base_url}{endpoint}"
         debug_print(f"Making {method} request to: {endpoint}")
+        
+        # Method mapping for cleaner code
+        method_handlers = {
+            'GET': self.session.get,
+            'POST': self.session.post,
+            'PUT': self.session.put,
+            'DELETE': self.session.delete
+        }
+        
         try:
-            if method.upper() == 'GET':
-                response = self.session.get(url, **kwargs)
-            elif method.upper() == 'POST':
-                response = self.session.post(url, **kwargs)
-            elif method.upper() == 'PUT':
-                response = self.session.put(url, **kwargs)
-            elif method.upper() == 'DELETE':
-                response = self.session.delete(url, **kwargs)
-            else:
+            handler = method_handlers.get(method.upper())
+            if handler is None:
                 raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            response = handler(url, **kwargs)
             response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
@@ -378,6 +381,7 @@ class ProxmoxClient:
             
             # Basic VM configuration
             config = {
+                "vmid": vmid,
                 "name": name,
                 "cores": cores,
                 "memory": memory,
@@ -416,7 +420,8 @@ class ProxmoxClient:
                     return "100"  # Default starting VMID
             else:
                 return "100"  # Fallback
-        except:
+        except Exception as e:
+            debug_print(f"Failed to get next VMID: {e}")
             return "100"  # Fallback
 
     def suspend_vm(self, node: str, vmid: int) -> Dict[str, Any]:
@@ -576,8 +581,8 @@ class ProxmoxClient:
                         "status": "success",
                         "message": f"VM snapshot {snapname} created successfully for VM {vmid}"
                     }
-            except:
-                pass
+            except Exception as vm_error:
+                debug_print(f"VM snapshot creation failed: {vm_error}")
             
             # Try container if VM failed
             try:
@@ -588,8 +593,8 @@ class ProxmoxClient:
                         "status": "success",
                         "message": f"Container snapshot {snapname} created successfully for container {vmid}"
                     }
-            except:
-                pass
+            except Exception as container_error:
+                debug_print(f"Container snapshot creation failed: {container_error}")
             
             return {
                 "status": "error",
@@ -615,8 +620,8 @@ class ProxmoxClient:
                         "count": len(snapshot_data.get("data", [])),
                         "message": f"VM snapshots retrieved for VM {vmid}"
                     }
-            except:
-                pass
+            except Exception as vm_error:
+                debug_print(f"VM snapshot listing failed: {vm_error}")
             
             # Try container if VM failed
             try:
@@ -629,8 +634,8 @@ class ProxmoxClient:
                         "count": len(snapshot_data.get("data", [])),
                         "message": f"Container snapshots retrieved for container {vmid}"
                     }
-            except:
-                pass
+            except Exception as container_error:
+                debug_print(f"Container snapshot listing failed: {container_error}")
             
             return {
                 "status": "error",
