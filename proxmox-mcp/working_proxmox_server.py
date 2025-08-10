@@ -319,7 +319,11 @@ class WorkingProxmoxMCPServer:
 
     def __init__(self):
         """Initialize the server."""
+        debug_print("Server starting...")
+        self.proxmox_client = None
+        
         try:
+            debug_print("Initializing Proxmox client...")
             self.proxmox_client = ProxmoxClient(
                 host=config['host'],
                 port=config['port'],
@@ -329,16 +333,25 @@ class WorkingProxmoxMCPServer:
                 realm=config.get('realm', 'pve'),
                 ssl_verify=config.get('ssl_verify', False)
             )
-            connection_result = self.proxmox_client.test_connection()
-            if connection_result['status'] == 'success':
-                debug_print("Proxmox connection successful")
-            else:
-                debug_print(f"Proxmox connection failed: {connection_result['error']}")
-                debug_print("Server will continue but Proxmox operations may fail")
+            
+            # Test connection in a non-blocking way
+            try:
+                connection_result = self.proxmox_client.test_connection()
+                if connection_result.get('status') == 'success':
+                    debug_print("Proxmox connection successful")
+                else:
+                    debug_print(f"Proxmox connection failed: {connection_result.get('error', 'Unknown error')}")
+                    debug_print("Server will continue but Proxmox operations may fail")
+            except Exception as conn_e:
+                debug_print(f"Connection test failed: {conn_e}")
+                debug_print("Server will continue but Proxmox operations will fail")
+                
         except Exception as e:
             debug_print(f"Failed to initialize Proxmox client: {e}")
             debug_print("Server will continue but Proxmox operations will fail")
             self.proxmox_client = None
+        
+        debug_print("Server initialization complete")
 
     def _list_tools(self) -> Dict[str, Any]:
         """List all available tools."""
