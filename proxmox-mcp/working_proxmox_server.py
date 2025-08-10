@@ -52,8 +52,11 @@ def load_config() -> Dict[str, Any]:
 # Load configuration
 config = load_config()
 
-# Suppress SSL warnings only for self-signed certificates when explicitly configured
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Only suppress SSL warnings when explicitly configured to not verify SSL
+# This is safer than globally disabling all warnings
+if not config.get('ssl_verify', True):
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    debug_print("SSL warnings disabled due to ssl_verify=False configuration")
 
 debug_print("Server starting...")
 
@@ -67,6 +70,18 @@ class ProxmoxClient:
     """Client for interacting with Proxmox VE API."""
 
     def __init__(self, host: str, port: int, protocol: str, username: str, password: str, realm: str = "pve", ssl_verify: bool = False):
+        """
+        Initialize Proxmox client.
+        
+        Args:
+            host: Proxmox hostname or IP address
+            port: Proxmox API port (usually 8006)
+            protocol: Protocol to use ('https' or 'http')
+            username: Proxmox username
+            password: Proxmox password
+            realm: Authentication realm (default: "pve" for Proxmox VE)
+            ssl_verify: Whether to verify SSL certificates (default: False for self-signed)
+        """
         self.host = host
         self.port = port
         self.protocol = protocol
@@ -97,8 +112,8 @@ class ProxmoxClient:
     def _authenticate(self):
         """Authenticate with Proxmox and get ticket."""
         try:
-            # If no realm is specified, just use the username
-            if self.realm:
+            # Handle realm properly - use default "pve" if not specified or empty
+            if self.realm and self.realm.strip():
                 username = f"{self.username}@{self.realm}"
             else:
                 username = self.username
@@ -155,12 +170,20 @@ class ProxmoxClient:
         """Test connection to Proxmox."""
         try:
             response = self._make_request('GET', '/version')
-            version_data = response.json()
-            return {
-                "status": "success",
-                "version": version_data.get('data', {}),
-                "message": "Connection successful"
-            }
+            try:
+                version_data = response.json()
+                return {
+                    "status": "success",
+                    "version": version_data.get('data', {}),
+                    "message": "Connection successful"
+                }
+            except (ValueError, KeyError) as parse_error:
+                debug_print(f"Failed to parse response: {parse_error}")
+                return {
+                    "status": "error",
+                    "error": f"Response parsing failed: {parse_error}",
+                    "message": "Connection succeeded but response parsing failed"
+                }
         except Exception as e:
             return {
                 "status": "error",
