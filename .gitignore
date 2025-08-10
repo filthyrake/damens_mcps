@@ -198,3 +198,6 @@ fleet_servers.json
 
 # Example configs are fine to commit
 !config.example.json
+
+# Warewulf MCP - tracked separately
+warewulf-mcp/
