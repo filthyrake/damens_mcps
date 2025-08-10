@@ -48,7 +48,7 @@ cd pfsense-mcp
 # For TrueNAS (Production Ready)
 cd truenas-mcp
 
-# For iDRAC (Untested - Use with caution)
+# For iDRAC (Production Ready)
 cd idrac-mcp
 
 # For Proxmox (Untested - Use with caution)
@@ -164,9 +164,9 @@ python examples/basic_usage.py
 python examples/basic_usage.py
 ```
 
-### ⚠️ iDRAC MCP (Untested)
+### ✅ iDRAC MCP (Production Ready)
 
-**⚠️ WARNING: This project is untested. Use with extreme caution!**
+**✅ STATUS: This project is now production ready and fully tested!**
 
 #### Setup Steps:
 
@@ -178,25 +178,39 @@ python examples/basic_usage.py
 2. **Configure environment:**
    ```bash
    cd idrac-mcp
-   cp env.example .env
+   cp config.example.json config.json
    ```
 
-3. **Edit `.env`:**
-   ```env
-   IDRAC_HOST=192.168.1.100
-   IDRAC_USERNAME=root
-   IDRAC_PASSWORD=your-password
-   SECRET_KEY=your-generated-secret-key
+3. **Edit `config.json`:**
+   ```json
+   {
+     "idrac_servers": {
+       "server1": {
+         "name": "Production Server 1",
+         "host": "192.168.1.100",
+         "port": 443,
+         "protocol": "https",
+         "username": "root",
+         "password": "your-password",
+         "ssl_verify": false
+       }
+     },
+     "default_server": "server1",
+     "server": {
+       "port": 8000,
+       "debug": true
+     }
+   }
    ```
 
 4. **Start server:**
    ```bash
-   python -m src.http_server
+   python working_mcp_server.py
    ```
 
 #### Testing:
 ```bash
-python tests/test_basic.py
+python test_server.py
 ```
 
 ### ⚠️ Proxmox MCP (Untested)
@@ -238,7 +252,13 @@ python tests/test_basic.py
 
 ## ⚙️ Configuration
 
-### Environment Variables
+### Configuration Methods
+
+**iDRAC MCP** now uses `config.json` files instead of environment variables for better multi-server support and security.
+
+**Other projects** continue to use environment variables for configuration.
+
+### Environment Variables (pfSense, TrueNAS, Proxmox)
 
 Each project uses environment variables for configuration. Here are the common ones:
 
@@ -551,4 +571,4 @@ htop
 
 **Happy Infrastructure Management! 🎉**
 
-Remember: Start with the production-ready projects (pfSense, TrueNAS) and be very careful with the untested ones (iDRAC, Proxmox).
+Remember: Start with the production-ready projects (pfSense, TrueNAS, iDRAC) and be very careful with the untested ones (Proxmox).
