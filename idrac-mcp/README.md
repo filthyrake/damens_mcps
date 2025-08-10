@@ -1,371 +1,157 @@
 # iDRAC MCP Server
 
-⚠️ **⚠️ WARNING: UNTESTED PROJECT ⚠️**
+A Model Context Protocol (MCP) server for managing multiple Dell iDRAC servers through their Redfish API.
 
-**This iDRAC MCP server has NOT been tested in production environments. Use at your own risk!**
+## Features
 
-- 🔴 **No real-world testing** has been performed
-- 🔴 **API compatibility** may not be fully verified
-- 🔴 **Error handling** may be incomplete
-- 🔴 **Security validation** is pending
+- **Multi-Server Support**: Manage multiple iDRAC servers from a single MCP server
+- **Power Management**: Power on, off, restart, and force power off servers
+- **System Information**: Get hardware details, power status, and health information
+- **Flexible Configuration**: JSON-based configuration with support for multiple server profiles
+- **Authentication**: Secure credential management with configurable SSL verification
 
-**Consider this project as a starting point for development rather than production-ready software.**
+## Configuration
 
----
-
-A Model Context Protocol (MCP) server for managing Dell PowerEdge servers via iDRAC (Integrated Dell Remote Access Controller).
-
-## 🚀 Features
-
-- **HTTP-based**: Fast, portable, and easy to deploy
-- **Docker Ready**: Containerized deployment with Docker
-- **Secure**: JWT authentication and HTTPS support
-- **Fast**: Built with FastAPI for high performance
-- **Monitoring**: Comprehensive logging and health checks
-- **RESTful**: Clean REST API for iDRAC management
-
-## 🛠️ Capabilities
-
-### System Management
-- Get system information and health status
-- View hardware inventory (CPU, memory, storage, network)
-- Monitor power consumption and thermal status
-- Check system events and logs
-
-### Power Management
-- Power on/off servers
-- Power cycle operations
-- Graceful shutdown
-- Force power operations
-
-### User Management
-- List, create, update, and delete iDRAC users
-- Manage user privileges and roles
-- Configure authentication settings
-
-### Network Management
-- Configure iDRAC network settings
-- View network interfaces and IP configuration
-- Manage VLAN settings
-
-### Storage Management
-- List storage controllers and drives
-- View RAID configuration
-- Monitor storage health and status
-
-### Firmware Management
-- Check firmware versions
-- List available firmware updates
-- Initiate firmware updates
-
-### Virtual Media
-- Mount/unmount virtual media
-- List available virtual media options
-- Configure virtual media settings
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.8+
-- Dell PowerEdge server with iDRAC
-- Network access to iDRAC interface
-
-### Local Development
-
-1. **Clone and setup:**
-```bash
-cd idrac-mcp
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-2. **Configure environment:**
-```bash
-cp env.example .env
-# Edit .env with your iDRAC settings
-```
-
-3. **Start the server:**
-   ```bash
-   python -m src.http_server
-   ```
-
-4. **Test the server:**
-   ```bash
-   # For direct testing
-   python mcp_server.py
-   
-   # For module testing
-   python -m src.http_server
-   ```
-
-5. **For fleet management (multiple servers):**
-   ```bash
-   # Use the secure fleet CLI (recommended)
-   python secure_fleet_cli.py init
-   python secure_fleet_cli.py add server_name host username
-   
-   # Or use the basic fleet CLI (less secure)
-   python fleet_cli.py init
-   python fleet_cli.py add server_name host username password
-   ```
-
-### Docker Deployment
-
-```bash
-docker-compose -f docker/docker-compose.yml up -d
-```
-
-## 📚 Documentation
-
-- **[Usage Guide](USAGE_GUIDE.md)** - Comprehensive guide for using all features
-- **[Security Warning](SECURITY_WARNING.md)** - Critical security information
-
-## 🔐 Security
-
-**IMPORTANT:** This project now includes secure password encryption for fleet management. See [SECURITY_WARNING.md](SECURITY_WARNING.md) for details.
-
-## 🖥️ Claude Desktop Integration
-
-This MCP server is configured to work with Claude Desktop. The `mcp_server.py` script provides a direct entry point that avoids import issues when run by Claude Desktop.
-
-- ✅ Passwords are encrypted using Fernet (AES-128-CBC)
-- ✅ Encryption keys are stored separately
-- ✅ All sensitive files are in `.gitignore`
-- ✅ Secure CLI prompts for passwords
-
-### Kubernetes Deployment
-
-```bash
-kubectl apply -f k8s/
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-```bash
-# iDRAC Connection Settings
-IDRAC_HOST=192.168.1.100
-IDRAC_PORT=443
-IDRAC_PROTOCOL=https
-IDRAC_USERNAME=root
-IDRAC_PASSWORD=your-password
-
-# SSL Settings
-IDRAC_SSL_VERIFY=false
-IDRAC_SSL_CERT_PATH=
-
-# MCP Server Settings
-SERVER_PORT=8000
-SECRET_KEY=your-secret-key
-DEBUG=false
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FORMAT=json
-
-# Authentication
-MCP_USERNAME=admin
-MCP_PASSWORD=admin
-ADMIN_TOKEN=admin-token-change-this
-```
-
-### CLI Usage
-
-```bash
-# Initialize configuration
-python -m src.cli init
-
-# Start server
-python -m src.cli serve
-
-# Check health
-python -m src.cli health
-
-# Login to get JWT token
-python -m src.cli login
-
-# List available tools
-python -m src.cli list-tools
-
-# Call a specific tool
-python -m src.cli call-tool --tool idrac_system_info --node server1
-```
-
-## 🔧 Cursor Integration
-
-Add to your Cursor MCP configuration (`~/.cursor/mcp.json`):
+Create a `config.json` file in the same directory as the server:
 
 ```json
 {
-  "mcpServers": {
-    "idrac": {
-      "url": "http://localhost:8000/mcp/",
-      "headers": {
-        "Authorization": "Bearer your-jwt-token-here"
-      }
+  "idrac_servers": {
+    "production": {
+      "name": "Production Server",
+      "host": "10.0.10.11",
+      "port": 443,
+      "protocol": "https",
+      "username": "root",
+      "password": "your_password_here",
+      "ssl_verify": false
+    },
+    "backup": {
+      "name": "Backup Server",
+      "host": "10.0.10.12",
+      "port": 443,
+      "protocol": "https",
+      "username": "root",
+      "password": "your_password_here",
+      "ssl_verify": false
     }
+  },
+  "default_server": "production",
+  "server": {
+    "port": 8000,
+    "debug": true
   }
 }
 ```
 
-## 🛠️ Available Tools
+### Configuration Options
 
-### System Tools
-- `idrac_system_info` - Get system information
-- `idrac_system_health` - Check system health status
-- `idrac_hardware_inventory` - List hardware components
-- `idrac_power_status` - Get power status
-- `idrac_thermal_status` - Get thermal status
+- **`idrac_servers`**: Dictionary of server configurations
+  - **`name`**: Human-readable server name (optional, defaults to server ID)
+  - **`host`**: IP address or hostname of the iDRAC
+  - **`port`**: Port number (usually 443 for HTTPS)
+  - **`protocol`**: Protocol to use (http or https)
+  - **`username`**: iDRAC username (usually "root")
+  - **`password`**: iDRAC password
+  - **`ssl_verify`**: Whether to verify SSL certificates (set to false for self-signed)
+- **`default_server`**: ID of the server to use when no server_id is specified
+- **`server`**: MCP server configuration
 
-### Power Management
-- `idrac_power_on` - Power on server
-- `idrac_power_off` - Power off server
-- `idrac_power_cycle` - Power cycle server
-- `idrac_graceful_shutdown` - Graceful shutdown
+## Available Tools
 
-### User Management
-- `idrac_users_list` - List iDRAC users
-- `idrac_user_create` - Create new user
-- `idrac_user_update` - Update user settings
-- `idrac_user_delete` - Delete user
+### `list_servers`
+Lists all configured iDRAC servers.
 
-### Network Management
-- `idrac_network_config` - Get network configuration
-- `idrac_network_interfaces` - List network interfaces
-- `idrac_network_update` - Update network settings
+**Arguments**: None
 
-### Storage Management
-- `idrac_storage_controllers` - List storage controllers
-- `idrac_storage_drives` - List storage drives
-- `idrac_raid_config` - Get RAID configuration
+### `test_connection`
+Tests connectivity to an iDRAC server.
 
-### Firmware Management
-- `idrac_firmware_versions` - Check firmware versions
-- `idrac_firmware_updates` - List available updates
-- `idrac_firmware_update` - Initiate firmware update
+**Arguments**:
+- `server_id` (optional): ID of the server to test. Uses default if not specified.
 
-### Virtual Media
-- `idrac_virtual_media_list` - List virtual media
-- `idrac_virtual_media_mount` - Mount virtual media
-- `idrac_virtual_media_unmount` - Unmount virtual media
+### `get_system_info`
+Retrieves system information from an iDRAC server.
 
-## 📝 Examples
+**Arguments**:
+- `server_id` (optional): ID of the server to query. Uses default if not specified.
 
-### Get System Information
-```python
-# Using the MCP client
-result = await client.call_tool("idrac_system_info", {"node": "server1"})
-print(result)
-```
+### `get_power_status`
+Gets the current power status of a server.
 
-### Power Management
-```python
-# Power cycle a server
-result = await client.call_tool("idrac_power_cycle", {
-    "node": "server1",
-    "force": False
-})
-```
+**Arguments**:
+- `server_id` (optional): ID of the server to query. Uses default if not specified.
 
-### User Management
-```python
-# Create a new user
-result = await client.call_tool("idrac_user_create", {
-    "node": "server1",
-    "username": "newuser",
-    "password": "securepass",
-    "privilege": "Administrator"
-})
-```
+### `power_on`
+Powers on a server.
 
-## 🔒 Security
+**Arguments**:
+- `server_id` (optional): ID of the server to control. Uses default if not specified.
 
-- JWT token authentication
-- HTTPS support for iDRAC communication
-- Password hashing with bcrypt
-- Configurable SSL verification
-- Role-based access control
+### `power_off`
+Gracefully powers off a server.
 
-## 🏗️ Development
+**Arguments**:
+- `server_id` (optional): ID of the server to control. Uses default if not specified.
 
-### Project Structure
-```
-idrac-mcp/
-├── src/
-│   ├── __init__.py
-│   ├── server.py          # Main MCP server
-│   ├── http_server.py     # FastAPI HTTP server
-│   ├── cli.py            # Command-line interface
-│   ├── idrac_client.py   # iDRAC API client
-│   ├── auth.py           # Authentication manager
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── logging.py    # Logging configuration
-│   │   └── validation.py # Input validation
-│   └── resources/
-│       ├── __init__.py
-│       ├── base.py       # Base resource handler
-│       ├── system.py     # System management
-│       ├── power.py      # Power management
-│       ├── users.py      # User management
-│       ├── network.py    # Network management
-│       ├── storage.py    # Storage management
-│       ├── firmware.py   # Firmware management
-│       └── virtual_media.py # Virtual media
-├── examples/
-├── tests/
-├── docker/
-├── k8s/
-├── requirements.txt
-├── env.example
-└── README.md
-```
+### `force_power_off`
+Forces a server to power off immediately.
 
-### Testing
+**Arguments**:
+- `server_id` (optional): ID of the server to control. Uses default if not specified.
+
+### `restart`
+Gracefully restarts a server.
+
+**Arguments**:
+- `server_id` (optional): ID of the server to control. Uses default if not specified.
+
+## Usage Examples
+
+### With Claude Desktop
+
+1. Add the MCP server to Claude Desktop
+2. Use tools like:
+   - "List all my iDRAC servers"
+   - "Get system info from the production server"
+   - "Check power status of all servers"
+   - "Power on the backup server"
+
+### Command Line Testing
+
+Run the test server to verify functionality:
+
 ```bash
-# Run tests
-pytest
-
-# Run with coverage
-pytest --cov=src
-
-# Run specific test
-pytest tests/test_system.py
+python test_server.py
 ```
 
-## 🤝 Contributing
+## Security Notes
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+- **Never commit `config.json`** - it contains sensitive credentials
+- Use `config.example.json` as a template
+- Consider using environment variables for production deployments
+- SSL verification is disabled by default for self-signed certificates
 
-## 📄 License
+## Troubleshooting
 
-MIT License - see LICENSE file for details.
+### 401 Authentication Errors
+- Verify credentials in `config.json`
+- Check if the iDRAC server is accessible from your network
+- Ensure the user account has appropriate permissions
 
-## 🆘 Support
+### Connection Timeouts
+- Verify the IP address and port
+- Check firewall settings
+- Ensure the iDRAC service is running
 
-- Create an issue for bugs or feature requests
-- Check the documentation in the `docs/` folder
-- Review the examples in the `examples/` folder
+### SSL Errors
+- Set `ssl_verify: false` for self-signed certificates
+- Verify the protocol is set correctly (http vs https)
 
-## 🗺️ Roadmap
+## Development
 
-- [ ] Support for multiple iDRAC versions
-- [ ] Advanced monitoring and alerting
-- [ ] Bulk operations across multiple servers
-- [ ] Integration with monitoring systems
-- [ ] Web UI for configuration
-- [ ] Plugin system for custom tools
-- [ ] Support for Dell OpenManage
-- [ ] Advanced security features
+The server is built as a pure JSON-RPC implementation to avoid MCP library compatibility issues. It reads from stdin and writes to stdout for MCP protocol communication.
 
----
+## License
 
-Built with ❤️ for Dell PowerEdge server management
+This project is for internal use only.
