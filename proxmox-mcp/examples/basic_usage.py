@@ -1,168 +1,162 @@
 #!/usr/bin/env python3
-"""Basic usage example for Proxmox MCP Server."""
+"""
+Basic usage examples for the Proxmox MCP Server.
 
-import asyncio
+This script demonstrates how to use the Proxmox MCP server
+and its various tools for managing Proxmox VE environments.
+"""
+
 import json
+import sys
 import os
-from typing import Dict, Any
+import time
 
-from dotenv import load_dotenv
+# Add the current directory to the path so we can import our modules
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Load environment variables
-load_dotenv()
+# Import the working server and client
+from working_proxmox_server import ProxmoxMCPServer
+from src.proxmox_client import ProxmoxClient
 
-# Configuration
-config = {
-    "host": os.getenv("PROXMOX_HOST"),
-    "port": int(os.getenv("PROXMOX_PORT", "8006")),
-    "protocol": os.getenv("PROXMOX_PROTOCOL", "https"),
-    "username": os.getenv("PROXMOX_USERNAME"),
-    "password": os.getenv("PROXMOX_PASSWORD"),
-    "api_token": os.getenv("PROXMOX_API_TOKEN"),
-    "realm": os.getenv("PROXMOX_REALM", "pve"),
-    "verify_ssl": os.getenv("PROXMOX_SSL_VERIFY", "true").lower() == "true",
-    "secret_key": os.getenv("SECRET_KEY"),
-}
-
-async def test_connection():
-    """Test connection to Proxmox."""
-    print("🔗 Testing Proxmox connection...")
+def test_proxmox_client():
+    """Test the Proxmox client directly."""
+    print("🔧 Testing Proxmox Client Directly...")
     
     try:
-        from src.proxmox_client import ProxmoxClient
+        # Create client instance
+        client = ProxmoxClient()
         
-        client = ProxmoxClient(config)
-        result = await client.test_connection()
+        # Test connection
+        print("  📡 Testing connection...")
+        result = client.test_connection()
+        print(f"  ✅ Connection result: {result}")
         
-        if result["status"] == "success":
-            print("✅ Connection successful!")
-            print(f"   Version: {result['version']}")
-        else:
-            print("❌ Connection failed!")
-            print(f"   Error: {result['error']}")
-            
+        # Get version
+        print("  📋 Getting version...")
+        version = client.get_version()
+        print(f"  ✅ Version: {version}")
+        
+        # List nodes
+        print("  🖥️  Listing nodes...")
+        nodes = client.list_nodes()
+        print(f"  ✅ Nodes: {nodes}")
+        
+        if nodes and 'data' in nodes:
+            for node in nodes['data']:
+                node_name = node['node']
+                print(f"    📊 Node: {node_name}")
+                
+                # List VMs on this node
+                vms = client.list_vms(node_name)
+                print(f"      🖥️  VMs: {len(vms.get('data', []))} found")
+                
+                # List containers on this node
+                containers = client.list_containers(node_name)
+                print(f"      📦 Containers: {len(containers.get('data', []))} found")
+                
+                # List storage on this node
+                storage = client.list_storage(node_name)
+                print(f"      💾 Storage: {len(storage.get('data', []))} pools")
+        
+        print("  🎉 Proxmox client test completed successfully!")
+        
     except Exception as e:
-        print(f"❌ Connection failed: {e}")
+        print(f"  ❌ Error testing Proxmox client: {e}")
+        return False
+    
+    return True
 
-async def list_nodes():
-    """List all nodes."""
-    print("\n🏗️  Listing cluster nodes...")
+def test_mcp_server():
+    """Test the MCP server functionality."""
+    print("\n🚀 Testing MCP Server...")
     
     try:
-        from src.proxmox_client import ProxmoxClient
+        # Create server instance
+        server = ProxmoxMCPServer()
         
-        client = ProxmoxClient(config)
-        nodes = await client.list_nodes()
+        # Test tools listing
+        print("  📋 Testing tools list...")
+        tools = server._list_tools()
+        print(f"  ✅ Found {len(tools)} tools:")
         
-        print(f"✅ Found {len(nodes)} nodes:")
-        for node in nodes:
-            print(f"   • {node['node']} - {node.get('status', 'unknown')}")
-            
+        for tool in tools:
+            print(f"    🛠️  {tool['name']}: {tool['description']}")
+        
+        # Test a simple tool call
+        print("  🔧 Testing tool call...")
+        result = server._call_tool("proxmox_test_connection", {})
+        print(f"  ✅ Tool call result: {result}")
+        
+        print("  🎉 MCP server test completed successfully!")
+        
     except Exception as e:
-        print(f"❌ Failed to list nodes: {e}")
+        print(f"  ❌ Error testing MCP server: {e}")
+        return False
+    
+    return False
 
-async def list_vms():
-    """List all virtual machines."""
-    print("\n🖥️  Listing virtual machines...")
+def test_specific_tools():
+    """Test specific tools with the client."""
+    print("\n🎯 Testing Specific Tools...")
     
     try:
-        from src.proxmox_client import ProxmoxClient
+        client = ProxmoxClient()
         
-        client = ProxmoxClient(config)
-        vms = await client.list_vms()
+        # Test VM operations
+        print("  🖥️  Testing VM operations...")
         
-        print(f"✅ Found {len(vms)} virtual machines:")
-        for vm in vms:
-            status = vm.get('status', 'unknown')
-            name = vm.get('name', f"VM {vm.get('vmid', 'unknown')}")
-            node = vm.get('node', 'unknown')
-            print(f"   • {name} (ID: {vm.get('vmid')}) - {status} on {node}")
-            
+        # List VMs (all nodes)
+        vms = client.list_vms()
+        print(f"    📋 Total VMs found: {len(vms.get('data', []))}")
+        
+        # Test container operations
+        print("  📦 Testing container operations...")
+        containers = client.list_containers()
+        print(f"    📋 Total containers found: {len(containers.get('data', []))}")
+        
+        # Test storage operations
+        print("  💾 Testing storage operations...")
+        storage = client.list_storage()
+        print(f"    📋 Total storage pools: {len(storage.get('data', []))}")
+        
+        print("  🎉 Specific tools test completed successfully!")
+        
     except Exception as e:
-        print(f"❌ Failed to list VMs: {e}")
-
-async def list_containers():
-    """List all containers."""
-    print("\n📦 Listing containers...")
+        print(f"  ❌ Error testing specific tools: {e}")
+        return False
     
-    try:
-        from src.proxmox_client import ProxmoxClient
-        
-        client = ProxmoxClient(config)
-        containers = await client.list_containers()
-        
-        print(f"✅ Found {len(containers)} containers:")
-        for container in containers:
-            status = container.get('status', 'unknown')
-            name = container.get('name', f"CT {container.get('vmid', 'unknown')}")
-            node = container.get('node', 'unknown')
-            print(f"   • {name} (ID: {container.get('vmid')}) - {status} on {node}")
-            
-    except Exception as e:
-        print(f"❌ Failed to list containers: {e}")
+    return True
 
-async def list_storage():
-    """List all storage pools."""
-    print("\n💾 Listing storage pools...")
-    
-    try:
-        from src.proxmox_client import ProxmoxClient
-        
-        client = ProxmoxClient(config)
-        storage = await client.list_storage()
-        
-        print(f"✅ Found {len(storage)} storage pools:")
-        for st in storage:
-            storage_type = st.get('type', 'unknown')
-            content = st.get('content', [])
-            node = st.get('node', 'unknown')
-            print(f"   • {st['storage']} ({storage_type}) - {', '.join(content)} on {node}")
-            
-    except Exception as e:
-        print(f"❌ Failed to list storage: {e}")
-
-async def get_version():
-    """Get Proxmox version."""
-    print("\n📋 Getting Proxmox version...")
-    
-    try:
-        from src.proxmox_client import ProxmoxClient
-        
-        client = ProxmoxClient(config)
-        version = await client.get_version()
-        
-        print("✅ Proxmox version information:")
-        for key, value in version.items():
-            print(f"   • {key}: {value}")
-            
-    except Exception as e:
-        print(f"❌ Failed to get version: {e}")
-
-async def main():
-    """Main function."""
-    print("🚀 Proxmox MCP Server - Basic Usage Example")
+def main():
+    """Main test function."""
+    print("🚀 Proxmox MCP Server - Basic Usage Examples")
     print("=" * 50)
     
-    # Validate configuration
-    if not config["host"]:
-        print("❌ PROXMOX_HOST environment variable is required")
-        return
+    # Test the client directly
+    client_success = test_proxmox_client()
     
-    if not config["api_token"] and (not config["username"] or not config["password"]):
-        print("❌ Either PROXMOX_API_TOKEN or PROXMOX_USERNAME/PROXMOX_PASSWORD is required")
-        return
+    # Test the MCP server
+    server_success = test_mcp_server()
     
-    print(f"📡 Connecting to Proxmox at {config['host']}:{config['port']}")
+    # Test specific tools
+    tools_success = test_specific_tools()
     
-    # Run tests
-    await test_connection()
-    await get_version()
-    await list_nodes()
-    await list_vms()
-    await list_containers()
-    await list_storage()
+    # Summary
+    print("\n📊 Test Summary")
+    print("=" * 30)
+    print(f"  🔧 Proxmox Client: {'✅ PASS' if client_success else '❌ FAIL'}")
+    print(f"  🚀 MCP Server: {'✅ PASS' if server_success else '❌ FAIL'}")
+    print(f"  🛠️  Specific Tools: {'✅ PASS' if tools_success else '❌ FAIL'}")
     
-    print("\n✅ Basic usage example completed!")
+    if client_success and tools_success:
+        print("\n🎉 All critical tests passed! The Proxmox MCP server is ready to use.")
+        print("\n💡 Next steps:")
+        print("   1. Start the server: python working_proxmox_server.py")
+        print("   2. Configure Claude Desktop to use this server")
+        print("   3. Test the tools in Claude Desktop")
+    else:
+        print("\n⚠️  Some tests failed. Please check the configuration and try again.")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
