@@ -1,0 +1,9 @@
+{
+  "host": "your-proxmox-host.example.com",
+  "port": 8006,
+  "protocol": "https",
+  "username": "your-username",
+  "password": "your-password",
+  "realm": "pve",
+  "ssl_verify": false
+}
