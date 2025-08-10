@@ -1,9 +1,0 @@
-{
-  "host": "localhost",
-  "port": 9873,
-  "protocol": "http",
-  "username": "admin",
-  "password": "your-password",
-  "ssl_verify": false,
-  "timeout": 30
-}
