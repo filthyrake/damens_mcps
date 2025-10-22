@@ -18,6 +18,7 @@ import mcp.server.stdio
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolRequest,
+    CallToolResult,
     ListToolsRequest,
     InitializeRequest,
     Tool,
@@ -175,7 +176,15 @@ class HTTPPfSenseMCPServer:
             ),
             Tool(
                 name="create_firewall_rule",
-                description="Create a new firewall rule",
+                description=(
+                    "Create a new firewall rule with validation.\n\n"
+                    "This operation will:\n"
+                    "- Create a firewall rule with specified action (pass, block, or reject)\n"
+                    "- Apply to specified interface and traffic direction\n"
+                    "- Optionally filter by source/destination addresses and ports\n\n"
+                    "Example: Create a rule to block incoming traffic from 192.168.1.100:\n"
+                    '  {"action": "block", "interface": "wan", "direction": "in", "source": "192.168.1.100"}'
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -210,7 +219,8 @@ class HTTPPfSenseMCPServer:
                             "description": "Rule description"
                         }
                     },
-                    "required": ["action", "interface", "direction"]
+                    "required": ["action", "interface", "direction"],
+                    "additionalProperties": False
                 }
             ),
             Tool(
@@ -450,7 +460,7 @@ class HTTPPfSenseMCPServer:
             ),
         ]
     
-    async def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool(self, name: str, arguments: Dict[str, Any]) -> CallToolResult:
         """
         Call a tool by name with the given arguments.
         
@@ -459,15 +469,15 @@ class HTTPPfSenseMCPServer:
             arguments: Tool arguments
             
         Returns:
-            Tool result as dictionary (CRITICAL: Using dict instead of CallToolResult)
+            Tool result as CallToolResult
         """
         global pfsense_client
         
         if not pfsense_client:
-            return {
-                "content": [{"type": "text", "text": "Error: pfSense client not initialized"}],
-                "isError": True
-            }
+            return CallToolResult(
+                content=[TextContent(type="text", text="Error: pfSense client not initialized")],
+                isError=True
+            )
         
         try:
             
@@ -485,18 +495,18 @@ class HTTPPfSenseMCPServer:
                 # Validate parameters
                 errors = validate_firewall_rule_params(arguments)
                 if errors:
-                    return {
-                        "content": [{"type": "text", "text": f"Validation errors: {', '.join(errors)}"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"Validation errors: {', '.join(errors)}")],
+                        isError=True
+                    )
                 result = await pfsense_client.create_firewall_rule(arguments)
             elif name == "delete_firewall_rule":
                 rule_id = arguments.get("rule_id", "")
                 if not rule_id or not validate_id(rule_id):
-                    return {
-                        "content": [{"type": "text", "text": "Error: rule_id is required and must be alphanumeric with hyphens/underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: rule_id is required and must be alphanumeric with hyphens/underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.delete_firewall_rule(rule_id)
             elif name == "get_firewall_logs":
                 limit = arguments.get("limit", 100)
@@ -507,18 +517,18 @@ class HTTPPfSenseMCPServer:
                 # Validate parameters
                 errors = validate_vlan_params(arguments)
                 if errors:
-                    return {
-                        "content": [{"type": "text", "text": f"Validation errors: {', '.join(errors)}"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"Validation errors: {', '.join(errors)}")],
+                        isError=True
+                    )
                 result = await pfsense_client.create_vlan(arguments)
             elif name == "delete_vlan":
                 vlan_id = arguments.get("vlan_id", "")
                 if not vlan_id or not validate_id(vlan_id):
-                    return {
-                        "content": [{"type": "text", "text": "Error: vlan_id is required and must be alphanumeric with hyphens/underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: vlan_id is required and must be alphanumeric with hyphens/underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.delete_vlan(vlan_id)
             elif name == "get_dhcp_leases":
                 result = await pfsense_client.get_dhcp_leases()
@@ -529,18 +539,18 @@ class HTTPPfSenseMCPServer:
             elif name == "install_package":
                 package_name = arguments.get("package_name", "")
                 if not package_name or not validate_package_name(package_name):
-                    return {
-                        "content": [{"type": "text", "text": "Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.install_package(package_name)
             elif name == "remove_package":
                 package_name = arguments.get("package_name", "")
                 if not package_name or not validate_package_name(package_name):
-                    return {
-                        "content": [{"type": "text", "text": "Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.remove_package(package_name)
             elif name == "get_package_updates":
                 result = await pfsense_client.get_package_updates()
@@ -553,26 +563,26 @@ class HTTPPfSenseMCPServer:
             elif name == "restart_vpn_service":
                 service_name = arguments.get("service_name", "")
                 if not service_name or not validate_service_name(service_name):
-                    return {
-                        "content": [{"type": "text", "text": "Error: service_name is required and must be alphanumeric with hyphens or underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: service_name is required and must be alphanumeric with hyphens or underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.restart_vpn_service(service_name)
             elif name == "create_backup":
                 backup_name = arguments.get("backup_name", "")
                 if not backup_name or not validate_backup_name(backup_name):
-                    return {
-                        "content": [{"type": "text", "text": "Error: backup_name is required and must be alphanumeric with dots, hyphens, or underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: backup_name is required and must be alphanumeric with dots, hyphens, or underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.create_backup(backup_name)
             elif name == "restore_backup":
                 backup_id = arguments.get("backup_id", "")
                 if not backup_id or not validate_id(backup_id):
-                    return {
-                        "content": [{"type": "text", "text": "Error: backup_id is required and must be alphanumeric with hyphens or underscores"}],
-                        "isError": True
-                    }
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="Error: backup_id is required and must be alphanumeric with hyphens or underscores")],
+                        isError=True
+                    )
                 result = await pfsense_client.restore_backup(backup_id)
             elif name == "get_backup_list":
                 result = await pfsense_client.get_backup_list()
@@ -580,30 +590,30 @@ class HTTPPfSenseMCPServer:
                 success = await pfsense_client.test_connection()
                 result = {"connected": success}
             else:
-                return {
-                    "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
-                    "isError": True
-                }
+                return CallToolResult(
+                    content=[TextContent(type="text", text=f"Unknown tool: {name}")],
+                    isError=True
+                )
             
             # Convert result to JSON string for proper serialization
             result_text = json.dumps(result, indent=2, default=str)
             
-            # CRITICAL: Return dictionary instead of CallToolResult
-            return {
-                "content": [{"type": "text", "text": result_text}],
-                "isError": False
-            }
+            # Return proper CallToolResult
+            return CallToolResult(
+                content=[TextContent(type="text", text=result_text)],
+                isError=False
+            )
             
         except PfSenseAPIError as e:
-            return {
-                "content": [{"type": "text", "text": f"pfSense API error: {str(e)}"}],
-                "isError": True
-            }
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"pfSense API error: {str(e)}")],
+                isError=True
+            )
         except Exception as e:
-            return {
-                "content": [{"type": "text", "text": f"Unexpected error: {str(e)}"}],
-                "isError": True
-            }
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Unexpected error: {str(e)}")],
+                isError=True
+            )
 
 
 async def initialize_pfsense_client() -> Optional[HTTPPfSenseClient]:
