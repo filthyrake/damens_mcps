@@ -167,7 +167,8 @@ class BaseResource(ABC):
             Error result
         """
         return CallToolResult(
-            content=[TextContent(type="text", text=f"Error: {error}")]
+            content=[TextContent(type="text", text=f"Error: {error}")],
+            isError=True
         )
     
     def _create_success_result(self, data: Any) -> CallToolResult:
