@@ -30,7 +30,10 @@ try:
     from .utils.validation import (
         validate_firewall_rule_params,
         validate_vlan_params,
-        sanitize_string
+        validate_package_name,
+        validate_service_name,
+        validate_backup_name,
+        validate_id
     )
 except ImportError:
     # Fallback for direct execution
@@ -39,7 +42,10 @@ except ImportError:
     from utils.validation import (
         validate_firewall_rule_params,
         validate_vlan_params,
-        sanitize_string
+        validate_package_name,
+        validate_service_name,
+        validate_backup_name,
+        validate_id
     )
 
 # Set up logging to stderr only (not stdout to avoid breaking MCP protocol)
@@ -481,10 +487,10 @@ class HTTPPfSenseMCPServer:
                     }
                 result = await pfsense_client.create_firewall_rule(arguments)
             elif name == "delete_firewall_rule":
-                rule_id = sanitize_string(arguments.get("rule_id", ""))
-                if not rule_id:
+                rule_id = arguments.get("rule_id", "")
+                if not rule_id or not validate_id(rule_id):
                     return {
-                        "content": [{"type": "text", "text": "Error: rule_id is required"}],
+                        "content": [{"type": "text", "text": "Error: rule_id is required and must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.delete_firewall_rule(rule_id)
@@ -503,10 +509,10 @@ class HTTPPfSenseMCPServer:
                     }
                 result = await pfsense_client.create_vlan(arguments)
             elif name == "delete_vlan":
-                vlan_id = sanitize_string(arguments.get("vlan_id", ""))
-                if not vlan_id:
+                vlan_id = arguments.get("vlan_id", "")
+                if not vlan_id or not validate_id(vlan_id):
                     return {
-                        "content": [{"type": "text", "text": "Error: vlan_id is required"}],
+                        "content": [{"type": "text", "text": "Error: vlan_id is required and must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.delete_vlan(vlan_id)
@@ -517,18 +523,18 @@ class HTTPPfSenseMCPServer:
             elif name == "get_installed_packages":
                 result = await pfsense_client.get_installed_packages()
             elif name == "install_package":
-                package_name = sanitize_string(arguments.get("package_name", ""))
-                if not package_name:
+                package_name = arguments.get("package_name", "")
+                if not package_name or not validate_package_name(package_name):
                     return {
-                        "content": [{"type": "text", "text": "Error: package_name is required"}],
+                        "content": [{"type": "text", "text": "Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.install_package(package_name)
             elif name == "remove_package":
-                package_name = sanitize_string(arguments.get("package_name", ""))
-                if not package_name:
+                package_name = arguments.get("package_name", "")
+                if not package_name or not validate_package_name(package_name):
                     return {
-                        "content": [{"type": "text", "text": "Error: package_name is required"}],
+                        "content": [{"type": "text", "text": "Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.remove_package(package_name)
@@ -541,26 +547,26 @@ class HTTPPfSenseMCPServer:
             elif name == "get_openvpn_clients":
                 result = await pfsense_client.get_openvpn_clients()
             elif name == "restart_vpn_service":
-                service_name = sanitize_string(arguments.get("service_name", ""))
-                if not service_name:
+                service_name = arguments.get("service_name", "")
+                if not service_name or not validate_service_name(service_name):
                     return {
-                        "content": [{"type": "text", "text": "Error: service_name is required"}],
+                        "content": [{"type": "text", "text": "Error: service_name is required and must be alphanumeric with hyphens or underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.restart_vpn_service(service_name)
             elif name == "create_backup":
-                backup_name = sanitize_string(arguments.get("backup_name", ""))
-                if not backup_name:
+                backup_name = arguments.get("backup_name", "")
+                if not backup_name or not validate_backup_name(backup_name):
                     return {
-                        "content": [{"type": "text", "text": "Error: backup_name is required"}],
+                        "content": [{"type": "text", "text": "Error: backup_name is required and must be alphanumeric with dots, hyphens, or underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.create_backup(backup_name)
             elif name == "restore_backup":
-                backup_id = sanitize_string(arguments.get("backup_id", ""))
-                if not backup_id:
+                backup_id = arguments.get("backup_id", "")
+                if not backup_id or not validate_id(backup_id):
                     return {
-                        "content": [{"type": "text", "text": "Error: backup_id is required"}],
+                        "content": [{"type": "text", "text": "Error: backup_id is required and must be alphanumeric with hyphens or underscores"}],
                         "isError": True
                     }
                 result = await pfsense_client.restore_backup(backup_id)

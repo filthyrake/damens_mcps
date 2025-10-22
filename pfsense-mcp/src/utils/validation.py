@@ -143,18 +143,116 @@ def sanitize_string(value: str) -> str:
     """
     Sanitize a string value for safe use in API calls.
     
+    DEPRECATED: Use specific validation functions instead (validate_package_name, validate_service_name, etc.)
+    This function will be removed in a future version. Please migrate to the appropriate validator.
+    
     Args:
         value: String to sanitize
         
     Returns:
         Sanitized string
+        
+    Raises:
+        DeprecationWarning: This function is deprecated
     """
+    import warnings
+    warnings.warn(
+        "sanitize_string() is deprecated. Use validate_package_name(), validate_service_name(), "
+        "validate_backup_name(), or validate_id() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
     if not value:
         return ""
     
     # Remove potentially dangerous characters
     sanitized = re.sub(r'[<>"\']', '', str(value))
     return sanitized.strip()
+
+
+def validate_package_name(name: str) -> bool:
+    """
+    Validate package name using whitelist approach.
+    
+    Package names should only contain alphanumeric characters, hyphens, underscores, and dots.
+    This prevents command injection attacks.
+    
+    Args:
+        name: Package name to validate
+        
+    Returns:
+        True if valid package name, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Only allow alphanumeric, hyphens, underscores, and dots
+    # This is safe for pfSense package manager
+    pattern = r'^[a-zA-Z0-9._-]+$'
+    return bool(re.match(pattern, name)) and len(name) <= 255
+
+
+def validate_service_name(name: str) -> bool:
+    """
+    Validate service name using whitelist approach.
+    
+    Service names should only contain alphanumeric characters, hyphens, and underscores.
+    This prevents command injection attacks.
+    
+    Args:
+        name: Service name to validate
+        
+    Returns:
+        True if valid service name, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Only allow alphanumeric, hyphens, and underscores
+    # Common service names: openvpn, ipsec, wireguard, etc.
+    pattern = r'^[a-zA-Z0-9_-]+$'
+    return bool(re.match(pattern, name)) and len(name) <= 128
+
+
+def validate_backup_name(name: str) -> bool:
+    """
+    Validate backup name using whitelist approach.
+    
+    Backup names should only contain alphanumeric characters, hyphens, underscores, and dots.
+    
+    Args:
+        name: Backup name to validate
+        
+    Returns:
+        True if valid backup name, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Only allow alphanumeric, hyphens, underscores, and dots
+    pattern = r'^[a-zA-Z0-9._-]+$'
+    return bool(re.match(pattern, name)) and len(name) <= 255
+
+
+def validate_id(id_value: str) -> bool:
+    """
+    Validate generic ID string (for rules, VLANs, backups, etc.).
+    
+    IDs should only contain alphanumeric characters, hyphens, and underscores.
+    
+    Args:
+        id_value: ID string to validate
+        
+    Returns:
+        True if valid ID, False otherwise
+    """
+    if not id_value or not isinstance(id_value, str):
+        return False
+    
+    # Only allow alphanumeric, hyphens, and underscores
+    pattern = r'^[a-zA-Z0-9_-]+$'
+    return bool(re.match(pattern, id_value)) and len(id_value) <= 128
 
 
 def validate_config(config: Dict[str, Any]) -> List[str]:
