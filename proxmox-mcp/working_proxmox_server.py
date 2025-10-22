@@ -189,9 +189,6 @@ class ProxmoxClient:
         except KeyError as e:
             debug_print(f"Missing expected field in authentication response: {e}")
             raise ProxmoxAPIError(f"Invalid authentication response format: {e}") from e
-        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-            debug_print(f"Unexpected error during authentication: {e}")
-            raise ProxmoxError(f"Unexpected authentication error: {e}") from e
 
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make a request with proper error handling and debugging."""
@@ -235,26 +232,24 @@ class ProxmoxClient:
             raise ProxmoxConnectionError(f"Request error: {e}") from e
         except (ProxmoxValidationError, ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxResourceNotFoundError, ProxmoxAPIError):
             raise
-        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-            debug_print(f"Unexpected error for {method} {endpoint}: {e}")
-            raise ProxmoxError(f"Unexpected request error: {e}") from e
 
     def test_connection(self) -> Dict[str, Any]:
         """Test connection to Proxmox."""
         try:
             response = self._make_request('GET', '/version')
-            version_data = response.json()
+            try:
+                version_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse response: {e}")
+                return {
+                    "status": "error",
+                    "error": f"Response parsing failed: {e}",
+                    "message": "Connection succeeded but response parsing failed"
+                }
             return {
                 "status": "success",
                 "version": version_data.get('data', {}),
                 "message": "Connection successful"
-            }
-        except json.JSONDecodeError as e:
-            debug_print(f"Failed to parse response: {e}")
-            return {
-                "status": "error",
-                "error": f"Response parsing failed: {e}",
-                "message": "Connection succeeded but response parsing failed"
             }
         except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
             debug_print(f"Connection test failed: {e}")
@@ -267,7 +262,11 @@ class ProxmoxClient:
     def list_nodes(self) -> List[Dict[str, Any]]:
         """List all nodes in the cluster."""
         response = self._make_request('GET', '/nodes')
-        nodes_data = response.json()
+        try:
+            nodes_data = response.json()
+        except json.JSONDecodeError as e:
+            debug_print(f"Failed to parse nodes list response: {e}")
+            raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
         return nodes_data.get('data', [])
 
     def list_vms(self, node: str = None) -> List[Dict[str, Any]]:
@@ -275,7 +274,11 @@ class ProxmoxClient:
         if node:
             endpoint = f'/nodes/{node}/qemu'
             response = self._make_request('GET', endpoint)
-            vms_data = response.json()
+            try:
+                vms_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse VMs list response: {e}")
+                raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
             return vms_data.get('data', [])
         else:
             # Get VMs from all nodes
@@ -284,7 +287,11 @@ class ProxmoxClient:
             for node_info in nodes:
                 try:
                     response = self._make_request('GET', f'/nodes/{node_info["node"]}/qemu')
-                    vms_data = response.json()
+                    try:
+                        vms_data = response.json()
+                    except json.JSONDecodeError as e:
+                        debug_print(f"Failed to parse VMs response for node {node_info['node']}: {e}")
+                        continue
                     node_vms = vms_data.get('data', [])
                     for vm in node_vms:
                         vm['node'] = node_info['node']
@@ -297,7 +304,11 @@ class ProxmoxClient:
     def get_vm_info(self, node: str, vmid: int) -> Dict[str, Any]:
         """Get detailed information about a specific VM."""
         response = self._make_request('GET', f'/nodes/{node}/qemu/{vmid}/status/current')
-        vm_data = response.json()
+        try:
+            vm_data = response.json()
+        except json.JSONDecodeError as e:
+            debug_print(f"Failed to parse VM info response: {e}")
+            raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
         return vm_data.get('data', {})
 
     def start_vm(self, node: str, vmid: int) -> Dict[str, Any]:
@@ -339,7 +350,11 @@ class ProxmoxClient:
         if node:
             endpoint = f'/nodes/{node}/lxc'
             response = self._make_request('GET', endpoint)
-            containers_data = response.json()
+            try:
+                containers_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse containers list response: {e}")
+                raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
             return containers_data.get('data', [])
         else:
             # Get containers from all nodes
@@ -348,7 +363,11 @@ class ProxmoxClient:
             for node_info in nodes:
                 try:
                     response = self._make_request('GET', f'/nodes/{node_info["node"]}/lxc')
-                    containers_data = response.json()
+                    try:
+                        containers_data = response.json()
+                    except json.JSONDecodeError as e:
+                        debug_print(f"Failed to parse containers response for node {node_info['node']}: {e}")
+                        continue
                     node_containers = containers_data.get('data', [])
                     for container in node_containers:
                         container['node'] = node_info['node']
@@ -362,7 +381,11 @@ class ProxmoxClient:
         if node:
             endpoint = f'/nodes/{node}/storage'
             response = self._make_request('GET', endpoint)
-            storage_data = response.json()
+            try:
+                storage_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse storage list response: {e}")
+                raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
             return storage_data.get('data', [])
         else:
             # Get storage from all nodes
@@ -371,7 +394,11 @@ class ProxmoxClient:
             for node_info in nodes:
                 try:
                     response = self._make_request('GET', f'/nodes/{node_info["node"]}/storage')
-                    storage_data = response.json()
+                    try:
+                        storage_data = response.json()
+                    except json.JSONDecodeError as e:
+                        debug_print(f"Failed to parse storage response for node {node_info['node']}: {e}")
+                        continue
                     node_storage = storage_data.get('data', [])
                     for storage in node_storage:
                         storage['node'] = node_info['node']

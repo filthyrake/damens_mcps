@@ -78,7 +78,7 @@ class AuthManager:
                 with open(token_path, 'r') as f:
                     self._token = f.read().strip()
                     logger.info("Loaded authentication token from file")
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.warning(f"Failed to load token from file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Unexpected error loading token from file {self.config.token_file}: {e}", exc_info=True)
@@ -102,7 +102,7 @@ class AuthManager:
             # Set appropriate permissions (read/write for owner only)
             token_path.chmod(0o600)
             logger.info("Saved authentication token to file")
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.warning(f"Failed to save token to file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Unexpected error saving token to file {self.config.token_file}: {e}", exc_info=True)
@@ -117,7 +117,7 @@ class AuthManager:
             if token_path.exists():
                 token_path.unlink()
                 logger.info("Cleared authentication token from file")
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.warning(f"Failed to clear token file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Unexpected error clearing token file {self.config.token_file}: {e}", exc_info=True)

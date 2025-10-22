@@ -99,7 +99,6 @@ class HTTPPfSenseClient:
                 except (PfSenseAuthError, aiohttp.ClientError) as e:
                     # Fall back to original auth method
                     logger.warning(f"JWT token acquisition failed, using fallback auth: {e}")
-                    pass
         
         url = urljoin(self.base_url, endpoint)
         
