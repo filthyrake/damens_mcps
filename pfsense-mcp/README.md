@@ -90,6 +90,140 @@ PFSENSE_API_KEY=your-api-key-here
 PFSENSE_SSL_VERIFY=true
 ```
 
+#### Configuration Options Explained
+
+##### Connection Settings
+
+- **PFSENSE_HOST** (required)
+  - **Type:** String (hostname or IP address)
+  - **Description:** pfSense firewall address
+  - **Example:** `192.168.1.1` or `firewall.example.com`
+  - **Security:** Should be on a trusted management network
+
+- **PFSENSE_PORT** (optional)
+  - **Type:** Integer
+  - **Default:** `443`
+  - **Description:** HTTPS port for pfSense web interface
+  - **Valid Range:** 1-65535
+  - **Note:** Use port 80 only if HTTPS is unavailable
+
+- **PFSENSE_PROTOCOL** (optional)
+  - **Type:** String
+  - **Default:** `https`
+  - **Valid Values:** `https`, `http`
+  - **Description:** Protocol for pfSense connection
+  - **Security:** Always use `https` in production
+
+##### Authentication Methods
+
+pfSense MCP supports two authentication methods. **Choose only one:**
+
+**Method 1: API Key (Recommended)**
+- **PFSENSE_API_KEY** (required if not using username/password)
+  - **Type:** String
+  - **Description:** pfSense REST API key
+  - **Security:** Preferred method - supports key rotation without password changes
+  - **How to generate:**
+    1. Log into pfSense web interface
+    2. Navigate to **System → API**
+    3. Enable the REST API if not already enabled
+    4. Click **+ Add** to create a new API key
+    5. Assign appropriate permissions (typically full access for MCP)
+    6. Copy the generated key immediately (it won't be shown again)
+  - **Example:** `AbCdEf123456789GhIjKlMnOpQrStUvWxYz`
+
+**Method 2: Username & Password**
+- **PFSENSE_USERNAME** (required if not using API key)
+  - **Type:** String
+  - **Description:** pfSense admin username
+  - **Default:** `admin`
+  - **Security:** Use a dedicated account with minimal necessary privileges
+
+- **PFSENSE_PASSWORD** (required if not using API key)
+  - **Type:** String
+  - **Description:** pfSense admin password
+  - **Security:** Use a strong password; rotate regularly
+
+**Authentication Precedence:** If both API key and username/password are provided, the API key takes precedence.
+
+##### SSL/TLS Settings
+
+- **PFSENSE_SSL_VERIFY** (optional)
+  - **Type:** Boolean
+  - **Default:** `true`
+  - **Valid Values:** `true`, `false`
+  - **Description:** Whether to verify SSL certificates
+  - **Security Implications:**
+    - `true` (recommended): Verifies the SSL certificate, preventing MITM attacks
+    - `false`: Disables SSL verification, accepting self-signed certificates
+  - **When to use `false`:**
+    - Development/testing environments
+    - pfSense uses a self-signed certificate
+    - Custom CA certificate (see below for better option)
+  - **Production:** Always use `true` with valid certificates
+
+#### Troubleshooting SSL Certificate Issues
+
+If you encounter SSL certificate errors:
+
+**Option 1: Disable Verification (Testing Only)**
+```bash
+PFSENSE_SSL_VERIFY=false
+```
+
+**Option 2: Use Valid Certificates (Recommended)**
+1. Install Let's Encrypt or commercial certificate on pfSense
+2. Navigate to **System → Cert. Manager**
+3. Import or generate a valid certificate
+4. Set it as the web interface certificate
+
+**Option 3: Trust Self-Signed Certificate**
+```python
+# Add custom CA certificate to Python's trust store
+import certifi
+import os
+os.environ['REQUESTS_CA_BUNDLE'] = '/path/to/custom-ca-bundle.crt'
+```
+
+#### Required pfSense Configuration
+
+Before using this MCP server, ensure pfSense is properly configured:
+
+1. **Enable REST API**
+   - Navigate to **System → API**
+   - Check **Enable REST API**
+   - Select **JSON** as the API format
+   - Click **Save**
+
+2. **API Version Requirements**
+   - **Minimum:** pfSense 2.5.0
+   - **Recommended:** pfSense 2.6.0 or later
+   - Some tools may require specific versions (noted in tool descriptions)
+
+3. **User Permissions**
+   - API key or user account must have appropriate permissions
+   - For full functionality, use an account with **System Administrator** privileges
+   - For restricted access, create a custom privilege set
+
+#### Environment Variable Alternatives
+
+Instead of `.env` file, you can also set variables directly:
+
+```bash
+# Export variables in your shell
+export PFSENSE_HOST=192.168.1.1
+export PFSENSE_API_KEY=your-api-key-here
+
+# Run the server
+python src/http_pfsense_server.py
+```
+
+Or pass them when running:
+
+```bash
+PFSENSE_HOST=192.168.1.1 PFSENSE_API_KEY=your-key python src/http_pfsense_server.py
+```
+
 ### Testing the Connection
 
 Run the basic usage example to test your configuration:
@@ -130,12 +264,6 @@ Add to `~/.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": {
-        "Authorization": "Bearer your-github-token"
-      }
-    },
     "pfsense": {
       "command": "/path/to/pfsense-mcp/.venv/bin/python",
       "args": [
