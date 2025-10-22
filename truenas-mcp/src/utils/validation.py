@@ -1,11 +1,74 @@
 """Validation utilities for TrueNAS MCP server."""
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+def validate_id(id_value: str) -> bool:
+    """Validate ID string to prevent path traversal attacks.
+    
+    IDs should only contain alphanumeric characters, hyphens, underscores, and dots.
+    This prevents path traversal attacks like '../' in URL construction.
+    
+    Args:
+        id_value: ID string to validate (pool_id, dataset_id, etc.)
+        
+    Returns:
+        True if valid ID, False otherwise
+    """
+    if not id_value or not isinstance(id_value, str):
+        return False
+    
+    # Reject path traversal attempts
+    if '..' in id_value or '/' in id_value or '\\' in id_value:
+        logger.warning(f"Rejected ID with path traversal characters: {id_value}")
+        return False
+    
+    # Only allow alphanumeric, hyphens, underscores, and dots
+    # No slashes, no path separators, no special shell characters
+    pattern = r'^[a-zA-Z0-9._-]+$'
+    is_valid = bool(re.match(pattern, id_value)) and len(id_value) <= 255
+    
+    if not is_valid:
+        logger.warning(f"Rejected invalid ID format: {id_value}")
+    
+    return is_valid
+
+
+def validate_dataset_name(name: str) -> bool:
+    """Validate dataset name format.
+    
+    Dataset names can contain alphanumeric characters, hyphens, underscores, and forward slashes
+    for hierarchy, but should not contain path traversal sequences.
+    
+    Args:
+        name: Dataset name to validate
+        
+    Returns:
+        True if valid dataset name, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Reject path traversal attempts
+    if '..' in name:
+        logger.warning(f"Rejected dataset name with path traversal: {name}")
+        return False
+    
+    # Dataset names can have hierarchy with slashes but no special characters
+    # Example: pool/dataset or pool/parent/child
+    pattern = r'^[a-zA-Z0-9._/-]+$'
+    is_valid = bool(re.match(pattern, name)) and len(name) <= 512
+    
+    if not is_valid:
+        logger.warning(f"Rejected invalid dataset name: {name}")
+    
+    return is_valid
 
 
 class TrueNASConfigValidator(BaseModel):

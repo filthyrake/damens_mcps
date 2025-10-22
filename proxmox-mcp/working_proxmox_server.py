@@ -12,6 +12,27 @@ from typing import Any, Dict, List
 import requests
 import urllib3
 
+# Import validation functions
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+try:
+    from utils.validation import validate_vmid, validate_node_name, validate_storage_name
+except ImportError:
+    # Fallback: define minimal validation functions if import fails
+    def validate_vmid(vmid):
+        try:
+            vmid_int = int(vmid)
+            return 100 <= vmid_int <= 999999
+        except (ValueError, TypeError):
+            return False
+    
+    def validate_node_name(node):
+        import re
+        return bool(node and re.match(r'^[a-zA-Z0-9\-_]+$', node))
+    
+    def validate_storage_name(storage):
+        import re
+        return bool(storage and re.match(r'^[a-zA-Z0-9\-_]+$', storage))
+
 
 def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
@@ -1063,6 +1084,25 @@ class WorkingProxmoxMCPServer:
         """Call a tool by name."""
         debug_print(f"Calling tool: {name} with arguments: {arguments}")
         
+        def validate_node_and_vmid(node, vmid):
+            """Helper to validate node and vmid parameters."""
+            if not node or not vmid:
+                return {
+                    "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                    "isError": True
+                }
+            if not validate_node_name(node):
+                return {
+                    "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                    "isError": True
+                }
+            if not validate_vmid(vmid):
+                return {
+                    "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
+                    "isError": True
+                }
+            return None  # No error
+        
         # Check if Proxmox client is available
         if self.proxmox_client is None:
             return {
@@ -1093,6 +1133,12 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: 'node' parameter is required"}],
                         "isError": True
                     }
+                # Validate node name
+                if not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.get_node_status(node)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1101,6 +1147,12 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_list_vms":
                 node = arguments.get('node')
+                # Validate node name if provided
+                if node and not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 vms = self.proxmox_client.list_vms(node)
                 result = {"vms": vms, "count": len(vms)}
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1114,6 +1166,17 @@ class WorkingProxmoxMCPServer:
                 if not node or not vmid:
                     return {
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                        "isError": True
+                    }
+                # Validate inputs to prevent injection attacks
+                if not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
+                if not validate_vmid(vmid):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
                         "isError": True
                     }
                 vm_info = self.proxmox_client.get_vm_info(node, int(vmid))
@@ -1130,6 +1193,17 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
+                # Validate inputs to prevent injection attacks
+                if not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
+                if not validate_vmid(vmid):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.get_vm_status(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1144,7 +1218,18 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'name' are required"}],
                         "isError": True
                     }
+                # Validate node name
+                if not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 vmid = arguments.get('vmid')
+                if vmid and not validate_vmid(vmid):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
+                        "isError": True
+                    }
                 cores = arguments.get('cores', '1')
                 memory = arguments.get('memory', '512')
                 result = self.proxmox_client.create_vm(node, name, vmid, cores, memory)
@@ -1156,11 +1241,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_start_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.start_vm(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1170,11 +1253,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_stop_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.stop_vm(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1184,11 +1265,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_suspend_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.suspend_vm(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1198,11 +1277,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_resume_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.resume_vm(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1212,11 +1289,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_delete_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.delete_vm(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1225,6 +1300,12 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_list_containers":
                 node = arguments.get('node')
+                # Validate node name if provided
+                if node and not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 containers = self.proxmox_client.list_containers(node)
                 result = {"containers": containers, "count": len(containers)}
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1235,11 +1316,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_start_container":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.start_container(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1249,11 +1328,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_stop_container":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.stop_container(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1262,6 +1339,12 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_list_storage":
                 node = arguments.get('node')
+                # Validate node name if provided
+                if node and not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 storage = self.proxmox_client.list_storage(node)
                 result = {"storage": storage, "count": len(storage)}
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1271,6 +1354,12 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_get_storage_usage":
                 node = arguments.get('node')
+                # Validate node name if provided
+                if node and not validate_node_name(node):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.get_storage_usage(node)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1286,6 +1375,10 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: 'node', 'vmid', and 'snapname' are required"}],
                         "isError": True
                     }
+                # Validate node and vmid
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 description = arguments.get('description', '')
                 result = self.proxmox_client.create_snapshot(node, int(vmid), snapname, description)
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1296,11 +1389,9 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_list_snapshots":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                if not node or not vmid:
-                    return {
-                        "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                        "isError": True
-                    }
+                error = validate_node_and_vmid(node, vmid)
+                if error:
+                    return error
                 result = self.proxmox_client.list_snapshots(node, int(vmid))
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
