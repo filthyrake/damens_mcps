@@ -831,7 +831,8 @@ class WorkingProxmoxMCPServer:
                     "inputSchema": {
                         "type": "object",
                         "properties": {},
-                        "required": []
+                        "required": [],
+                        "additionalProperties": False
                     }
                 },
                 {
@@ -840,7 +841,8 @@ class WorkingProxmoxMCPServer:
                     "inputSchema": {
                         "type": "object",
                         "properties": {},
-                        "required": []
+                        "required": [],
+                        "additionalProperties": False
                     }
                 },
                 {
@@ -882,7 +884,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
@@ -900,7 +902,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
@@ -909,7 +911,15 @@ class WorkingProxmoxMCPServer:
                 },
                 {
                     "name": "proxmox_create_vm", 
-                    "description": "Create a new virtual machine",
+                    "description": (
+                        "Create a new virtual machine in Proxmox.\n\n"
+                        "This operation will:\n"
+                        "- Create a VM with specified configuration\n"
+                        "- Auto-assign VMID if not provided (next available ID)\n"
+                        "- Allocate storage from specified pool\n\n"
+                        "Example: Create a VM with 2 cores and 4GB RAM:\n"
+                        '  {"node": "pve", "name": "test-vm", "cores": "2", "memory": "4096"}'
+                    ),
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -918,7 +928,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID (optional, auto-assigned if not specified)"
                             },
                             "name": {
@@ -934,7 +944,8 @@ class WorkingProxmoxMCPServer:
                                 "description": "Memory in MB (default: 512)"
                             }
                         },
-                        "required": ["node", "name"]
+                        "required": ["node", "name"],
+                        "additionalProperties": False
                     }
                 },
                 {
@@ -948,7 +959,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
@@ -966,7 +977,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
@@ -984,7 +995,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
@@ -1002,7 +1013,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
@@ -1011,7 +1022,15 @@ class WorkingProxmoxMCPServer:
                 },
                 {
                     "name": "proxmox_delete_vm", 
-                    "description": "Delete a virtual machine",
+                    "description": (
+                        "Delete a virtual machine permanently.\n\n"
+                        "⚠️ WARNING: This operation is destructive and cannot be undone!\n\n"
+                        "This will:\n"
+                        "- Permanently delete the VM and its configuration\n"
+                        "- Remove all associated storage (if configured)\n"
+                        "- Cannot be reversed once completed\n\n"
+                        "Ensure you have backups before proceeding."
+                    ),
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -1020,11 +1039,12 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM ID"
                             }
                         },
-                        "required": ["node", "vmid"]
+                        "required": ["node", "vmid"],
+                        "additionalProperties": False
                     }
                 },
                 {
@@ -1052,7 +1072,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "Container ID"
                             }
                         },
@@ -1070,7 +1090,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "Container ID"
                             }
                         },
@@ -1116,7 +1136,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM/Container ID"
                             },
                             "snapname": {
@@ -1142,7 +1162,7 @@ class WorkingProxmoxMCPServer:
                                 "description": "Node name"
                             },
                             "vmid": {
-                                "type": "string",
+                                "type": "integer",
                                 "description": "VM/Container ID"
                             }
                         },
