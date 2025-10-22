@@ -12,6 +12,14 @@ from typing import Any, Dict, List
 import requests
 import urllib3
 
+# Import validation functions
+try:
+    from src.utils.validation import validate_vmid, validate_node_name, validate_storage_name
+except ImportError:
+    # If running directly from the proxmox-mcp directory
+    sys.path.insert(0, os.path.dirname(__file__))
+    from src.utils.validation import validate_vmid, validate_node_name, validate_storage_name
+
 
 def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
@@ -1093,6 +1101,13 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: 'node' parameter is required"}],
                         "isError": True
                     }
+                try:
+                    validate_node_name(node)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid node name - {str(e)}"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.get_node_status(node)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1101,6 +1116,14 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_list_vms":
                 node = arguments.get('node')
+                if node:
+                    try:
+                        validate_node_name(node)
+                    except ValueError as e:
+                        return {
+                            "content": [{"type": "text", "text": f"Error: Invalid node name - {str(e)}"}],
+                            "isError": True
+                        }
                 vms = self.proxmox_client.list_vms(node)
                 result = {"vms": vms, "count": len(vms)}
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1116,7 +1139,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                vm_info = self.proxmox_client.get_vm_info(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                vm_info = self.proxmox_client.get_vm_info(node, vmid_int)
                 result_text = json.dumps(vm_info, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1130,7 +1161,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.get_vm_status(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.get_vm_status(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1161,7 +1200,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.start_vm(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.start_vm(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1175,7 +1222,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.stop_vm(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.stop_vm(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1189,7 +1244,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.suspend_vm(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.suspend_vm(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1203,7 +1266,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.resume_vm(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.resume_vm(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1217,7 +1288,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.delete_vm(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.delete_vm(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1225,6 +1304,14 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_list_containers":
                 node = arguments.get('node')
+                if node:
+                    try:
+                        validate_node_name(node)
+                    except ValueError as e:
+                        return {
+                            "content": [{"type": "text", "text": f"Error: Invalid node name - {str(e)}"}],
+                            "isError": True
+                        }
                 containers = self.proxmox_client.list_containers(node)
                 result = {"containers": containers, "count": len(containers)}
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1240,7 +1327,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.start_container(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.start_container(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1254,7 +1349,15 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                         "isError": True
                     }
-                result = self.proxmox_client.stop_container(node, int(vmid))
+                try:
+                    validate_node_name(node)
+                    vmid_int = validate_vmid(vmid)
+                except ValueError as e:
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid parameters - {str(e)}"}],
+                        "isError": True
+                    }
+                result = self.proxmox_client.stop_container(node, vmid_int)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -1262,6 +1365,14 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_list_storage":
                 node = arguments.get('node')
+                if node:
+                    try:
+                        validate_node_name(node)
+                    except ValueError as e:
+                        return {
+                            "content": [{"type": "text", "text": f"Error: Invalid node name - {str(e)}"}],
+                            "isError": True
+                        }
                 storage = self.proxmox_client.list_storage(node)
                 result = {"storage": storage, "count": len(storage)}
                 result_text = json.dumps(result, indent=2, default=str)
@@ -1271,6 +1382,14 @@ class WorkingProxmoxMCPServer:
                 }
             elif name == "proxmox_get_storage_usage":
                 node = arguments.get('node')
+                if node:
+                    try:
+                        validate_node_name(node)
+                    except ValueError as e:
+                        return {
+                            "content": [{"type": "text", "text": f"Error: Invalid node name - {str(e)}"}],
+                            "isError": True
+                        }
                 result = self.proxmox_client.get_storage_usage(node)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {

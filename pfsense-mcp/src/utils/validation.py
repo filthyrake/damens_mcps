@@ -143,6 +143,9 @@ def sanitize_string(value: str) -> str:
     """
     Sanitize a string value for safe use in API calls.
     
+    DEPRECATED: Use specific validation functions instead.
+    This function uses a blacklist approach which is not secure.
+    
     Args:
         value: String to sanitize
         
@@ -155,6 +158,92 @@ def sanitize_string(value: str) -> str:
     # Remove potentially dangerous characters
     sanitized = re.sub(r'[<>"\']', '', str(value))
     return sanitized.strip()
+
+
+def validate_package_name(name: str) -> bool:
+    """
+    Validate package name using whitelist approach.
+    
+    Package names should only contain alphanumeric characters,
+    hyphens, underscores, and dots.
+    
+    Args:
+        name: Package name to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Whitelist: alphanumeric, hyphen, underscore, dot
+    # Must start with alphanumeric, length 1-100
+    pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$'
+    return bool(re.match(pattern, name))
+
+
+def validate_service_name(name: str) -> bool:
+    """
+    Validate service name using whitelist approach.
+    
+    Service names should only contain alphanumeric characters,
+    hyphens, and underscores.
+    
+    Args:
+        name: Service name to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Whitelist: alphanumeric, hyphen, underscore
+    # Common pfSense services: openvpn, ipsec, etc.
+    pattern = r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$'
+    return bool(re.match(pattern, name))
+
+
+def validate_backup_name(name: str) -> bool:
+    """
+    Validate backup name using whitelist approach.
+    
+    Backup names should only contain alphanumeric characters,
+    hyphens, underscores, and dots.
+    
+    Args:
+        name: Backup name to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    # Whitelist: alphanumeric, hyphen, underscore, dot
+    pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$'
+    return bool(re.match(pattern, name))
+
+
+def validate_identifier(value: str) -> bool:
+    """
+    Validate a generic identifier (rule_id, backup_id, vlan_id, etc.).
+    
+    Identifiers should only contain alphanumeric characters,
+    hyphens, and underscores.
+    
+    Args:
+        value: Identifier to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not value or not isinstance(value, str):
+        return False
+    
+    # Whitelist: alphanumeric, hyphen, underscore
+    pattern = r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$'
+    return bool(re.match(pattern, value))
 
 
 def validate_config(config: Dict[str, Any]) -> List[str]:

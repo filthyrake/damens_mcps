@@ -1,6 +1,7 @@
 """Validation utilities for TrueNAS MCP server."""
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
@@ -210,6 +211,9 @@ def _is_valid_ip_address(ip: str) -> bool:
 def sanitize_input(input_data: Any) -> Any:
     """Sanitize input data to prevent injection attacks.
     
+    DEPRECATED: Use specific validation functions instead.
+    This function uses a blacklist approach which is not secure.
+    
     Args:
         input_data: Input data to sanitize
         
@@ -231,6 +235,133 @@ def sanitize_input(input_data: Any) -> Any:
     
     else:
         return input_data
+
+
+def validate_resource_id(resource_id: str) -> bool:
+    """Validate resource ID to prevent path traversal attacks.
+    
+    Resource IDs should only contain alphanumeric characters,
+    hyphens, underscores, and dots. No path separators allowed.
+    
+    Args:
+        resource_id: Resource ID to validate (pool_id, dataset_id, etc.)
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not resource_id or not isinstance(resource_id, str):
+        logger.error("Resource ID must be a non-empty string")
+        return False
+    
+    # Prevent path traversal - no slashes, no "..", etc.
+    if '/' in resource_id or '\\' in resource_id or '..' in resource_id:
+        logger.error(f"Resource ID contains path traversal characters: {resource_id}")
+        return False
+    
+    # Whitelist: alphanumeric, hyphen, underscore, dot
+    # Allow reasonable length (1-255 characters)
+    pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,254}$'
+    if not re.match(pattern, resource_id):
+        logger.error(f"Resource ID contains invalid characters: {resource_id}")
+        return False
+    
+    return True
+
+
+def validate_pool_id(pool_id: str) -> bool:
+    """Validate pool ID.
+    
+    Args:
+        pool_id: Pool ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return validate_resource_id(pool_id)
+
+
+def validate_dataset_id(dataset_id: str) -> bool:
+    """Validate dataset ID.
+    
+    Args:
+        dataset_id: Dataset ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return validate_resource_id(dataset_id)
+
+
+def validate_service_id(service_id: Union[str, int]) -> bool:
+    """Validate service ID.
+    
+    Args:
+        service_id: Service ID to validate (can be string or int)
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if isinstance(service_id, int):
+        return service_id > 0
+    elif isinstance(service_id, str):
+        return validate_resource_id(service_id)
+    else:
+        logger.error(f"Service ID must be string or int: {type(service_id)}")
+        return False
+
+
+def validate_user_id(user_id: Union[str, int]) -> bool:
+    """Validate user ID.
+    
+    Args:
+        user_id: User ID to validate (can be string or int)
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if isinstance(user_id, int):
+        return user_id > 0
+    elif isinstance(user_id, str):
+        return validate_resource_id(user_id)
+    else:
+        logger.error(f"User ID must be string or int: {type(user_id)}")
+        return False
+
+
+def validate_interface_id(interface_id: str) -> bool:
+    """Validate network interface ID.
+    
+    Args:
+        interface_id: Interface ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return validate_resource_id(interface_id)
+
+
+def validate_snapshot_id(snapshot_id: str) -> bool:
+    """Validate snapshot ID.
+    
+    Args:
+        snapshot_id: Snapshot ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return validate_resource_id(snapshot_id)
+
+
+def validate_app_id(app_id: str) -> bool:
+    """Validate application ID.
+    
+    Args:
+        app_id: Application ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return validate_resource_id(app_id)
 
 
 def validate_permissions(permissions: Dict[str, Any]) -> bool:

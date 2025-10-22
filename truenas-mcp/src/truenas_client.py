@@ -10,6 +10,15 @@ import aiohttp
 from pydantic import BaseModel, Field
 
 from .auth import AuthManager
+from .utils.validation import (
+    validate_pool_id,
+    validate_dataset_id,
+    validate_service_id,
+    validate_user_id,
+    validate_interface_id,
+    validate_snapshot_id,
+    validate_app_id
+)
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +181,8 @@ class TrueNASClient:
     
     async def get_pool(self, pool_id: str) -> Dict[str, Any]:
         """Get specific storage pool by ID."""
+        if not validate_pool_id(pool_id):
+            raise ValueError(f"Invalid pool_id: {pool_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("GET", f"pool/id/{pool_id}")
     
     async def create_pool(self, pool_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -180,6 +191,8 @@ class TrueNASClient:
     
     async def delete_pool(self, pool_id: str) -> Dict[str, Any]:
         """Delete a storage pool."""
+        if not validate_pool_id(pool_id):
+            raise ValueError(f"Invalid pool_id: {pool_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("DELETE", f"pool/id/{pool_id}")
     
     async def get_datasets(self, pool_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -194,6 +207,8 @@ class TrueNASClient:
     
     async def delete_dataset(self, dataset_id: str) -> Dict[str, Any]:
         """Delete a dataset."""
+        if not validate_dataset_id(dataset_id):
+            raise ValueError(f"Invalid dataset_id: {dataset_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("DELETE", f"pool/dataset/id/{dataset_id}")
     
     # Network Methods
@@ -204,10 +219,14 @@ class TrueNASClient:
     
     async def get_interface(self, interface_id: str) -> Dict[str, Any]:
         """Get specific network interface."""
+        if not validate_interface_id(interface_id):
+            raise ValueError(f"Invalid interface_id: {interface_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("GET", f"network/interface/id/{interface_id}")
     
     async def update_interface(self, interface_id: str, interface_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update network interface configuration."""
+        if not validate_interface_id(interface_id):
+            raise ValueError(f"Invalid interface_id: {interface_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("PUT", f"network/interface/id/{interface_id}", data=interface_data)
     
     async def get_routes(self) -> List[Dict[str, Any]]:
@@ -222,18 +241,26 @@ class TrueNASClient:
     
     async def get_service(self, service_id: str) -> Dict[str, Any]:
         """Get specific service."""
+        if not validate_service_id(service_id):
+            raise ValueError(f"Invalid service_id: {service_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("GET", f"service/id/{service_id}")
     
     async def start_service(self, service_id: str) -> Dict[str, Any]:
         """Start a service."""
+        if not validate_service_id(service_id):
+            raise ValueError(f"Invalid service_id: {service_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("POST", f"service/id/{service_id}/start")
     
     async def stop_service(self, service_id: str) -> Dict[str, Any]:
         """Stop a service."""
+        if not validate_service_id(service_id):
+            raise ValueError(f"Invalid service_id: {service_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("POST", f"service/id/{service_id}/stop")
     
     async def restart_service(self, service_id: str) -> Dict[str, Any]:
         """Restart a service."""
+        if not validate_service_id(service_id):
+            raise ValueError(f"Invalid service_id: {service_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("POST", f"service/id/{service_id}/restart")
     
     # User Management Methods
@@ -244,6 +271,8 @@ class TrueNASClient:
     
     async def get_user(self, user_id: str) -> Dict[str, Any]:
         """Get specific user."""
+        if not validate_user_id(user_id):
+            raise ValueError(f"Invalid user_id: {user_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("GET", f"user/id/{user_id}")
     
     async def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -252,10 +281,14 @@ class TrueNASClient:
     
     async def update_user(self, user_id: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update user information."""
+        if not validate_user_id(user_id):
+            raise ValueError(f"Invalid user_id: {user_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("PUT", f"user/id/{user_id}", data=user_data)
     
     async def delete_user(self, user_id: str) -> Dict[str, Any]:
         """Delete a user."""
+        if not validate_user_id(user_id):
+            raise ValueError(f"Invalid user_id: {user_id}. Must be a positive integer or contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("DELETE", f"user/id/{user_id}")
     
     async def get_groups(self) -> List[Dict[str, Any]]:
@@ -298,6 +331,8 @@ class TrueNASClient:
     
     async def delete_snapshot(self, snapshot_id: str) -> Dict[str, Any]:
         """Delete a snapshot."""
+        if not validate_snapshot_id(snapshot_id):
+            raise ValueError(f"Invalid snapshot_id: {snapshot_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("DELETE", f"zfs/snapshot/id/{snapshot_id}")
     
     # Docker/Kubernetes Methods (for TrueNAS Scale)
@@ -308,6 +343,8 @@ class TrueNASClient:
     
     async def get_application(self, app_id: str) -> Dict[str, Any]:
         """Get specific application."""
+        if not validate_app_id(app_id):
+            raise ValueError(f"Invalid app_id: {app_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("GET", f"app/id/{app_id}")
     
     async def install_application(self, app_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -316,6 +353,8 @@ class TrueNASClient:
     
     async def uninstall_application(self, app_id: str) -> Dict[str, Any]:
         """Uninstall an application."""
+        if not validate_app_id(app_id):
+            raise ValueError(f"Invalid app_id: {app_id}. Must contain only alphanumeric characters, hyphens, underscores, and dots.")
         return await self._make_request("DELETE", f"app/id/{app_id}")
     
     # Utility Methods
