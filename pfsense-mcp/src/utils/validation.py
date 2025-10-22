@@ -144,13 +144,25 @@ def sanitize_string(value: str) -> str:
     Sanitize a string value for safe use in API calls.
     
     DEPRECATED: Use specific validation functions instead (validate_package_name, validate_service_name, etc.)
+    This function will be removed in a future version. Please migrate to the appropriate validator.
     
     Args:
         value: String to sanitize
         
     Returns:
         Sanitized string
+        
+    Raises:
+        DeprecationWarning: This function is deprecated
     """
+    import warnings
+    warnings.warn(
+        "sanitize_string() is deprecated. Use validate_package_name(), validate_service_name(), "
+        "validate_backup_name(), or validate_id() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
     if not value:
         return ""
     

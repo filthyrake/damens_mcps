@@ -30,7 +30,7 @@ def validate_id(id_value: str) -> bool:
         return False
     
     # Only allow alphanumeric, hyphens, underscores, and dots
-    # No slashes, no path separators, no special shell characters
+    # Dots are intentionally allowed (e.g., for pool names like 'pool.name'), but slashes and path separators are explicitly forbidden to prevent path construction abuse. No special shell characters allowed.
     pattern = r'^[a-zA-Z0-9._-]+$'
     is_valid = bool(re.match(pattern, id_value)) and len(id_value) <= 255
     
@@ -58,6 +58,11 @@ def validate_dataset_name(name: str) -> bool:
     # Reject path traversal attempts
     if '..' in name:
         logger.warning(f"Rejected dataset name with path traversal: {name}")
+        return False
+    
+    # Prevent absolute path references
+    if name.startswith('/') or name.startswith('\\'):
+        logger.warning(f"Rejected dataset name with absolute path: {name}")
         return False
     
     # Dataset names can have hierarchy with slashes but no special characters

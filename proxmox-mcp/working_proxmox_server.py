@@ -16,22 +16,11 @@ import urllib3
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 try:
     from utils.validation import validate_vmid, validate_node_name, validate_storage_name
-except ImportError:
-    # Fallback: define minimal validation functions if import fails
-    def validate_vmid(vmid):
-        try:
-            vmid_int = int(vmid)
-            return 100 <= vmid_int <= 999999
-        except (ValueError, TypeError):
-            return False
-    
-    def validate_node_name(node):
-        import re
-        return bool(node and re.match(r'^[a-zA-Z0-9\-_]+$', node))
-    
-    def validate_storage_name(storage):
-        import re
-        return bool(storage and re.match(r'^[a-zA-Z0-9\-_]+$', storage))
+except ImportError as e:
+    # Fail fast if validation functions cannot be imported - this indicates a configuration issue
+    print(f"CRITICAL ERROR: Failed to import validation functions from 'src/utils/validation.py': {e}", file=sys.stderr)
+    print("This suggests a deployment or configuration issue that must be resolved.", file=sys.stderr)
+    sys.exit(1)
 
 
 def debug_print(message: str):
@@ -740,6 +729,34 @@ class WorkingProxmoxMCPServer:
         
         debug_print("Server initialization complete")
 
+    def _validate_node_and_vmid(self, node: str, vmid: str) -> Dict[str, Any]:
+        """
+        Validate node and vmid parameters.
+        
+        Args:
+            node: Node name to validate
+            vmid: VM/Container ID to validate
+            
+        Returns:
+            Error dictionary if validation fails, None if valid
+        """
+        if not node or not vmid:
+            return {
+                "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
+                "isError": True
+            }
+        if not validate_node_name(node):
+            return {
+                "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
+                "isError": True
+            }
+        if not validate_vmid(vmid):
+            return {
+                "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
+                "isError": True
+            }
+        return None  # No error
+
     def _list_tools(self) -> Dict[str, Any]:
         """List all available tools."""
         return {
@@ -1084,25 +1101,6 @@ class WorkingProxmoxMCPServer:
         """Call a tool by name."""
         debug_print(f"Calling tool: {name} with arguments: {arguments}")
         
-        def validate_node_and_vmid(node, vmid):
-            """Helper to validate node and vmid parameters."""
-            if not node or not vmid:
-                return {
-                    "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                    "isError": True
-                }
-            if not validate_node_name(node):
-                return {
-                    "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
-                    "isError": True
-                }
-            if not validate_vmid(vmid):
-                return {
-                    "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
-                    "isError": True
-                }
-            return None  # No error
-        
         # Check if Proxmox client is available
         if self.proxmox_client is None:
             return {
@@ -1241,7 +1239,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_start_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.start_vm(node, int(vmid))
@@ -1253,7 +1251,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_stop_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.stop_vm(node, int(vmid))
@@ -1265,7 +1263,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_suspend_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.suspend_vm(node, int(vmid))
@@ -1277,7 +1275,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_resume_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.resume_vm(node, int(vmid))
@@ -1289,7 +1287,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_delete_vm":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.delete_vm(node, int(vmid))
@@ -1316,7 +1314,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_start_container":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.start_container(node, int(vmid))
@@ -1328,7 +1326,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_stop_container":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.stop_container(node, int(vmid))
@@ -1376,7 +1374,7 @@ class WorkingProxmoxMCPServer:
                         "isError": True
                     }
                 # Validate node and vmid
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 description = arguments.get('description', '')
@@ -1389,7 +1387,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_list_snapshots":
                 node = arguments.get('node')
                 vmid = arguments.get('vmid')
-                error = validate_node_and_vmid(node, vmid)
+                error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
                 result = self.proxmox_client.list_snapshots(node, int(vmid))
