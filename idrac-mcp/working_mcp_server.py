@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 Working iDRAC MCP Server - Pure JSON-RPC implementation with real iDRAC functionality
+
+This is the CANONICAL implementation of the iDRAC MCP server.
+All other server implementations have been removed to avoid confusion.
+Use this file for all iDRAC MCP server operations.
 """
 
 import json

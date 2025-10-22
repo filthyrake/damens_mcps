@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 Working Proxmox MCP Server - Pure JSON-RPC implementation with real Proxmox functionality
+
+This is the CANONICAL implementation of the Proxmox MCP server.
+All other server implementations have been removed to avoid confusion.
+Use this file for all Proxmox MCP server operations.
 """
 
 import json

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 pfSense MCP Server - HTTP-based server for pfSense firewall management.
+
+This is the CANONICAL implementation of the pfSense MCP server.
+All other server implementations have been removed to avoid confusion.
+Use this file for all pfSense MCP server operations.
 """
 
 import asyncio

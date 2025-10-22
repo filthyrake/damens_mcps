@@ -56,15 +56,13 @@ python -m src.http_cli serve
 # OR
 python -m src.server
 
-# pfSense MCP
+# pfSense MCP (canonical implementation)
 python -m src.http_pfsense_server
-# OR
-python src/production_server.py
 
-# iDRAC MCP
+# iDRAC MCP (canonical implementation)
 python working_mcp_server.py
 
-# Proxmox MCP
+# Proxmox MCP (canonical implementation)
 python working_proxmox_server.py
 # OR
 python -m src.http_server
@@ -286,7 +284,7 @@ logging.basicConfig(level=logging.DEBUG)
 ### pfSense
 - Requires pfSense 2.5+ with REST API enabled
 - Must enable API access in System → API
-- Multiple server implementations (use `production_server.py` or `http_pfsense_server.py`)
+- Canonical server: `http_pfsense_server.py`
 - Comprehensive firewall rule management
 
 ### iDRAC
