@@ -65,10 +65,8 @@ def load_config() -> Dict[str, Any]:
         return config
     except json.JSONDecodeError as e:
         raise ProxmoxConfigurationError(f"Invalid JSON in config file {config_path}: {e}")
-    except (OSError, IOError) as e:
+    except OSError as e:
         raise ProxmoxConfigurationError(f"Failed to read config file {config_path}: {e}")
-    except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-        raise ProxmoxError(f"Unexpected error loading config file {config_path}: {e}")
 
 
 def main():
