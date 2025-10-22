@@ -12,6 +12,11 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 
+try:
+    from .exceptions import TrueNASError, TrueNASTokenError, TrueNASAuthenticationError
+except ImportError:
+    from exceptions import TrueNASError, TrueNASTokenError, TrueNASAuthenticationError
+
 logger = logging.getLogger(__name__)
 
 # Password hashing
@@ -73,8 +78,10 @@ class AuthManager:
                 with open(token_path, 'r') as f:
                     self._token = f.read().strip()
                     logger.info("Loaded authentication token from file")
+        except OSError as e:
+            logger.warning(f"Failed to load token from file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
-            logger.warning(f"Failed to load token from file: {e}")
+            logger.error(f"Unexpected error loading token from file {self.config.token_file}: {e}", exc_info=True)
     
     def _save_token_to_file(self, token: str) -> None:
         """Save authentication token to file.
@@ -95,8 +102,10 @@ class AuthManager:
             # Set appropriate permissions (read/write for owner only)
             token_path.chmod(0o600)
             logger.info("Saved authentication token to file")
+        except OSError as e:
+            logger.warning(f"Failed to save token to file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
-            logger.warning(f"Failed to save token to file: {e}")
+            logger.error(f"Unexpected error saving token to file {self.config.token_file}: {e}", exc_info=True)
     
     def _clear_token_file(self) -> None:
         """Clear authentication token from file."""
@@ -108,8 +117,10 @@ class AuthManager:
             if token_path.exists():
                 token_path.unlink()
                 logger.info("Cleared authentication token from file")
+        except OSError as e:
+            logger.warning(f"Failed to clear token file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
-            logger.warning(f"Failed to clear token file: {e}")
+            logger.error(f"Unexpected error clearing token file {self.config.token_file}: {e}", exc_info=True)
     
     def get_auth_method(self) -> str:
         """Get the authentication method being used.

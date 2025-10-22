@@ -14,18 +14,29 @@ try:
     from .auth import PfSenseAuth, PfSenseAuthError
     from .utils.logging import get_logger
     from .utils.validation import validate_config
+    from .exceptions import (
+        PfSenseError,
+        PfSenseAPIError,
+        PfSenseConnectionError,
+        PfSenseAuthenticationError,
+        PfSenseTimeoutError,
+        PfSenseConfigurationError
+    )
 except ImportError:
     # Fallback for direct execution
     from auth import PfSenseAuth, PfSenseAuthError
     from utils.logging import get_logger
     from utils.validation import validate_config
+    from exceptions import (
+        PfSenseError,
+        PfSenseAPIError,
+        PfSenseConnectionError,
+        PfSenseAuthenticationError,
+        PfSenseTimeoutError,
+        PfSenseConfigurationError
+    )
 
 logger = get_logger(__name__)
-
-
-class PfSenseAPIError(Exception):
-    """Exception raised for pfSense API errors."""
-    pass
 
 
 class HTTPPfSenseClient:
@@ -43,7 +54,7 @@ class HTTPPfSenseClient:
         # Validate configuration
         errors = validate_config(config)
         if errors:
-            raise PfSenseAPIError(f"Configuration errors: {', '.join(errors)}")
+            raise PfSenseConfigurationError(f"Configuration errors: {', '.join(errors)}")
         
         self.auth = PfSenseAuth(config)
         self.session: Optional[ClientSession] = None
@@ -85,9 +96,9 @@ class HTTPPfSenseClient:
             elif self.auth.username and self.auth.password:
                 try:
                     self.jwt_token = await self.auth.get_jwt_token()
-                except Exception as e:
+                except (PfSenseAuthError, aiohttp.ClientError) as e:
                     # Fall back to original auth method
-                    pass
+                    logger.warning(f"JWT token acquisition failed, using fallback auth: {e}")
         
         url = urljoin(self.base_url, endpoint)
         
@@ -127,10 +138,21 @@ class HTTPPfSenseClient:
                 else:
                     return {}
                     
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"Connection error to pfSense: {e}", exc_info=True)
+            raise PfSenseConnectionError(f"Failed to connect to pfSense: {str(e)}") from e
+        except aiohttp.ClientResponseError as e:
+            logger.error(f"HTTP error from pfSense: {e}", exc_info=True)
+            raise PfSenseAPIError(f"API HTTP error: {str(e)}") from e
+        except aiohttp.ServerTimeoutError as e:
+            logger.error(f"Request timeout to pfSense: {e}", exc_info=True)
+            raise PfSenseTimeoutError(f"Request timed out: {str(e)}") from e
         except aiohttp.ClientError as e:
-            raise PfSenseAPIError(f"Network error: {str(e)}")
-        except Exception as e:
-            raise PfSenseAPIError(f"Unexpected error: {str(e)}")
+            logger.error(f"Network error communicating with pfSense: {e}", exc_info=True)
+            raise PfSenseConnectionError(f"Network error: {str(e)}") from e
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}", exc_info=True)
+            raise PfSenseAPIError(f"Invalid JSON response: {str(e)}") from e
     
     async def get_system_info(self) -> Dict[str, Any]:
         """Get system information."""
@@ -146,9 +168,12 @@ class HTTPPfSenseClient:
                 "status": status_info.get("data", {}),
                 "api_status": "Connected"
             }
-        except Exception:
-            # Fallback to basic info
-            return {"version": "2.8.0-RELEASE", "status": "Connected", "note": "Using fallback data"}
+        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+            logger.error(f"Failed to get system info: {e}", exc_info=True)
+            raise
+        except PfSenseAPIError as e:
+            logger.error(f"API error getting system info: {e}", exc_info=True)
+            raise
     
     async def get_system_health(self) -> Dict[str, Any]:
         """Get system health information."""
@@ -164,9 +189,12 @@ class HTTPPfSenseClient:
                 "services": service_status.get("data", []),
                 "note": "System is responding to API calls"
             }
-        except Exception:
-            # Fallback to basic status
-            return {"status": "Unknown", "note": "Unable to reach system"}
+        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+            logger.error(f"Failed to get system health: {e}", exc_info=True)
+            raise
+        except PfSenseAPIError as e:
+            logger.error(f"API error getting system health: {e}", exc_info=True)
+            raise
     
     async def get_interfaces(self) -> Dict[str, Any]:
         """Get network interfaces information."""
@@ -180,18 +208,24 @@ class HTTPPfSenseClient:
                 "status": interface_status.get("data", []),
                 "note": "Combined interface configuration and status"
             }
-        except Exception:
-            # Fallback
-            return {"interfaces": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+            logger.error(f"Failed to get interfaces: {e}", exc_info=True)
+            raise
+        except PfSenseAPIError as e:
+            logger.error(f"API error getting interfaces: {e}", exc_info=True)
+            raise
     
     async def get_services(self) -> Dict[str, Any]:
         """Get running services information."""
         try:
             # Get service status (we know this works)
             return await self._make_request("GET", "/api/v2/status/services")
-        except Exception:
-            # Fallback - return basic service info
-            return {"services": "Unable to retrieve via API", "note": "Check web interface for service status"}
+        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+            logger.error(f"Failed to get services: {e}", exc_info=True)
+            raise
+        except PfSenseAPIError as e:
+            logger.error(f"API error getting services: {e}", exc_info=True)
+            raise
     
     async def get_firewall_rules(self) -> Dict[str, Any]:
         """Get firewall rules and aliases."""
@@ -203,117 +237,75 @@ class HTTPPfSenseClient:
                 "aliases": aliases.get("data", []),
                 "note": "Firewall aliases retrieved successfully. Rules may be available via additional endpoints."
             }
-        except Exception:
-            # Fallback
-            return {"firewall_rules": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+            logger.error(f"Failed to get firewall rules: {e}", exc_info=True)
+            raise
+        except PfSenseAPIError as e:
+            logger.error(f"API error getting firewall rules: {e}", exc_info=True)
+            raise
     
     async def get_firewall_aliases(self) -> Dict[str, Any]:
         """Get firewall aliases configuration."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/aliases")
-        except Exception:
-            return {"aliases": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/aliases")
     
     async def get_service_status(self) -> Dict[str, Any]:
         """Get detailed service status information."""
-        try:
-            return await self._make_request("GET", "/api/v2/status/services")
-        except Exception:
-            return {"services": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/status/services")
     
     async def get_interface_status(self) -> Dict[str, Any]:
         """Get detailed interface status information."""
-        try:
-            return await self._make_request("GET", "/api/v2/status/interfaces")
-        except Exception:
-            return {"interfaces": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/status/interfaces")
     
     async def get_nat_outbound_mappings(self) -> Dict[str, Any]:
         """Get NAT outbound mappings."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/nat/outbound/mappings")
-        except Exception:
-            return {"nat_outbound": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/nat/outbound/mappings")
     
     async def get_nat_port_forwarding(self) -> Dict[str, Any]:
         """Get NAT port forwarding rules."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/nat/port_forward")
-        except Exception:
-            return {"nat_port_forward": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/nat/port_forward")
     
     async def get_nat_one_to_one_mappings(self) -> Dict[str, Any]:
         """Get NAT one-to-one mappings."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/nat/one_to_one/mappings")
-        except Exception:
-            return {"nat_one_to_one": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/nat/one_to_one/mappings")
     
     async def get_firewall_schedules(self) -> Dict[str, Any]:
         """Get firewall schedules."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/schedules")
-        except Exception:
-            return {"schedules": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/schedules")
     
     async def get_firewall_states(self) -> Dict[str, Any]:
         """Get firewall states."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/states")
-        except Exception:
-            return {"states": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/states")
     
     async def get_traffic_shaper(self) -> Dict[str, Any]:
         """Get traffic shaper configuration."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/traffic_shaper")
-        except Exception:
-            return {"traffic_shaper": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/traffic_shaper")
     
     async def get_traffic_shapers(self) -> Dict[str, Any]:
         """Get all traffic shapers."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/traffic_shapers")
-        except Exception:
-            return {"traffic_shapers": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/traffic_shapers")
     
     async def get_traffic_shaper_limiters(self) -> Dict[str, Any]:
         """Get traffic shaper limiters."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/traffic_shaper/limiters")
-        except Exception:
-            return {"limiters": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/traffic_shaper/limiters")
     
     async def get_traffic_shaper_queues(self) -> Dict[str, Any]:
         """Get traffic shaper queues."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/traffic_shaper/queue")
-        except Exception:
-            return {"queues": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/traffic_shaper/queue")
     
     async def get_virtual_ips(self) -> Dict[str, Any]:
         """Get virtual IP addresses."""
-        try:
-            return await self._make_request("GET", "/api/v2/firewall/virtual_ips")
-        except Exception:
-            return {"virtual_ips": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        return await self._make_request("GET", "/api/v2/firewall/virtual_ips")
     
     async def get_virtual_ip(self, interface: str = None) -> Dict[str, Any]:
         """Get specific virtual IP configuration."""
-        try:
-            if interface:
-                return await self._make_request("GET", f"/api/v2/firewall/virtual_ip/{interface}")
-            else:
-                return await self._make_request("GET", "/api/v2/firewall/virtual_ip")
-        except Exception:
-            return {"virtual_ip": "Unable to retrieve", "note": "API endpoint may be unavailable"}
+        if interface:
+            return await self._make_request("GET", f"/api/v2/firewall/virtual_ip/{interface}")
+        else:
+            return await self._make_request("GET", "/api/v2/firewall/virtual_ip")
     
     async def apply_virtual_ip_changes(self) -> Dict[str, Any]:
         """Apply virtual IP configuration changes."""
-        try:
-            return await self._make_request("POST", "/api/v2/firewall/virtual_ip/apply")
-        except Exception:
-            return {"status": "Failed to apply changes", "note": "API endpoint may be unavailable"}
+        return await self._make_request("POST", "/api/v2/firewall/virtual_ip/apply")
     
     async def create_firewall_rule(self, rule_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new firewall rule."""
@@ -349,13 +341,10 @@ class HTTPPfSenseClient:
         try:
             # Try different DHCP endpoints for pfSense 2.8.0
             return await self._make_request("GET", "/api/v2/dhcp/leases")
-        except Exception:
-            try:
-                # Fallback to DHCP status
-                return await self._make_request("GET", "/api/v2/dhcp/status")
-            except Exception:
-                # Final fallback
-                return {"dhcp_leases": "Available via web interface", "note": "API endpoint may vary"}
+        except PfSenseAPIError:
+            # Fallback to DHCP status
+            logger.info("Primary DHCP leases endpoint failed, trying DHCP status endpoint")
+            return await self._make_request("GET", "/api/v2/dhcp/status")
     
     async def get_dns_servers(self) -> Dict[str, Any]:
         """Get DNS server configuration."""
@@ -381,45 +370,29 @@ class HTTPPfSenseClient:
     
     async def get_arp_table(self) -> Dict[str, Any]:
         """Get ARP table entries."""
-        try:
-            return await self._make_request("GET", "/api/v2/diagnostics/arp_table")
-        except Exception:
-            # Fallback to basic ARP info
-            return {"arp_table": "Available via web interface", "note": "API endpoint may vary"}
+        return await self._make_request("GET", "/api/v2/diagnostics/arp_table")
     
     async def clear_arp_table(self) -> Dict[str, Any]:
         """Clear all ARP table entries."""
-        try:
-            return await self._make_request("DELETE", "/api/v2/diagnostics/arp_table")
-        except Exception:
-            return {"status": "Failed to clear ARP table", "note": "API endpoint may vary"}
+        return await self._make_request("DELETE", "/api/v2/diagnostics/arp_table")
     
     async def delete_arp_entry(self, ip_address: str) -> Dict[str, Any]:
         """Delete a specific ARP table entry."""
-        try:
-            return await self._make_request("DELETE", f"/api/v2/diagnostics/arp_table/entry?ip={ip_address}")
-        except Exception:
-            return {"status": f"Failed to delete ARP entry for {ip_address}", "note": "API endpoint may vary"}
+        return await self._make_request("DELETE", f"/api/v2/diagnostics/arp_table/entry?ip={ip_address}")
     
     async def get_system_logs(self, limit: int = 100) -> Dict[str, Any]:
         """Get system logs."""
-        try:
-            return await self._make_request("GET", f"/api/v2/system/logs?limit={limit}")
-        except Exception:
-            return {"logs": "Available via web interface", "note": "API endpoint may vary"}
+        return await self._make_request("GET", f"/api/v2/system/logs?limit={limit}")
     
     async def get_vpn_status(self) -> Dict[str, Any]:
         """Get VPN connection status."""
         try:
             # Try different VPN endpoints for pfSense 2.8.0
             return await self._make_request("GET", "/api/v2/vpn/status")
-        except Exception:
-            try:
-                # Fallback to VPN connections
-                return await self._make_request("GET", "/api/v2/vpn/connections")
-            except Exception:
-                # Final fallback
-                return {"vpn_status": "Available via web interface", "note": "API endpoint may vary"}
+        except PfSenseAPIError:
+            # Fallback to VPN connections
+            logger.info("Primary VPN status endpoint failed, trying connections endpoint")
+            return await self._make_request("GET", "/api/v2/vpn/connections")
     
     async def get_openvpn_servers(self) -> Dict[str, Any]:
         """Get OpenVPN server configurations."""

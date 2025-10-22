@@ -11,6 +11,15 @@ from pydantic import BaseModel, Field
 
 from .auth import AuthManager
 from .utils.validation import validate_id, validate_dataset_name
+from .exceptions import (
+    TrueNASError,
+    TrueNASConnectionError,
+    TrueNASAuthenticationError,
+    TrueNASAPIError,
+    TrueNASTimeoutError,
+    TrueNASConfigurationError,
+    TrueNASValidationError
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +83,7 @@ class TrueNASClient:
     async def _authenticate(self) -> None:
         """Authenticate with TrueNAS using username/password."""
         if not self.config.username or not self.config.password:
-            raise ValueError("Username and password required for authentication")
+            raise TrueNASConfigurationError("Username and password required for authentication")
         
         auth_url = urljoin(self.config.base_url, "auth/generate_token")
         auth_data = {
@@ -88,12 +97,29 @@ class TrueNASClient:
                     result = await response.json()
                     self._auth_token = result.get("token")
                     if not self._auth_token:
-                        raise ValueError("No token received from authentication")
+                        raise TrueNASAuthenticationError("No token received from authentication")
+                elif response.status == 401:
+                    error_text = await response.text()
+                    logger.error(f"Authentication failed with 401: {error_text}", exc_info=True)
+                    raise TrueNASAuthenticationError(f"Invalid credentials: {error_text}")
                 else:
-                    raise ValueError(f"Authentication failed: {response.status}")
-        except Exception as e:
-            logger.error(f"Authentication error: {e}")
+                    error_text = await response.text()
+                    logger.error(f"Authentication failed with {response.status}: {error_text}", exc_info=True)
+                    raise TrueNASAuthenticationError(f"Authentication failed: {response.status} - {error_text}")
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"Connection error during authentication: {e}", exc_info=True)
+            raise TrueNASConnectionError(f"Failed to connect to TrueNAS: {str(e)}") from e
+        except aiohttp.ServerTimeoutError as e:
+            logger.error(f"Timeout during authentication: {e}", exc_info=True)
+            raise TrueNASTimeoutError(f"Authentication request timed out: {str(e)}") from e
+        except aiohttp.ClientError as e:
+            logger.error(f"Network error during authentication: {e}", exc_info=True)
+            raise TrueNASConnectionError(f"Network error: {str(e)}") from e
+        except (TrueNASAuthenticationError, TrueNASConnectionError, TrueNASTimeoutError):
             raise
+        except Exception as e:
+            logger.error(f"Unexpected error during authentication: {e}", exc_info=True)
+            raise TrueNASError(f"Unexpected authentication error: {str(e)}") from e
     
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests."""
@@ -136,16 +162,34 @@ class TrueNASClient:
             ) as response:
                 if response.status >= 400:
                     error_text = await response.text()
-                    logger.error(f"API request failed: {response.status} - {error_text}")
-                    raise ValueError(f"API request failed: {response.status} - {error_text}")
+                    if response.status == 401:
+                        logger.error(f"Authentication error for {method} {endpoint}: {error_text}", exc_info=True)
+                        raise TrueNASAuthenticationError(f"Authentication failed: {error_text}")
+                    elif response.status == 404:
+                        logger.error(f"Resource not found for {method} {endpoint}: {error_text}", exc_info=True)
+                        raise TrueNASAPIError(f"Resource not found: {error_text}")
+                    else:
+                        logger.error(f"API request failed for {method} {endpoint}: {response.status} - {error_text}", exc_info=True)
+                        raise TrueNASAPIError(f"API request failed: {response.status} - {error_text}")
                 
                 return await response.json()
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"Connection error for {method} {endpoint}: {e}", exc_info=True)
+            raise TrueNASConnectionError(f"Failed to connect to TrueNAS: {str(e)}") from e
+        except aiohttp.ServerTimeoutError as e:
+            logger.error(f"Request timeout for {method} {endpoint}: {e}", exc_info=True)
+            raise TrueNASTimeoutError(f"Request timed out: {str(e)}") from e
         except aiohttp.ClientError as e:
-            logger.error(f"Network error: {e}")
+            logger.error(f"Network error for {method} {endpoint}: {e}", exc_info=True)
+            raise TrueNASConnectionError(f"Network error: {str(e)}") from e
+        except (TrueNASAuthenticationError, TrueNASAPIError, TrueNASConnectionError, TrueNASTimeoutError):
             raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response for {method} {endpoint}: {e}", exc_info=True)
+            raise TrueNASAPIError(f"Invalid JSON response: {str(e)}") from e
         except Exception as e:
-            logger.error(f"Request error: {e}")
-            raise
+            logger.error(f"Unexpected error for {method} {endpoint}: {e}", exc_info=True)
+            raise TrueNASError(f"Unexpected request error: {str(e)}") from e
     
     # System Information Methods
     
