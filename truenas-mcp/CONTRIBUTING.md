@@ -43,7 +43,7 @@ Thank you for your interest in contributing to the TrueNAS MCP Server! This docu
 ```bash
 # Fork the repository on GitHub, then clone your fork
 git clone https://github.com/YOUR-USERNAME/damens_mcps.git
-cd damens_mcps/pfsense-mcp
+cd damens_mcps/truenas-mcp
 ```
 
 ### 2. Create Virtual Environment

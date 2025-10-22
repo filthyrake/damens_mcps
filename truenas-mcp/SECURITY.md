@@ -329,7 +329,7 @@ Before deploying to production:
   - [ ] Unused accounts disabled
 
 - [ ] **Monitoring**
-  - [ ] Logging enabled on pfSense
+  - [ ] Logging enabled on TrueNAS
   - [ ] Logs forwarded to SIEM
   - [ ] Alerts configured for suspicious activity
   - [ ] Log retention policy defined
