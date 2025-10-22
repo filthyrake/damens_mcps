@@ -1,0 +1,30 @@
+# Core dependencies for Proxmox MCP Server
+requests>=2.31.0,<3.0.0
+urllib3>=2.0.0,<3.0.0
+python-dotenv>=1.0.0,<2.0.0
+
+# MCP protocol and server framework
+mcp>=1.0.0,<2.0.0
+pydantic>=2.0.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
+
+# Authentication and security
+passlib[bcrypt]>=1.7.4,<2.0.0
+python-jose[cryptography]>=3.3.0,<4.0.0
+
+# Proxmox API client
+proxmoxer>=2.0.0,<3.0.0
+
+# HTTP server and client
+fastapi>=0.104.0,<0.115.0
+uvicorn[standard]>=0.24.0,<0.31.0
+httpx>=0.24.0,<0.28.0
+
+# Logging and utilities
+structlog>=23.1.0,<25.0.0
+click>=8.1.0,<9.0.0
+rich>=13.0.0,<14.0.0
+
+# Additional utilities
+python-multipart>=0.0.6,<0.1.0
+typing-extensions>=4.0.0,<5.0.0
