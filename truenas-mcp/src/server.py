@@ -141,7 +141,8 @@ class TrueNASMCPServer:
         except Exception as e:
             logger.error(f"Error calling tool {tool_name}: {e}")
             return CallToolResult(
-                content=[TextContent(type="text", text=f"Error: {str(e)}")]
+                content=[TextContent(type="text", text=f"Error: {str(e)}")],
+                isError=True
             )
     
     async def _get_system_info(self) -> CallToolResult:
@@ -153,7 +154,8 @@ class TrueNASMCPServer:
             )
         except Exception as e:
             return CallToolResult(
-                content=[TextContent(type="text", text=f"Error getting system info: {e}")]
+                content=[TextContent(type="text", text=f"Error getting system info: {e}")],
+                isError=True
             )
     
     async def _get_version(self) -> CallToolResult:
@@ -165,7 +167,8 @@ class TrueNASMCPServer:
             )
         except Exception as e:
             return CallToolResult(
-                content=[TextContent(type="text", text=f"Error getting version: {e}")]
+                content=[TextContent(type="text", text=f"Error getting version: {e}")],
+                isError=True
             )
     
     async def _get_health(self) -> CallToolResult:
@@ -177,7 +180,8 @@ class TrueNASMCPServer:
             )
         except Exception as e:
             return CallToolResult(
-                content=[TextContent(type="text", text=f"Error getting health: {e}")]
+                content=[TextContent(type="text", text=f"Error getting health: {e}")],
+                isError=True
             )
     
     async def run(self) -> None:

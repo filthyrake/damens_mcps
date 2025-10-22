@@ -436,16 +436,29 @@ class WorkingIDracMCPServer:
         self.tools = [
             {
                 "name": "list_servers",
-                "description": "List all available iDRAC servers",
+                "description": (
+                    "List all available iDRAC servers configured in this MCP instance.\n\n"
+                    "Returns a list of server IDs that can be used with other tools.\n"
+                    "The default server is indicated in the configuration."
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {},
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "test_connection",
-                "description": "Test connection to iDRAC server",
+                "description": (
+                    "Test connection to iDRAC server.\n\n"
+                    "Verifies that:\n"
+                    "- iDRAC is reachable over the network\n"
+                    "- Credentials are valid\n"
+                    "- API is responding correctly\n\n"
+                    "Example: Test default server connection:\n"
+                    '  {}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -454,12 +467,22 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to test (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "get_system_info",
-                "description": "Get iDRAC system information",
+                "description": (
+                    "Get comprehensive iDRAC system information.\n\n"
+                    "Returns detailed information including:\n"
+                    "- System model and manufacturer\n"
+                    "- BIOS version and settings\n"
+                    "- Hardware configuration\n"
+                    "- Service tag and asset information\n\n"
+                    "Example: Get system info for default server:\n"
+                    '  {}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -468,12 +491,21 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to query (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "get_power_status",
-                "description": "Get server power status",
+                "description": (
+                    "Get current server power status.\n\n"
+                    "Returns the current power state of the server:\n"
+                    "- On: Server is powered on and running\n"
+                    "- Off: Server is powered off\n"
+                    "- Other states may include standby or transitioning\n\n"
+                    "Example: Check power status of default server:\n"
+                    '  {}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -482,12 +514,23 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to query (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "power_on",
-                "description": "Power on the server",
+                "description": (
+                    "Power on the server.\n\n"
+                    "This operation will:\n"
+                    "- Send a power on command to the server via iDRAC\n"
+                    "- Start the boot process if the server is currently off\n"
+                    "- Return success if the server is already powered on\n\n"
+                    "Example: Power on the default server:\n"
+                    '  {}\n'
+                    "Example: Power on a specific server:\n"
+                    '  {"server_id": "server1"}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -496,12 +539,25 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to control (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "power_off",
-                "description": "Power off the server gracefully",
+                "description": (
+                    "Power off the server gracefully.\n\n"
+                    "⚠️ WARNING: This will initiate an orderly shutdown of the server.\n\n"
+                    "This operation will:\n"
+                    "- Send a graceful shutdown command to the operating system\n"
+                    "- Allow services to shut down cleanly\n"
+                    "- May take several minutes to complete\n\n"
+                    "Use 'force_power_off' only if graceful shutdown fails.\n\n"
+                    "Example: Power off the default server:\n"
+                    '  {}\n'
+                    "Example: Power off a specific server:\n"
+                    '  {"server_id": "server1"}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -510,12 +566,26 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to control (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "force_power_off",
-                "description": "Force power off the server",
+                "description": (
+                    "Force power off the server (immediate shutdown).\n\n"
+                    "⚠️ DANGER: This performs an immediate hard shutdown, equivalent to pulling the power plug!\n\n"
+                    "This operation will:\n"
+                    "- Immediately cut power to the server\n"
+                    "- Skip all shutdown procedures\n"
+                    "- May cause data loss or corruption\n"
+                    "- Should only be used when graceful shutdown fails\n\n"
+                    "USE WITH EXTREME CAUTION. Try 'power_off' first for graceful shutdown.\n\n"
+                    "Example: Force power off the default server:\n"
+                    '  {}\n'
+                    "Example: Force power off a specific server:\n"
+                    '  {"server_id": "server1"}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -524,12 +594,25 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to control (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             },
             {
                 "name": "restart",
-                "description": "Restart the server gracefully",
+                "description": (
+                    "Restart the server gracefully.\n\n"
+                    "⚠️ WARNING: This will initiate a system restart.\n\n"
+                    "This operation will:\n"
+                    "- Send a graceful restart command to the operating system\n"
+                    "- Allow services to shut down cleanly\n"
+                    "- Automatically power back on after shutdown\n"
+                    "- May take several minutes to complete\n\n"
+                    "Example: Restart the default server:\n"
+                    '  {}\n'
+                    "Example: Restart a specific server:\n"
+                    '  {"server_id": "server1"}'
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -538,7 +621,8 @@ class WorkingIDracMCPServer:
                             "description": "ID of the server to control (optional, uses default if not specified)"
                         }
                     },
-                    "required": []
+                    "required": [],
+                    "additionalProperties": False
                 }
             }
         ]
