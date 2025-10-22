@@ -4,8 +4,7 @@ __version__ = "1.0.0"
 __author__ = "Your Name"
 __email__ = "your.email@example.com"
 
-from .server import ProxmoxMCPServer
 from .proxmox_client import ProxmoxClient
 from .auth import AuthManager
 
-__all__ = ["ProxmoxMCPServer", "ProxmoxClient", "AuthManager"]
+__all__ = ["ProxmoxClient", "AuthManager"]

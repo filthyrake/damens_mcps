@@ -71,7 +71,10 @@ class TestProxmoxMCPServer(unittest.TestCase):
     
     def test_list_tools(self):
         """Test that the server can list tools."""
-        tools = self.server._list_tools()
+        result = self.server._list_tools()
+        self.assertIsInstance(result, dict)
+        self.assertIn('tools', result)
+        tools = result['tools']
         self.assertIsInstance(tools, list)
         self.assertGreater(len(tools), 0)
         
@@ -83,7 +86,8 @@ class TestProxmoxMCPServer(unittest.TestCase):
     
     def test_tool_names_have_prefix(self):
         """Test that all tool names have the 'proxmox_' prefix."""
-        tools = self.server._list_tools()
+        result = self.server._list_tools()
+        tools = result['tools']
         for tool in tools:
             self.assertTrue(tool['name'].startswith('proxmox_'), 
                           f"Tool {tool['name']} doesn't have 'proxmox_' prefix")
@@ -142,8 +146,9 @@ class TestToolDefinitions(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.server = ProxmoxMCPServer()
-        self.tools = self.server._list_tools()
+        self.server = WorkingProxmoxMCPServer()
+        result = self.server._list_tools()
+        self.tools = result['tools']
     
     def test_all_tools_have_input_schema(self):
         """Test that all tools have inputSchema defined."""
