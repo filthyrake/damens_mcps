@@ -196,8 +196,22 @@ config.json
 .env
 fleet_servers.json
 
+# MCP Server specific credential files (explicit patterns)
+pfsense-mcp/.env
+pfsense-mcp/config.json
+truenas-mcp/.env
+truenas-mcp/config.json
+idrac-mcp/.env
+idrac-mcp/config.json
+idrac-mcp/.fleet_key
+idrac-mcp/fleet_servers.json
+proxmox-mcp/.env
+proxmox-mcp/config.json
+
 # Example configs are fine to commit
 !config.example.json
+!env.example
+!*.example.json
 
 # Warewulf MCP - tracked separately
 warewulf-mcp/
