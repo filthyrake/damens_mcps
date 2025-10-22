@@ -4,158 +4,214 @@ Basic usage examples for the Proxmox MCP Server.
 
 This script demonstrates how to use the Proxmox MCP server
 and its various tools for managing Proxmox VE environments.
+
+NOTE: This example requires a valid config.json file with Proxmox credentials.
+Copy config.example.json to config.json and update with your settings.
 """
 
 import json
 import sys
 import os
-import time
 
-# Add the current directory to the path so we can import our modules
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Import the working server and client
-from working_proxmox_server import ProxmoxMCPServer
-from src.proxmox_client import ProxmoxClient
+def load_config():
+    """Load configuration from config.json."""
+    config_paths = [
+        'config.json',
+        os.path.join(os.path.dirname(__file__), '..', 'config.json'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config.json'),
+    ]
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return json.load(f)
+    
+    print("❌ Error: config.json not found!")
+    print("Please copy config.example.json to config.json and update with your Proxmox settings.")
+    sys.exit(1)
 
 def test_proxmox_client():
     """Test the Proxmox client directly."""
     print("🔧 Testing Proxmox Client Directly...")
     
+    # Add parent directory to path to import modules
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    
     try:
+        from src.proxmox_client import ProxmoxClient
+        
+        # Load configuration
+        config = load_config()
+        
         # Create client instance
-        client = ProxmoxClient()
+        print("  📡 Creating Proxmox client...")
+        client = ProxmoxClient(config)
         
         # Test connection
-        print("  📡 Testing connection...")
-        result = client.test_connection()
+        print("  🔌 Testing connection...")
+        import asyncio
+        result = asyncio.run(client.test_connection())
         print(f"  ✅ Connection result: {result}")
         
-        # Get version
-        print("  📋 Getting version...")
-        version = client.get_version()
-        print(f"  ✅ Version: {version}")
+        # Get cluster status
+        print("  📊 Getting cluster status...")
+        status = asyncio.run(client.get_cluster_status())
+        print(f"  ✅ Cluster status: {status}")
         
         # List nodes
         print("  🖥️  Listing nodes...")
-        nodes = client.list_nodes()
-        print(f"  ✅ Nodes: {nodes}")
+        nodes = asyncio.run(client.list_nodes())
+        print(f"  ✅ Nodes found: {len(nodes) if isinstance(nodes, list) else 'N/A'}")
         
-        if nodes and 'data' in nodes:
-            for node in nodes['data']:
-                node_name = node['node']
-                print(f"    📊 Node: {node_name}")
-                
-                # List VMs on this node
-                vms = client.list_vms(node_name)
-                print(f"      🖥️  VMs: {len(vms.get('data', []))} found")
-                
-                # List containers on this node
-                containers = client.list_containers(node_name)
-                print(f"      📦 Containers: {len(containers.get('data', []))} found")
-                
-                # List storage on this node
-                storage = client.list_storage(node_name)
-                print(f"      💾 Storage: {len(storage.get('data', []))} pools")
+        if isinstance(nodes, list):
+            for node in nodes:
+                node_name = node.get('node', 'unknown')
+                status = node.get('status', 'unknown')
+                print(f"    📍 Node: {node_name} - Status: {status}")
         
         print("  🎉 Proxmox client test completed successfully!")
+        return True
         
+    except ImportError as e:
+        print(f"  ❌ Import error: {e}")
+        print("  💡 Make sure you're in the proxmox-mcp directory and src/ exists")
+        return False
+    except FileNotFoundError as e:
+        print(f"  ❌ Configuration error: {e}")
+        return False
     except Exception as e:
         print(f"  ❌ Error testing Proxmox client: {e}")
+        import traceback
+        traceback.print_exc()
         return False
-    
-    return True
 
-def test_mcp_server():
-    """Test the MCP server functionality."""
-    print("\n🚀 Testing MCP Server...")
+def test_vm_operations():
+    """Test VM operations."""
+    print("\n🖥️  Testing VM Operations...")
+    
+    # Add parent directory to path to import modules
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     
     try:
-        # Create server instance
-        server = ProxmoxMCPServer()
+        from src.proxmox_client import ProxmoxClient
+        import asyncio
         
-        # Test tools listing
-        print("  📋 Testing tools list...")
-        tools = server._list_tools()
-        print(f"  ✅ Found {len(tools)} tools:")
+        # Load configuration
+        config = load_config()
         
-        for tool in tools:
-            print(f"    🛠️  {tool['name']}: {tool['description']}")
+        # Create client
+        client = ProxmoxClient(config)
         
-        # Test a simple tool call
-        print("  🔧 Testing tool call...")
-        result = server._call_tool("proxmox_test_connection", {})
-        print(f"  ✅ Tool call result: {result}")
+        # List VMs
+        print("  📋 Listing all VMs...")
+        vms = asyncio.run(client.list_vms())
+        print(f"  ✅ Total VMs: {len(vms) if isinstance(vms, list) else 'N/A'}")
         
-        print("  🎉 MCP server test completed successfully!")
+        if isinstance(vms, list) and vms:
+            for vm in vms[:3]:  # Show first 3 VMs
+                vmid = vm.get('vmid', 'N/A')
+                name = vm.get('name', 'unnamed')
+                status = vm.get('status', 'unknown')
+                print(f"    🖥️  VM {vmid}: {name} ({status})")
+        
+        print("  🎉 VM operations test completed!")
+        return True
         
     except Exception as e:
-        print(f"  ❌ Error testing MCP server: {e}")
+        print(f"  ❌ Error testing VM operations: {e}")
+        import traceback
+        traceback.print_exc()
         return False
-    
-    return False
 
-def test_specific_tools():
-    """Test specific tools with the client."""
-    print("\n🎯 Testing Specific Tools...")
+def test_storage_operations():
+    """Test storage operations."""
+    print("\n💾 Testing Storage Operations...")
+    
+    # Add parent directory to path to import modules
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     
     try:
-        client = ProxmoxClient()
+        from src.proxmox_client import ProxmoxClient
+        import asyncio
         
-        # Test VM operations
-        print("  🖥️  Testing VM operations...")
+        # Load configuration
+        config = load_config()
         
-        # List VMs (all nodes)
-        vms = client.list_vms()
-        print(f"    📋 Total VMs found: {len(vms.get('data', []))}")
+        # Create client
+        client = ProxmoxClient(config)
         
-        # Test container operations
-        print("  📦 Testing container operations...")
-        containers = client.list_containers()
-        print(f"    📋 Total containers found: {len(containers.get('data', []))}")
+        # List storage
+        print("  📋 Listing storage...")
+        storage = asyncio.run(client.list_storage())
+        print(f"  ✅ Storage pools: {len(storage) if isinstance(storage, list) else 'N/A'}")
         
-        # Test storage operations
-        print("  💾 Testing storage operations...")
-        storage = client.list_storage()
-        print(f"    📋 Total storage pools: {len(storage.get('data', []))}")
+        if isinstance(storage, list) and storage:
+            for stor in storage[:3]:  # Show first 3 storage pools
+                storage_id = stor.get('storage', 'N/A')
+                storage_type = stor.get('type', 'unknown')
+                status = stor.get('status', 'unknown')
+                print(f"    💾 Storage: {storage_id} ({storage_type}) - {status}")
         
-        print("  🎉 Specific tools test completed successfully!")
+        print("  🎉 Storage operations test completed!")
+        return True
         
     except Exception as e:
-        print(f"  ❌ Error testing specific tools: {e}")
+        print(f"  ❌ Error testing storage operations: {e}")
+        import traceback
+        traceback.print_exc()
         return False
-    
-    return True
 
 def main():
     """Main test function."""
     print("🚀 Proxmox MCP Server - Basic Usage Examples")
-    print("=" * 50)
+    print("=" * 60)
+    print()
     
-    # Test the client directly
-    client_success = test_proxmox_client()
+    # Check for config file first
+    if not any(os.path.exists(p) for p in ['config.json', '../config.json']):
+        print("⚠️  Configuration file not found!")
+        print()
+        print("Please create config.json from config.example.json:")
+        print("  1. Copy: cp config.example.json config.json")
+        print("  2. Edit config.json with your Proxmox credentials")
+        print("  3. Run this example again")
+        print()
+        sys.exit(1)
     
-    # Test the MCP server
-    server_success = test_mcp_server()
+    # Run tests
+    results = {}
     
-    # Test specific tools
-    tools_success = test_specific_tools()
+    results['client'] = test_proxmox_client()
+    results['vms'] = test_vm_operations()
+    results['storage'] = test_storage_operations()
     
     # Summary
-    print("\n📊 Test Summary")
-    print("=" * 30)
-    print(f"  🔧 Proxmox Client: {'✅ PASS' if client_success else '❌ FAIL'}")
-    print(f"  🚀 MCP Server: {'✅ PASS' if server_success else '❌ FAIL'}")
-    print(f"  🛠️  Specific Tools: {'✅ PASS' if tools_success else '❌ FAIL'}")
+    print("\n" + "=" * 60)
+    print("📊 Test Summary")
+    print("=" * 60)
+    print(f"  🔧 Proxmox Client:   {'✅ PASS' if results.get('client') else '❌ FAIL'}")
+    print(f"  🖥️  VM Operations:    {'✅ PASS' if results.get('vms') else '❌ FAIL'}")
+    print(f"  💾 Storage Ops:      {'✅ PASS' if results.get('storage') else '❌ FAIL'}")
+    print()
     
-    if client_success and tools_success:
-        print("\n🎉 All critical tests passed! The Proxmox MCP server is ready to use.")
-        print("\n💡 Next steps:")
-        print("   1. Start the server: python working_proxmox_server.py")
+    if all(results.values()):
+        print("🎉 All tests passed! The Proxmox MCP client is working correctly.")
+        print()
+        print("💡 Next steps:")
+        print("   1. Start the MCP server:")
+        print("      python working_proxmox_server.py")
+        print()
         print("   2. Configure Claude Desktop to use this server")
+        print("      Edit ~/.config/claude/mcp.json (see README.md)")
+        print()
         print("   3. Test the tools in Claude Desktop")
+        print()
     else:
-        print("\n⚠️  Some tests failed. Please check the configuration and try again.")
+        print("⚠️  Some tests failed. Please check:")
+        print("   • config.json has correct Proxmox credentials")
+        print("   • Proxmox server is accessible from this machine")
+        print("   • Network connectivity and firewall rules")
+        print()
         sys.exit(1)
 
 if __name__ == "__main__":

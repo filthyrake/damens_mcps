@@ -6,7 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a collection of **Model Context Protocol (MCP) servers** for managing infrastructure components. Each MCP server provides AI assistants with direct API access to different platforms (pfSense, TrueNAS, iDRAC, Proxmox).
 
-**Status**: All four MCP servers are production-ready and have been tested with real systems.
+**Status Overview**:
+- **pfSense MCP**: ✅ Production-ready - Comprehensive firewall management with 20+ tools
+- **TrueNAS MCP**: ✅ Production-ready - Storage and NAS management with HTTP/CLI interface
+- **iDRAC MCP**: ✅ Stable - Dell server power management with 8 tools for multi-server fleets
+- **Proxmox MCP**: ✅ Stable - Virtualization management with 21 tools for VMs and containers
+
+**Important Notes**:
+- All servers use JSON-RPC or MCP library implementations
+- Security varies by project - see individual `SECURITY.md` files
+- Credential storage methods differ - review before production use
 
 ## Project Structure
 
@@ -23,6 +32,8 @@ Each project follows a similar structure:
 - `examples/` or `tests/` - Usage examples and tests
 - `config.example.json` or `env.example` - Configuration templates
 - `requirements.txt` - Python dependencies
+- `CONTRIBUTING.md` - Contribution guidelines
+- `SECURITY.md` - Security best practices and credential management
 
 ## Development Commands
 
@@ -51,22 +62,20 @@ nano .env  # or config.json
 ### Starting Servers
 
 ```bash
-# TrueNAS MCP
+# TrueNAS MCP (canonical implementation - HTTP server)
 python -m src.http_cli serve
-# OR
-python -m src.server
 
 # pfSense MCP (canonical implementation)
 python -m src.http_pfsense_server
 
-# iDRAC MCP (canonical implementation)
+# iDRAC MCP (canonical implementation - ONLY use this one)
 python working_mcp_server.py
 
-# Proxmox MCP (canonical implementation)
+# Proxmox MCP (canonical implementation - ONLY use this one)
 python working_proxmox_server.py
-# OR
-python -m src.http_server
 ```
+
+**Note**: Each project has a "canonical" implementation - the definitive version to use. Other server files may exist for historical reasons but should not be used.
 
 ### Testing
 
@@ -82,9 +91,11 @@ python examples/basic_usage.py
 python test_server.py
 
 # Proxmox
+python examples/basic_usage.py
 python test_server.py
-.venv/bin/python test_server.py
 ```
+
+**Note**: proxmox-mcp's basic_usage.py has been updated to work correctly with the actual client implementation.
 
 ### Testing Single Tools
 ```bash
@@ -170,21 +181,62 @@ SSL_VERIFY=true/false
 
 ## Security Practices
 
+**IMPORTANT**: Each project has different security characteristics. Always review the project-specific `SECURITY.md` file before deployment.
+
 ### Credential Management
+
+#### General Rules
 - **NEVER commit** `.env` files, `config.json`, or any files containing credentials
 - Use `config.example.json` and `env.example` as templates
 - All sensitive files are in `.gitignore`
-- Store credentials in environment variables or secure config files
+- Set restrictive file permissions: `chmod 600 .env config.json`
+
+#### Project-Specific Credential Storage
+
+**TrueNAS & pfSense**:
+- Use `.env` files for configuration
+- Support both API keys (recommended) and username/password
+- Credentials stored in plain text (rely on file permissions)
+- Consider environment variables or external secret managers for production
+
+**iDRAC**:
+- **Basic mode**: Plain text passwords in `config.json` (development only)
+- **Secure mode**: Encrypted passwords via `secure_fleet_cli.py`
+  - Uses Fernet (AES-128) symmetric encryption
+  - Encryption key stored in `.fleet_key` (still on disk)
+  - Better than plain text, but not enterprise-grade
+- **Production**: Use external secret management (Vault, AWS Secrets Manager)
+- See `idrac-mcp/SECURITY.md` for detailed security guidance
+
+**Proxmox**:
+- Credentials in `config.json` (plain text)
+- Ticket-based authentication after initial login
+- File permissions critical for security
+- Consider external secret management for production
 
 ### SSL/TLS
-- Production should use `SSL_VERIFY=true` or `ssl_verify: true`
-- Self-signed certificates can use `SSL_VERIFY=false` (dev/test only)
+
+- **Production**: Always use `SSL_VERIFY=true` or `ssl_verify: true`
+- **Development/Testing**: `SSL_VERIFY=false` acceptable for self-signed certificates
+- **Best Practice**: Install valid certificates (Let's Encrypt, commercial CA)
 - Custom CA certificates supported via configuration
 
 ### Input Validation
+
 - All tool inputs are validated before execution
 - Type checking and sanitization in resource handlers
 - Parameter validation in client methods
+- Dangerous operations (power off, delete) have appropriate warnings
+
+### Security Documentation
+
+Each project has comprehensive security documentation:
+- `pfsense-mcp/SECURITY.md` - API key management, SSL config, firewall rules
+- `truenas-mcp/SECURITY.md` - API key management, storage access controls
+- `idrac-mcp/SECURITY.md` - Credential options, encryption limitations, best practices
+- `proxmox-mcp/SECURITY.md` - VM management security, access controls
+
+**Always review the appropriate SECURITY.md before deploying to production.**
 
 ## MCP Protocol Implementation
 
@@ -290,14 +342,18 @@ logging.basicConfig(level=logging.DEBUG)
 ### iDRAC
 - Supports Dell PowerEdge servers with iDRAC 8+
 - Uses Redfish API standard
-- Multi-server fleet management support
+- Multi-server fleet management support (8 tools)
 - Pure JSON-RPC implementation for reliability
+- **Security**: Credentials stored in plain text in config.json (see SECURITY.md)
+  - Secure fleet CLI available with encrypted passwords
+  - Choose appropriate method based on security requirements
 
 ### Proxmox
 - Requires Proxmox VE 7.0+
 - Ticket-based authentication (PVE realm)
 - 21 tools covering VMs, containers, storage, snapshots
 - Auto VMID assignment for new VMs
+- **Security**: Credentials in config.json (see SECURITY.md for best practices)
 
 ## Dependencies
 
