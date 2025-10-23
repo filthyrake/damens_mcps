@@ -60,6 +60,7 @@ def sample_container_config():
         "node": "pve",
         "vmid": 101,
         "name": "test-container",
+        "ostemplate": "local:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.gz",
         "cores": 1,
         "memory": 512,
         "rootfs": "local-lvm:8",

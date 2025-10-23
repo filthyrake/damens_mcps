@@ -66,66 +66,72 @@ class TestValidationUtils:
     def test_validate_vm_config_valid(self, sample_vm_config):
         """Test VM config validation with valid data."""
         result = validate_vm_config(sample_vm_config)
-        assert result is True
+        assert isinstance(result, dict)
+        assert result['name'] == sample_vm_config['name']
+        assert result['node'] == sample_vm_config['node']
     
     def test_validate_vm_config_missing_required(self):
         """Test VM config validation with missing required fields."""
         config = {
             "name": "test-vm",
-            "cores": "2"
-            # Missing required fields
+            "cores": 2
+            # Missing required 'node' field
         }
-        result = validate_vm_config(config)
-        assert result is False
+        with pytest.raises(ValueError):
+            validate_vm_config(config)
     
     def test_validate_vm_config_invalid_name(self):
         """Test VM config validation with invalid name."""
         config = {
             "node": "pve",
-            "name": "",  # Invalid: empty name
-            "cores": "2",
-            "memory": "1024"
+            "name": "invalid name with spaces!",  # Invalid: contains spaces and special chars
+            "cores": 2,
+            "memory": 1024
         }
-        result = validate_vm_config(config)
-        assert result is False
+        with pytest.raises(ValueError):
+            validate_vm_config(config)
     
     def test_validate_vm_config_invalid_cores(self):
         """Test VM config validation with invalid cores."""
         config = {
             "node": "pve",
             "name": "test-vm",
-            "cores": "invalid",  # Invalid: non-numeric
-            "memory": "1024"
+            "cores": 0,  # Invalid: must be >= 1
+            "memory": 1024
         }
-        result = validate_vm_config(config)
-        assert result is False
+        with pytest.raises(ValueError):
+            validate_vm_config(config)
     
     def test_validate_container_config_valid(self, sample_container_config):
         """Test container config validation with valid data."""
         result = validate_container_config(sample_container_config)
-        assert result is True
+        assert isinstance(result, dict)
+        assert result['name'] == sample_container_config['name']
+        assert result['node'] == sample_container_config['node']
+    
+    def test_validate_container_config_missing_required(self):
+        """Test container config validation with missing required field."""
+        config = {
+            "node": "pve",
+            "name": "test-container",
+            "cores": 1,
+            "memory": 512
+            # Missing required 'ostemplate' field
+        }
+        with pytest.raises(ValueError):
+            validate_container_config(config)
     
     def test_validate_container_config_invalid_name(self):
         """Test container config validation with invalid name."""
         config = {
             "node": "pve",
-            "name": "",  # Invalid: empty name
-            "cores": "1",
-            "memory": "512"
+            "name": "invalid name!",  # Invalid: contains spaces and special chars
+            "ostemplate": "local:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.gz",
+            "cores": 1,
+            "memory": 512
         }
-        result = validate_container_config(config)
-        assert result is False
-    
-    def test_validate_container_config_invalid_cores(self):
-        """Test container config validation with invalid cores."""
-        config = {
-            "node": "pve",
-            "name": "test-container",
-            "cores": "-1",  # Invalid: negative cores
-            "memory": "512"
-        }
-        result = validate_container_config(config)
-        assert result is False
+        with pytest.raises(ValueError):
+            validate_container_config(config)
 
 
 class TestServerMock:
