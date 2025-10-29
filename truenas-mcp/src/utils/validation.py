@@ -278,6 +278,9 @@ def _is_valid_ip_address(ip: str) -> bool:
 def sanitize_input(input_data: Any) -> Any:
     """Sanitize input data to prevent injection attacks.
     
+    Enhanced sanitization that removes dangerous characters, control characters,
+    and escapes HTML entities.
+    
     Args:
         input_data: Input data to sanitize
         
@@ -285,11 +288,24 @@ def sanitize_input(input_data: Any) -> Any:
         Sanitized input data
     """
     if isinstance(input_data, str):
-        # Remove potentially dangerous characters
-        dangerous_chars = ['<', '>', '"', "'", '&', ';', '|', '`', '$', '(', ')']
+        # Remove null bytes
+        cleaned = input_data.replace('\x00', '')
+        
+        # Remove other control characters except newlines and tabs
+        cleaned = ''.join(
+            char for char in cleaned 
+            if char in ('\n', '\t') or not (0 <= ord(char) < 32)
+        )
+        
+        # Remove potentially dangerous characters for command injection
+        dangerous_chars = ['<', '>', '"', "'", '&', ';', '|', '`', '$', '(', ')', '\r']
         for char in dangerous_chars:
-            input_data = input_data.replace(char, '')
-        return input_data.strip()
+            cleaned = cleaned.replace(char, '')
+        
+        # Remove path traversal sequences
+        cleaned = cleaned.replace('..', '')
+        
+        return cleaned.strip()
     
     elif isinstance(input_data, dict):
         return {key: sanitize_input(value) for key, value in input_data.items()}
@@ -299,6 +315,108 @@ def sanitize_input(input_data: Any) -> Any:
     
     else:
         return input_data
+
+
+def escape_html(text: str) -> str:
+    """Escape HTML special characters to prevent XSS attacks.
+    
+    Args:
+        text: Text to escape
+        
+    Returns:
+        HTML-escaped text
+    """
+    import html as html_module
+    
+    if not text or not isinstance(text, str):
+        return ""
+    
+    return html_module.escape(text)
+
+
+def coerce_and_validate_int(value: Any, min_val: Optional[int] = None, max_val: Optional[int] = None, param_name: str = "value") -> int:
+    """Coerce value to integer and validate bounds.
+    
+    Args:
+        value: Value to coerce and validate
+        min_val: Minimum allowed value (inclusive)
+        max_val: Maximum allowed value (inclusive)
+        param_name: Parameter name for error messages
+        
+    Returns:
+        Validated integer value
+        
+    Raises:
+        ValueError: If value cannot be coerced or is out of bounds
+    """
+    try:
+        int_value = int(value)
+    except (ValueError, TypeError):
+        raise ValueError(f"{param_name} must be a valid integer, got: {value}")
+    
+    if min_val is not None and int_value < min_val:
+        raise ValueError(f"{param_name} must be at least {min_val}, got: {int_value}")
+    
+    if max_val is not None and int_value > max_val:
+        raise ValueError(f"{param_name} must be at most {max_val}, got: {int_value}")
+    
+    return int_value
+
+
+def coerce_and_validate_bool(value: Any, param_name: str = "value") -> bool:
+    """Coerce value to boolean.
+    
+    Args:
+        value: Value to coerce (accepts bool, int, str)
+        param_name: Parameter name for error messages
+        
+    Returns:
+        Boolean value
+        
+    Raises:
+        ValueError: If value cannot be coerced to boolean
+    """
+    if isinstance(value, bool):
+        return value
+    
+    if isinstance(value, int):
+        return value != 0
+    
+    if isinstance(value, str):
+        lower_val = value.lower().strip()
+        if lower_val in ('true', '1', 'yes', 'on'):
+            return True
+        elif lower_val in ('false', '0', 'no', 'off'):
+            return False
+    
+    raise ValueError(f"{param_name} must be a valid boolean, got: {value}")
+
+
+def validate_string_length(value: str, min_length: int = 0, max_length: int = 255, param_name: str = "value") -> str:
+    """Validate string length.
+    
+    Args:
+        value: String to validate
+        min_length: Minimum allowed length
+        max_length: Maximum allowed length
+        param_name: Parameter name for error messages
+        
+    Returns:
+        Validated string
+        
+    Raises:
+        ValueError: If string length is invalid
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"{param_name} must be a string, got: {type(value)}")
+    
+    if len(value) < min_length:
+        raise ValueError(f"{param_name} must be at least {min_length} characters, got: {len(value)}")
+    
+    if len(value) > max_length:
+        raise ValueError(f"{param_name} must be at most {max_length} characters, got: {len(value)}")
+    
+    return value
 
 
 def validate_permissions(permissions: Dict[str, Any]) -> bool:
