@@ -19,7 +19,7 @@ import urllib3
 # Use try-except to allow imports to work both when running directly and when importing from tests
 try:
     # Try absolute import first (for when imported as a module)
-    from src.utils.validation import validate_vmid, validate_node_name, validate_storage_name
+    from src.utils.validation import validate_vmid, validate_node_name
     from src.exceptions import (
         ProxmoxError,
         ProxmoxConnectionError,
@@ -35,7 +35,7 @@ except ImportError:
     # Fall back to sys.path modification for direct execution
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
     try:
-        from utils.validation import validate_vmid, validate_node_name, validate_storage_name
+        from utils.validation import validate_vmid, validate_node_name
         from exceptions import (
             ProxmoxError,
             ProxmoxConnectionError,

@@ -10,8 +10,10 @@ def mock_proxmox_config():
     return {
         "host": "192.168.1.100",
         "port": 8006,
+        "protocol": "https",
         "username": "root@pam",
         "password": "testpassword",
+        "realm": "pam",
         "node": "pve",
         "ssl_verify": False
     }
@@ -32,10 +34,10 @@ def mock_proxmox_client(mock_proxmox_config, monkeypatch):
     client = ProxmoxClient(
         host=mock_proxmox_config["host"],
         port=mock_proxmox_config["port"],
-        protocol="https",
+        protocol=mock_proxmox_config["protocol"],
         username=mock_proxmox_config["username"],
         password=mock_proxmox_config["password"],
-        realm="pam",
+        realm=mock_proxmox_config["realm"],
         ssl_verify=mock_proxmox_config["ssl_verify"]
     )
     

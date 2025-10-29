@@ -3,17 +3,14 @@
 This is the canonical ProxmoxClient implementation extracted from working_proxmox_server.py.
 It uses synchronous HTTP requests with the requests library for maximum compatibility.
 
-IMPORTANT: This implementation uses individual parameters for initialization instead of 
-a config dictionary. This change was made to consolidate the working implementation 
-from working_proxmox_server.py which has been proven in production.
+This implementation uses individual parameters for initialization. The previous
+async/proxmoxer-based implementation that used a config dictionary has been replaced
+with this proven synchronous implementation.
 
-Old API (deprecated):
-    client = ProxmoxClient(config={"host": "...", "port": 8006, ...})
-
-New API:
+Example usage:
     client = ProxmoxClient(
-        host="...", port=8006, protocol="https",
-        username="...", password="...", realm="pve", ssl_verify=False
+        host="proxmox.example.com", port=8006, protocol="https",
+        username="root", password="secret", realm="pam", ssl_verify=False
     )
 """
 
@@ -24,13 +21,13 @@ from typing import Any, Dict, List
 import requests
 
 from .exceptions import (
-    ProxmoxError,
     ProxmoxConnectionError,
     ProxmoxAuthenticationError,
     ProxmoxAPIError,
     ProxmoxTimeoutError,
     ProxmoxValidationError,
-    ProxmoxResourceNotFoundError
+    ProxmoxResourceNotFoundError,
+    ProxmoxConfigurationError
 )
 
 
@@ -54,7 +51,22 @@ class ProxmoxClient:
             password: Proxmox password
             realm: Authentication realm (default: "pve" for Proxmox VE)
             ssl_verify: Whether to verify SSL certificates (default: False for self-signed)
+            
+        Raises:
+            ProxmoxConfigurationError: If required parameters are empty or invalid
         """
+        # Validate required parameters
+        if not host:
+            raise ProxmoxConfigurationError("host cannot be empty")
+        if not username:
+            raise ProxmoxConfigurationError("username cannot be empty")
+        if not password:
+            raise ProxmoxConfigurationError("password cannot be empty")
+        if not protocol:
+            raise ProxmoxConfigurationError("protocol cannot be empty")
+        if protocol not in ('http', 'https'):
+            raise ProxmoxConfigurationError(f"protocol must be 'http' or 'https', got '{protocol}'")
+            
         self.host = host
         self.port = port
         self.protocol = protocol
