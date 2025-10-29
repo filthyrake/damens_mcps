@@ -135,16 +135,11 @@ def _get_client_lock() -> asyncio.Lock:
     
     try:
         # Check if existing lock is compatible with current event loop
-        loop = asyncio.get_running_loop()
-        # Try to access the lock's internal loop - if it differs, we'll get RuntimeError
-        if hasattr(_client_lock, '_loop') and _client_lock._loop is not None:
-            if _client_lock._loop is not loop:
-                # Lock is bound to a different event loop, create a new one
-                _client_lock = asyncio.Lock()
+        # by checking if locked() works without raising RuntimeError
+        _ = _client_lock.locked()
         return _client_lock
     except RuntimeError:
-        # No event loop is running - this shouldn't happen in async context
-        # but if it does, create a new lock
+        # Lock is bound to a different event loop, create a new one
         _client_lock = asyncio.Lock()
         return _client_lock
 
@@ -684,7 +679,7 @@ async def get_client() -> Optional[HTTPPfSenseClient]:
     """
     Get the pfSense client with proper synchronization.
     
-    This function ensures thread-safe access to the global client instance
+    This function ensures coroutine-safe (concurrency-safe) access to the global client instance
     by using an asyncio lock. If the client hasn't been initialized yet,
     it will initialize it.
     

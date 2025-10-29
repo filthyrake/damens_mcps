@@ -2,7 +2,7 @@
 
 import asyncio
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch, AsyncMock
 
 
 class TestConcurrentAccess:
@@ -11,10 +11,10 @@ class TestConcurrentAccess:
     @pytest.mark.asyncio
     async def test_concurrent_get_client_calls(self):
         """Test that multiple concurrent get_client() calls are properly synchronized."""
+        import src.http_pfsense_server
         from src.http_pfsense_server import get_client
         
         # Reset global state for test
-        import src.http_pfsense_server
         src.http_pfsense_server.pfsense_client = None
         src.http_pfsense_server._client_lock = None
         
@@ -46,10 +46,10 @@ class TestConcurrentAccess:
     @pytest.mark.asyncio
     async def test_concurrent_tool_calls(self):
         """Test that concurrent tool calls don't corrupt client state."""
-        from src.http_pfsense_server import HTTPPfSenseMCPServer, get_client
+        import src.http_pfsense_server
+        from src.http_pfsense_server import HTTPPfSenseMCPServer
         
         # Reset global state for test
-        import src.http_pfsense_server
         src.http_pfsense_server.pfsense_client = None
         src.http_pfsense_server._client_lock = None
         
@@ -79,7 +79,7 @@ class TestConcurrentAccess:
             failed_results = [(i, r) for i, r in enumerate(results) if r.isError]
             assert not failed_results, \
                 f"Expected all tool calls to succeed, but {len(failed_results)} failed: " + \
-                ", ".join([f"task {i}: {r.content[0].text if r.content else 'unknown error'}" 
+                ", ".join([f"task {i}: {r.content[0].text if r.content and len(r.content) > 0 else 'unknown error'}" 
                           for i, r in failed_results])
             
             # Verify the mock client methods were called
@@ -90,10 +90,10 @@ class TestConcurrentAccess:
     @pytest.mark.asyncio
     async def test_lock_prevents_race_condition(self):
         """Test that the lock prevents race conditions during initialization."""
+        import src.http_pfsense_server
         from src.http_pfsense_server import get_client
         
         # Reset global state for test
-        import src.http_pfsense_server
         src.http_pfsense_server.pfsense_client = None
         src.http_pfsense_server._client_lock = None  # Reset the lock too
         
@@ -120,10 +120,10 @@ class TestConcurrentAccess:
     @pytest.mark.asyncio
     async def test_get_client_returns_none_on_failure(self):
         """Test that get_client returns None when initialization fails."""
+        import src.http_pfsense_server
         from src.http_pfsense_server import get_client
         
         # Reset global state for test
-        import src.http_pfsense_server
         src.http_pfsense_server.pfsense_client = None
         src.http_pfsense_server._client_lock = None
         
@@ -135,10 +135,10 @@ class TestConcurrentAccess:
     @pytest.mark.asyncio
     async def test_get_client_reuses_existing_client(self):
         """Test that get_client reuses an already initialized client."""
+        import src.http_pfsense_server
         from src.http_pfsense_server import get_client
         
         # Reset global state for test
-        import src.http_pfsense_server
         src.http_pfsense_server.pfsense_client = None
         src.http_pfsense_server._client_lock = None
         
@@ -159,6 +159,7 @@ class TestConcurrentAccess:
             assert initialization_count == 1
             
             # Second call should reuse
+            prev_count = initialization_count
             client2 = await get_client()
             assert client2 is client1
-            assert initialization_count == 1, "Should not reinitialize"
+            assert initialization_count == prev_count, "Should not reinitialize"
