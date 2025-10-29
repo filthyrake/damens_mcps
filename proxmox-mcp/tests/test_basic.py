@@ -24,7 +24,17 @@ class TestProxmoxClient(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.client = ProxmoxClient()
+        # Mock the authentication to avoid actual API calls
+        with patch.object(ProxmoxClient, '_authenticate'):
+            self.client = ProxmoxClient(
+                host="192.168.1.100",
+                port=8006,
+                protocol="https",
+                username="root",
+                password="testpassword",
+                realm="pam",
+                ssl_verify=False
+            )
     
     def test_client_initialization(self):
         """Test that the client can be initialized."""
@@ -32,29 +42,31 @@ class TestProxmoxClient(unittest.TestCase):
         self.assertTrue(hasattr(self.client, 'host'))
         self.assertTrue(hasattr(self.client, 'username'))
     
-    @patch('src.proxmox_client.requests.get')
-    def test_test_connection(self, mock_get):
+    @patch('src.proxmox_client.ProxmoxClient._make_request')
+    def test_test_connection(self, mock_make_request):
         """Test the test_connection method."""
         # Mock successful response
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"version": "8.0.0"}}
-        mock_get.return_value = mock_response
+        mock_make_request.return_value = mock_response
         
         result = self.client.test_connection()
         self.assertIn('status', result)
+        self.assertEqual(result['status'], 'success')
     
-    @patch('src.proxmox_client.requests.get')
-    def test_get_version(self, mock_get):
+    @patch('src.proxmox_client.ProxmoxClient._make_request')
+    def test_get_version(self, mock_make_request):
         """Test the get_version method."""
         # Mock successful response
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"version": "8.0.0"}}
-        mock_get.return_value = mock_response
+        mock_make_request.return_value = mock_response
         
         result = self.client.get_version()
-        self.assertIn('data', result)
+        self.assertIn('status', result)
+        self.assertEqual(result['status'], 'success')
 
 class TestProxmoxMCPServer(unittest.TestCase):
     """Test cases for the WorkingProxmoxMCPServer class."""
