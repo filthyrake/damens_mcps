@@ -15,13 +15,25 @@ from secure_multi_server_manager import SecureMultiServerManager
 
 @click.group()
 @click.option('--config', '-c', default='fleet_servers.json', help='Fleet configuration file')
-@click.option('--key-file', '-k', default='.fleet_key', help='Encryption key file')
+@click.option('--key-file', '-k', default='.fleet_key', help='Encryption key file (legacy)')
+@click.option('--password', '-p', envvar='IDRAC_FLEET_PASSWORD', help='Master password (or set IDRAC_FLEET_PASSWORD env var)')
 @click.pass_context
-def cli(ctx, config, key_file):
+def cli(ctx, config, key_file, password):
     """Secure iDRAC Fleet Management CLI with encrypted passwords."""
     ctx.ensure_object(dict)
+    
+    # Prompt for password if not provided and not using legacy key file
+    if password is None and not Path(key_file).exists():
+        # Check if this is first-time setup (no config file exists)
+        is_first_time = not Path(config).exists()
+        
+        if is_first_time:
+            password = click.prompt("Enter fleet master password", hide_input=True, confirmation_prompt=True)
+        else:
+            password = click.prompt("Enter fleet master password", hide_input=True)
+    
     try:
-        ctx.obj['manager'] = SecureMultiServerManager(config, key_file)
+        ctx.obj['manager'] = SecureMultiServerManager(config, key_file, password)
     except Exception as e:
         click.echo(f"❌ Failed to initialize secure manager: {e}")
         sys.exit(1)
@@ -244,15 +256,19 @@ def security_info(ctx):
     
     click.echo("🔐 Fleet Security Information:")
     click.echo(f"  Configuration file: {manager.config_file}")
-    click.echo(f"  Encryption key file: {manager.key_file}")
+    click.echo(f"  Encryption method: Password-based key derivation (PBKDF2-SHA256)")
+    click.echo(f"  Key derivation iterations: 480,000 (OWASP 2023 recommendation)")
     click.echo(f"  Passwords encrypted: ✅")
     click.echo(f"  Servers configured: {len(manager.servers)}")
     
     if manager.key_file.exists():
-        click.echo(f"  Encryption key: ✅ Present")
-        click.echo("  ⚠️  Keep the key file secure! If lost, you'll need to reconfigure all servers.")
+        click.echo(f"  Legacy key file: ⚠️  Present (.fleet_key)")
+        click.echo("  ⚠️  SECURITY WARNING: Legacy key file stores encryption key unencrypted on disk!")
+        click.echo("  💡 Consider migrating to password-based encryption by removing .fleet_key")
     else:
-        click.echo(f"  Encryption key: ❌ Missing")
+        click.echo(f"  Encryption key storage: ✅ No key stored on disk")
+        click.echo("  🔒 Master password required for each session")
+        click.echo("  💡 Password can be set via --password flag or IDRAC_FLEET_PASSWORD env var")
 
 if __name__ == '__main__':
     cli()
