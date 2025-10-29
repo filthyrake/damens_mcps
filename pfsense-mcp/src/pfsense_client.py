@@ -5,7 +5,7 @@ pfSense API Client for MCP Server.
 import json
 import ssl
 from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlencode
 
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout
@@ -13,7 +13,7 @@ from aiohttp import ClientSession, ClientTimeout
 try:
     from .auth import PfSenseAuth, PfSenseAuthError
     from .utils.logging import get_logger
-    from .utils.validation import validate_config
+    from .utils.validation import validate_config, validate_ip_address
     from .exceptions import (
         PfSenseError,
         PfSenseAPIError,
@@ -26,7 +26,7 @@ except ImportError:
     # Fallback for direct execution
     from auth import PfSenseAuth, PfSenseAuthError
     from utils.logging import get_logger
-    from utils.validation import validate_config
+    from utils.validation import validate_config, validate_ip_address
     from exceptions import (
         PfSenseError,
         PfSenseAPIError,
@@ -378,7 +378,11 @@ class HTTPPfSenseClient:
     
     async def delete_arp_entry(self, ip_address: str) -> Dict[str, Any]:
         """Delete a specific ARP table entry."""
-        return await self._make_request("DELETE", f"/api/v2/diagnostics/arp_table/entry?ip={ip_address}")
+        if not validate_ip_address(ip_address):
+            raise ValueError(f"Invalid IP address: {ip_address}")
+        
+        params = urlencode({"ip": ip_address})
+        return await self._make_request("DELETE", f"/api/v2/diagnostics/arp_table/entry?{params}")
     
     async def get_system_logs(self, limit: int = 100) -> Dict[str, Any]:
         """Get system logs."""
