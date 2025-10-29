@@ -102,7 +102,7 @@ class AuthManager:
             try:
                 with os.fdopen(fd, 'w') as f:
                     f.write(token)
-            except (OSError, IOError, ValueError):
+            except (OSError, IOError):
                 # Close fd if fdopen fails to avoid fd leak
                 os.close(fd)
                 raise
