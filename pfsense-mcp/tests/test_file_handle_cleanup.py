@@ -38,10 +38,14 @@ class TestFileHandleCleanup:
             def fileno(self):
                 return self.original_stdout.fileno()
             
-            def __del__(self):
-                """Ensure file handle is properly closed on cleanup."""
+            def close(self):
+                """Explicitly close the null_output file handle."""
                 if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
                     self.null_output.close()
+            
+            def __del__(self):
+                """Ensure file handle is properly closed on cleanup."""
+                self.close()
         
         # Create instance
         silent = TestSilentStdout()
@@ -74,10 +78,14 @@ class TestFileHandleCleanup:
             def fileno(self):
                 return self.original_stderr.fileno()
             
-            def __del__(self):
-                """Ensure file handle is properly closed on cleanup."""
+            def close(self):
+                """Explicitly close the file handle if needed."""
                 if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
                     self.null_output.close()
+            
+            def __del__(self):
+                """Ensure file handle is properly closed on cleanup."""
+                self.close()
         
         # Create instance
         silent = TestSilentStderr()
@@ -99,9 +107,12 @@ class TestFileHandleCleanup:
             def __init__(self):
                 self.null_output = open(os.devnull, 'w')
             
-            def __del__(self):
+            def close(self):
                 if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
                     self.null_output.close()
+            
+            def __del__(self):
+                self.close()
         
         # Create multiple instances
         silent1 = TestSilent()
@@ -143,9 +154,12 @@ class TestFileHandleCleanup:
                 if create_handle:
                     self.null_output = open(os.devnull, 'w')
             
-            def __del__(self):
+            def close(self):
                 if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
                     self.null_output.close()
+            
+            def __del__(self):
+                self.close()
         
         # Create instance without handle
         silent_no_handle = TestSilent(create_handle=False)
@@ -160,9 +174,12 @@ class TestFileHandleCleanup:
             def __init__(self):
                 self.null_output = open(os.devnull, 'w')
             
-            def __del__(self):
+            def close(self):
                 if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
                     self.null_output.close()
+            
+            def __del__(self):
+                self.close()
         
         # Create instance
         silent = TestSilent()
@@ -174,6 +191,37 @@ class TestFileHandleCleanup:
         # Delete should not raise an exception even though already closed
         del silent
         gc.collect()
+    
+    def test_explicit_close_method(self):
+        """Test that the explicit close() method works correctly."""
+        class TestSilent:
+            def __init__(self):
+                self.null_output = open(os.devnull, 'w')
+            
+            def close(self):
+                """Explicitly close the file handle if needed."""
+                if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
+                    self.null_output.close()
+            
+            def __del__(self):
+                self.close()
+        
+        # Create instance
+        silent = TestSilent()
+        file_handle = silent.null_output
+        
+        # Verify file is open
+        assert not file_handle.closed, "File handle should be open after init"
+        
+        # Explicitly close
+        silent.close()
+        
+        # Verify file is closed
+        assert file_handle.closed, "File handle should be closed after explicit close()"
+        
+        # Calling close again should not raise an exception
+        silent.close()
+        assert file_handle.closed
 
 
 if __name__ == "__main__":
