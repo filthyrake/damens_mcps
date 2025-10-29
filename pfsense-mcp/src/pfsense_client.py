@@ -63,9 +63,10 @@ class HTTPPfSenseClient:
         self.base_url = self.auth.get_base_url()
         self.jwt_token: Optional[str] = None
         self.jwt_token_expiry: Optional[float] = None
-        # JWT tokens typically last 3600 seconds, refresh 5 minutes before expiry
-        self.jwt_token_lifetime = 3600  # seconds
-        self.jwt_token_refresh_buffer = 300  # seconds (5 minutes)
+        # JWT token lifetime - configurable, defaults to 3600 seconds (1 hour)
+        # Can be overridden via config if pfSense uses different expiry
+        self.jwt_token_lifetime = int(config.get("jwt_token_lifetime", 3600))  # seconds
+        self.jwt_token_refresh_buffer = int(config.get("jwt_token_refresh_buffer", 300))  # seconds
     
     def _token_expired(self) -> bool:
         """

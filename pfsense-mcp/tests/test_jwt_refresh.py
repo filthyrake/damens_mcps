@@ -1,13 +1,12 @@
 """Unit tests for JWT token refresh mechanism."""
 
-import asyncio
 import time
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock
 import aiohttp
 
 from src.pfsense_client import HTTPPfSenseClient
-from src.auth import PfSenseAuth, PfSenseAuthError
+from src.auth import PfSenseAuthError
 from src.exceptions import PfSenseConfigurationError
 
 
@@ -251,3 +250,22 @@ class TestJWTTokenRefresh:
             # Should have retried and succeeded
             assert mock_get_jwt.call_count == 2
             assert client.jwt_token == "new-token"
+    
+    @pytest.mark.asyncio
+    async def test_configurable_token_lifetime(self):
+        """Test that JWT token lifetime can be configured."""
+        config = {
+            "host": "192.168.1.1",
+            "port": 443,
+            "protocol": "https",
+            "username": "admin",
+            "password": "password",
+            "ssl_verify": "false",
+            "jwt_token_lifetime": 7200,  # 2 hours
+            "jwt_token_refresh_buffer": 600  # 10 minutes
+        }
+        
+        client = HTTPPfSenseClient(config)
+        
+        assert client.jwt_token_lifetime == 7200
+        assert client.jwt_token_refresh_buffer == 600
