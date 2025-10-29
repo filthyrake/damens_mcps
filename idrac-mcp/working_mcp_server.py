@@ -18,7 +18,7 @@ from requests.auth import HTTPBasicAuth
 # Import validation utilities
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'utils'))
 try:
-    from validation import validate_server_id, safe_get_field, safe_get_nested_field
+    from validation import validate_server_id
 except ImportError:
     # Fallback if validation module not available
     def validate_server_id(server_id: str) -> bool:
@@ -27,23 +27,6 @@ except ImportError:
         if not server_id or not isinstance(server_id, str):
             return False
         return bool(re.match(r'^[a-zA-Z0-9_-]+$', server_id)) and len(server_id) <= 128
-    
-    def safe_get_field(data: Dict[str, Any], field: str, default: Any = None) -> Any:
-        """Fallback safe field getter."""
-        if not isinstance(data, dict):
-            return default
-        return data.get(field, default)
-    
-    def safe_get_nested_field(data: Dict[str, Any], *fields: str, default: Any = None) -> Any:
-        """Fallback safe nested field getter."""
-        current = data
-        for field in fields:
-            if not isinstance(current, dict):
-                return default
-            current = current.get(field)
-            if current is None:
-                return default
-        return current
 
 def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""

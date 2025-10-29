@@ -408,10 +408,10 @@ def sanitize_for_api(value: str) -> str:
     cleaned = value.replace('\x00', '')
     
     # Remove other control characters except newlines and tabs
-    cleaned = ''.join(char for char in cleaned if char == '\n' or char == '\t' or not (0 <= ord(char) < 32))
+    cleaned = ''.join(char for char in cleaned if char in ('\n', '\t') or ord(char) >= 32)
     
     # Remove dangerous shell characters that could be used for command injection
-    dangerous_chars = ['<', '>', '"', "'", ';', '|', '`', '$', '(', ')', '&', '\n', '\r']
+    dangerous_chars = ['<', '>', '"', "'", ';', '|', '`', '$', '(', ')', '&', '\r']
     for char in dangerous_chars:
         cleaned = cleaned.replace(char, '')
     

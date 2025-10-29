@@ -28,23 +28,27 @@ class VMConfig(BaseModel):
     
     @validator('cores')
     def validate_cores(cls, v):
+        # Use the standalone validation function for consistency
         if not isinstance(v, int):
             try:
                 v = int(v)
             except (ValueError, TypeError):
                 raise ValueError('CPU cores must be an integer')
-        if v < 1 or v > 128:
+        # Reuse validate_cores_range logic
+        if not (1 <= v <= 128):
             raise ValueError('CPU cores must be between 1 and 128')
         return v
     
     @validator('memory')
     def validate_memory(cls, v):
+        # Use the standalone validation function for consistency
         if not isinstance(v, int):
             try:
                 v = int(v)
             except (ValueError, TypeError):
                 raise ValueError('Memory must be an integer')
-        if v < 64 or v > 1048576:  # 64MB to 1TB
+        # Reuse validate_memory_range logic
+        if not (64 <= v <= 1048576):
             raise ValueError('Memory must be between 64MB and 1TB (1048576MB)')
         return v
     

@@ -1320,14 +1320,14 @@ class WorkingProxmoxMCPServer:
                         "isError": True
                     }
                 # Validate cores
-                cores = arguments.get('cores', '1')
+                cores = arguments.get('cores', 1)
                 if not validate_cores_range(cores):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid cores '{cores}'. Must be between 1 and 128"}],
                         "isError": True
                     }
                 # Validate memory
-                memory = arguments.get('memory', '512')
+                memory = arguments.get('memory', 512)
                 if not validate_memory_range(memory):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid memory '{memory}'. Must be between 64 and 1048576 MB"}],

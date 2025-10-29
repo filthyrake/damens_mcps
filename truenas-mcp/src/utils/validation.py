@@ -294,7 +294,7 @@ def sanitize_input(input_data: Any) -> Any:
         # Remove other control characters except newlines and tabs
         cleaned = ''.join(
             char for char in cleaned 
-            if char in ('\n', '\t') or not (0 <= ord(char) < 32)
+            if char in ('\n', '\t') or ord(char) >= 32
         )
         
         # Remove potentially dangerous characters for command injection
