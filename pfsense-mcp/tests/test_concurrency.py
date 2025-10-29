@@ -1,6 +1,7 @@
 """Tests for concurrent access synchronization in pfSense MCP Server."""
 
 import asyncio
+import time
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from src.http_pfsense_server import get_pfsense_client
@@ -26,7 +27,6 @@ class TestConcurrentAccess:
         
         async def timed_access(client_id: int):
             """Track when we enter and exit the get_pfsense_client call."""
-            import time
             start = time.time()
             client = await get_pfsense_client()
             end = time.time()
@@ -53,7 +53,6 @@ class TestConcurrentAccess:
         
         async def increment_with_delay():
             """Simulate a race condition scenario using the same lock."""
-            from src.http_pfsense_server import _client_lock
             async with _client_lock:
                 # Read
                 current = counter["value"]

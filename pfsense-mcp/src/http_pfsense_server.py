@@ -619,7 +619,7 @@ class HTTPPfSenseMCPServer:
 
 async def get_pfsense_client() -> Optional[HTTPPfSenseClient]:
     """
-    Get the pfSense client instance with thread-safe synchronization.
+    Get the pfSense client instance with async-safe synchronization.
     
     Returns:
         Initialized HTTPPfSenseClient or None if not initialized
