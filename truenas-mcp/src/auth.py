@@ -98,14 +98,17 @@ class AuthManager:
             
             # Use os.open with proper permissions to avoid race condition
             # File is created with 0o600 permissions atomically
+            # Note: On Windows, granular Unix permissions are not fully supported
             fd = os.open(str(token_path), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
             try:
-                with os.fdopen(fd, 'w') as f:
-                    f.write(token)
+                f = os.fdopen(fd, 'w')
             except (OSError, IOError):
                 # Close fd if fdopen fails to avoid fd leak
                 os.close(fd)
                 raise
+            # If fdopen succeeds, use context manager for writing
+            with f:
+                f.write(token)
             
             logger.info("Saved authentication token to file")
         except OSError as e:

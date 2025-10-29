@@ -4,7 +4,6 @@ import os
 import stat
 import sys
 import tempfile
-from pathlib import Path
 
 import pytest
 
