@@ -18,7 +18,7 @@ damens_mcps/
 
 ### Project Status
 
-- **pfSense MCP**: ✅ Production-ready - Comprehensive firewall management with 20+ tools
+- **pfSense MCP**: ✅ Production-ready - Comprehensive firewall management with 25 tools
 - **TrueNAS MCP**: ✅ Production-ready - Storage and NAS management with HTTP/CLI interface
 - **iDRAC MCP**: ✅ Stable - Dell server power management with 8 tools for multi-server fleets
 - **Proxmox MCP**: ✅ Stable - Virtualization management with 21 tools for VMs and containers
