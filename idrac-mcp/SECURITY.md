@@ -104,6 +104,10 @@ python secure_fleet_cli.py list
    - Can be set via `IDRAC_FLEET_PASSWORD` environment variable
    - Will be prompted interactively if not provided
 
+   > ⚠️ **Security Warning:**  
+   > Supplying the master password via the `IDRAC_FLEET_PASSWORD` environment variable can expose your credentials to other users on the system (e.g., via `ps aux`, environment dumps, or shell history).  
+   > For production environments, prefer interactive prompts or secure CLI flags to minimize the risk of credential leakage.
+
 3. **Salt storage** - Unique salt stored with encrypted config
    - Salt is not sensitive (useless without password)
    - Prevents rainbow table attacks

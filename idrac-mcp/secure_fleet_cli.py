@@ -24,7 +24,13 @@ def cli(ctx, config, key_file, password):
     
     # Prompt for password if not provided and not using legacy key file
     if password is None and not Path(key_file).exists():
-        password = click.prompt("Enter fleet master password", hide_input=True)
+        # Check if this is first-time setup (no config file exists)
+        is_first_time = not Path(config).exists()
+        
+        if is_first_time:
+            password = click.prompt("Enter fleet master password", hide_input=True, confirmation_prompt=True)
+        else:
+            password = click.prompt("Enter fleet master password", hide_input=True)
     
     try:
         ctx.obj['manager'] = SecureMultiServerManager(config, key_file, password)

@@ -84,16 +84,18 @@ class SecureMultiServerManager:
                     config_data = json.load(f)
                 
                 # Load salt from config
-                if 'salt' in config_data:
+                if 'salt' in config_data and config_data['salt'] is not None:
                     self.salt = base64.b64decode(config_data['salt'])
                     print("✅ Loaded existing salt from configuration")
                 else:
                     # Generate new salt
                     self.salt = os.urandom(16)
                     print("🔑 Generated new salt for key derivation")
-            except Exception:
+            except Exception as e:
                 # Don't expose config details for security reasons
                 print("⚠️  Could not load existing configuration, generating new salt")
+                import sys
+                print(f"[DEBUG] Exception in loading config: {type(e).__name__}: {e}", file=sys.stderr)
                 self.salt = os.urandom(16)
         else:
             # Generate new salt for first-time setup
@@ -144,19 +146,28 @@ class SecureMultiServerManager:
     def save_config(self):
         """Save server configurations to encrypted file with salt."""
         try:
+            # Ensure we have a salt (should never be None for password-based encryption)
+            if self.salt is None and not self.key_file.exists():
+                raise ValueError("Salt is not initialized. Cannot save configuration.")
+            
             config = {"servers": self.servers}
             config_json = json.dumps(config)
             
             # Encrypt the data
             encrypted_data = self.fernet.encrypt(config_json.encode())
             
-            # Save encrypted data with salt
+            # Save encrypted data with salt (if using password-based encryption)
+            config_data = {
+                'version': '2.0' if self.salt else '1.0',  # v1.0 for legacy, v2.0 for password-based
+                'data': encrypted_data.decode()
+            }
+            
+            # Only include salt for password-based encryption (v2.0)
+            if self.salt:
+                config_data['salt'] = base64.b64encode(self.salt).decode()
+            
             with open(self.config_file, 'w') as f:
-                json.dump({
-                    'version': '2.0',  # Version 2.0 includes salt for password-based encryption
-                    'salt': base64.b64encode(self.salt).decode() if self.salt else None,
-                    'data': encrypted_data.decode()
-                }, f, indent=2)
+                json.dump(config_data, f, indent=2)
             
             print(f"✅ Saved {len(self.servers)} servers to {self.config_file}")
         except Exception as e:
@@ -402,11 +413,18 @@ class SecureMultiServerManager:
     def create_sample_config(self):
         """Create a sample server configuration file."""
         print("🔐 Creating sample encrypted configuration...")
-        print("⚠️  You'll need to set a master password for encryption")
+        
+        # Check if using legacy key file
+        if self.key_file.exists():
+            print("⚠️  Using legacy encryption key from .fleet_key")
+            print("⚠️  Configuration will use legacy format (no password-based encryption)")
+        else:
+            print("⚠️  You'll need to set a master password for encryption")
         
         # Note: _initialize_encryption was already called in __init__
-        # If salt wasn't generated yet, we need to ensure we have one
-        if self.salt is None:
+        # For password-based encryption, ensure we have a salt
+        if self.salt is None and not self.key_file.exists():
+            # This should not happen, but handle it gracefully
             self.salt = os.urandom(16)
             print("🔑 Generated new salt for key derivation")
         
@@ -438,5 +456,9 @@ class SecureMultiServerManager:
         
         print(f"✅ Created sample encrypted configuration at {self.config_file}")
         print("💡 Edit the passwords using the CLI commands")
-        print("🔐 Passwords are encrypted with password-based key derivation")
-        print("🔒 No encryption key stored on disk - password required for each session")
+        if self.salt:
+            print("🔐 Passwords are encrypted with password-based key derivation")
+            print("🔒 No encryption key stored on disk - password required for each session")
+        else:
+            print("🔐 Passwords are encrypted with legacy key file")
+            print("⚠️  Legacy key file stores encryption key unencrypted on disk")

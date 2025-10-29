@@ -4,7 +4,6 @@ import pytest
 import tempfile
 import json
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 # Import the module to test
