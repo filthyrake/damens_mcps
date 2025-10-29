@@ -2,6 +2,19 @@
 
 This is the canonical ProxmoxClient implementation extracted from working_proxmox_server.py.
 It uses synchronous HTTP requests with the requests library for maximum compatibility.
+
+IMPORTANT: This implementation uses individual parameters for initialization instead of 
+a config dictionary. This change was made to consolidate the working implementation 
+from working_proxmox_server.py which has been proven in production.
+
+Old API (deprecated):
+    client = ProxmoxClient(config={"host": "...", "port": 8006, ...})
+
+New API:
+    client = ProxmoxClient(
+        host="...", port=8006, protocol="https",
+        username="...", password="...", realm="pve", ssl_verify=False
+    )
 """
 
 import json
