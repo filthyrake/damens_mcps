@@ -175,6 +175,6 @@ This fix addresses the HIGH severity security vulnerability by eliminating the p
 3. ✅ Backward compatible (legacy keys still work)
 4. ✅ Well-tested (11 comprehensive tests)
 5. ✅ Properly documented (SECURITY.md updated)
-6. ✅ Security-scanned (0 CodeQL alerts)
+6. ✅ Security scanned (0 CodeQL alerts)
 
 The solution follows industry best practices (OWASP recommendations) and provides a clear migration path for existing users.
