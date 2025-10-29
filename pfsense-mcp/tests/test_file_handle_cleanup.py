@@ -1,4 +1,11 @@
-"""Tests for file handle cleanup in SilentStdout and SilentStderr classes."""
+"""Tests for file handle cleanup in SilentStdout and SilentStderr classes.
+
+Note: These tests recreate the SilentStdout/SilentStderr classes locally
+rather than importing them from the main module. This is intentional because
+the actual classes are instantiated as module-level globals that modify
+sys.stdout/stderr during import, making them difficult to test in isolation.
+The tests validate that the cleanup pattern works correctly.
+"""
 
 import os
 import sys
