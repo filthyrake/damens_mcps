@@ -96,11 +96,17 @@ class AuthManager:
             token_path = Path(self.config.token_file)
             token_path.parent.mkdir(parents=True, exist_ok=True)
             
-            with open(token_path, 'w') as f:
-                f.write(token)
+            # Use os.open with proper permissions to avoid race condition
+            # File is created with 0o600 permissions atomically
+            fd = os.open(str(token_path), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+            try:
+                with os.fdopen(fd, 'w') as f:
+                    f.write(token)
+            except:
+                # Close fd if fdopen fails to avoid fd leak
+                os.close(fd)
+                raise
             
-            # Set appropriate permissions (read/write for owner only)
-            token_path.chmod(0o600)
             logger.info("Saved authentication token to file")
         except OSError as e:
             logger.warning(f"Failed to save token to file {self.config.token_file}: {e}", exc_info=True)
