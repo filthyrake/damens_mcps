@@ -188,15 +188,17 @@ def create_app() -> FastAPI:
                     "timestamp": None  # Could add actual timestamp
                 }
             except Exception as e:
+                logger.error(f"TrueNAS connection check failed: {e}")
                 return {
                     "status": "degraded",
-                    "message": f"TrueNAS connection issue: {str(e)}",
+                    "message": "TrueNAS connection issue",
                     "truenas_connection": "error"
                 }
         except Exception as e:
+            logger.error(f"Health check error: {e}")
             return {
                 "status": "error",
-                "message": str(e),
+                "message": "Health check failed",
                 "truenas_connection": "unknown"
             }
     
@@ -318,8 +320,9 @@ def create_app() -> FastAPI:
             }
         except Exception as e:
             logger.error(f"Error calling tool {request.name}: {e}")
+            # Return a generic error message to avoid exposing stack traces
             return {
-                "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                "content": [{"type": "text", "text": "Tool execution failed. Check server logs for details."}],
                 "isError": True
             }
     
