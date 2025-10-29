@@ -78,6 +78,11 @@ class SilentStdout:
     
     def fileno(self):
         return self.original_stdout.fileno()
+    
+    def __del__(self):
+        """Ensure file handle is properly closed on cleanup."""
+        if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
+            self.null_output.close()
 
 # Set up the filter
 sys.stdout = SilentStdout()
@@ -107,6 +112,11 @@ class SilentStderr:
     
     def fileno(self):
         return self.original_stderr.fileno()
+    
+    def __del__(self):
+        """Ensure file handle is properly closed on cleanup."""
+        if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
+            self.null_output.close()
 
 sys.stderr = SilentStderr()
 
