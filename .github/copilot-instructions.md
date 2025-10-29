@@ -18,10 +18,10 @@ damens_mcps/
 
 ### Project Status
 
-- **pfSense MCP**: ✅ Production-ready - 20+ tools for firewall management
-- **TrueNAS MCP**: ✅ Production-ready - HTTP/CLI interface for storage
-- **iDRAC MCP**: ✅ Production-ready - 8 tools for server fleet management
-- **Proxmox MCP**: ✅ Production-ready - 21 tools for VM/container management
+- **pfSense MCP**: ✅ Production-ready - Comprehensive firewall management with 20+ tools
+- **TrueNAS MCP**: ✅ Production-ready - Storage and NAS management with HTTP/CLI interface
+- **iDRAC MCP**: ✅ Stable - Dell server power management with 8 tools for multi-server fleets
+- **Proxmox MCP**: ✅ Stable - Virtualization management with 21 tools for VMs and containers
 
 ## Development Environment Setup
 
@@ -332,7 +332,7 @@ Be mindful of API call frequency:
 
 ### Repository Documentation
 
-- **CLAUDE.md** - Comprehensive guide for Claude AI (similar content to this file)
+- **CLAUDE.md** - Comprehensive guide for Claude Code (claude.ai/code) when working with this repository
 - **README.md** - Main repository overview and quick start
 - **SETUP_GUIDE.md** - Detailed setup instructions
 - **TESTING.md** - Testing guide and best practices
