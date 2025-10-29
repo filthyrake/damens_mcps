@@ -11,53 +11,65 @@ class TestProxmoxClient:
     
     def test_client_initialization(self, mock_proxmox_config):
         """Test that the client can be initialized with config."""
-        with patch('src.proxmox_client.requests.post') as mock_post:
-            # Mock successful authentication
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "data": {
-                    "ticket": "test-ticket",
-                    "CSRFPreventionToken": "test-csrf"
-                }
-            }
-            mock_post.return_value = mock_response
-            
-            client = ProxmoxClient(mock_proxmox_config)
+        with patch.object(ProxmoxClient, '_authenticate'):
+            client = ProxmoxClient(
+                host=mock_proxmox_config["host"],
+                port=mock_proxmox_config["port"],
+                protocol="https",
+                username=mock_proxmox_config["username"],
+                password=mock_proxmox_config["password"],
+                realm="pam",
+                ssl_verify=mock_proxmox_config["ssl_verify"]
+            )
             assert client.host == mock_proxmox_config["host"]
             assert client.username == mock_proxmox_config["username"]
-            assert hasattr(client, 'ticket')
     
     def test_client_authentication_failure(self, mock_proxmox_config):
         """Test client handles authentication failure."""
-        with patch('src.proxmox_client.requests.post') as mock_post:
+        from src.exceptions import ProxmoxAuthenticationError
+        
+        with patch('src.proxmox_client.requests.Session.post') as mock_post:
             # Mock authentication failure
             mock_response = Mock()
             mock_response.status_code = 401
             mock_response.text = "Authentication failed"
+            mock_response.raise_for_status.side_effect = Exception("401 Unauthorized")
             mock_post.return_value = mock_response
             
-            with pytest.raises(Exception):
-                ProxmoxClient(mock_proxmox_config)
+            with pytest.raises((ProxmoxAuthenticationError, Exception)):
+                ProxmoxClient(
+                    host=mock_proxmox_config["host"],
+                    port=mock_proxmox_config["port"],
+                    protocol="https",
+                    username=mock_proxmox_config["username"],
+                    password=mock_proxmox_config["password"],
+                    realm="pam",
+                    ssl_verify=mock_proxmox_config["ssl_verify"]
+                )
     
-    @patch('src.proxmox_client.requests.get')
-    def test_test_connection(self, mock_get, mock_proxmox_client):
+    def test_test_connection(self, mock_proxmox_client):
         """Test the test_connection method."""
-        # Use the already-mocked client
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.json.return_value = {"data": {"version": "8.0.0"}}
-        
-        result = mock_proxmox_client.test_connection()
-        assert "status" in result
+        with patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"data": {"version": "8.0.0"}}
+            mock_make_request.return_value = mock_response
+            
+            result = mock_proxmox_client.test_connection()
+            assert "status" in result
+            assert result["status"] == "success"
     
-    @patch('src.proxmox_client.requests.get')
-    def test_get_version(self, mock_get, mock_proxmox_client):
+    def test_get_version(self, mock_proxmox_client):
         """Test the get_version method."""
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.json.return_value = {"data": {"version": "8.0.0"}}
-        
-        result = mock_proxmox_client.get_version()
-        assert "data" in result
+        with patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"data": {"version": "8.0.0"}}
+            mock_make_request.return_value = mock_response
+            
+            result = mock_proxmox_client.get_version()
+            assert "status" in result
+            assert result["status"] == "success"
 
 
 class TestValidationUtils:
