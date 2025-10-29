@@ -2,8 +2,10 @@
 pfSense API Client for MCP Server.
 """
 
+import asyncio
 import json
 import ssl
+import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -60,8 +62,73 @@ class HTTPPfSenseClient:
         self.session: Optional[ClientSession] = None
         self.base_url = self.auth.get_base_url()
         self.jwt_token: Optional[str] = None
+        self.jwt_token_expiry: Optional[float] = None
+        # JWT tokens typically last 3600 seconds, refresh 5 minutes before expiry
+        self.jwt_token_lifetime = 3600  # seconds
+        self.jwt_token_refresh_buffer = 300  # seconds (5 minutes)
         
         pass
+    
+    def _token_expired(self) -> bool:
+        """
+        Check if the JWT token has expired or will expire soon.
+        
+        Returns:
+            True if token is expired or will expire within refresh buffer
+        """
+        if self.jwt_token_expiry is None:
+            return True
+        
+        current_time = time.time()
+        # Refresh if within buffer period of expiration
+        return current_time >= (self.jwt_token_expiry - self.jwt_token_refresh_buffer)
+    
+    async def _ensure_valid_token(self) -> None:
+        """
+        Ensure we have a valid JWT token, refreshing if necessary.
+        
+        Implements retry logic with exponential backoff for transient failures.
+        
+        Raises:
+            PfSenseAuthError: If token acquisition fails after all retries
+        """
+        # If we have API key auth, no need for JWT token
+        if self.auth.api_key:
+            return
+        
+        # If we don't have username/password, can't get JWT token
+        if not (self.auth.username and self.auth.password):
+            return
+        
+        # Check if token is expired or missing
+        if self.jwt_token and not self._token_expired():
+            # Token is still valid
+            return
+        
+        # Clear expired token
+        if self.jwt_token and self._token_expired():
+            logger.info("JWT token expired, refreshing...")
+            self.jwt_token = None
+            self.jwt_token_expiry = None
+        
+        # Retry logic with exponential backoff
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self.jwt_token = await self.auth.get_jwt_token()
+                self.jwt_token_expiry = time.time() + self.jwt_token_lifetime
+                logger.info(f"JWT token acquired successfully (expires in {self.jwt_token_lifetime}s)")
+                return
+            except (PfSenseAuthError, aiohttp.ClientError) as e:
+                if attempt == max_retries - 1:
+                    # Last attempt failed, fall back to basic auth
+                    logger.warning(f"JWT token acquisition failed after {max_retries} attempts, using fallback auth: {e}")
+                    return
+                
+                # Calculate backoff delay: 2^attempt seconds
+                backoff_delay = 2 ** attempt
+                logger.warning(f"JWT token acquisition attempt {attempt + 1}/{max_retries} failed: {e}, retrying in {backoff_delay}s...")
+                await asyncio.sleep(backoff_delay)
     
     async def _make_request(
         self, 
@@ -88,17 +155,8 @@ class HTTPPfSenseClient:
         if not self.session:
             self.session = await self.auth.create_session()
         
-        # Try API key first, then JWT token
-        if not self.jwt_token:
-            if self.auth.api_key:
-                # Use API key authentication
-                pass
-            elif self.auth.username and self.auth.password:
-                try:
-                    self.jwt_token = await self.auth.get_jwt_token()
-                except (PfSenseAuthError, aiohttp.ClientError) as e:
-                    # Fall back to original auth method
-                    logger.warning(f"JWT token acquisition failed, using fallback auth: {e}")
+        # Ensure we have a valid JWT token (if applicable)
+        await self._ensure_valid_token()
         
         url = urljoin(self.base_url, endpoint)
         
