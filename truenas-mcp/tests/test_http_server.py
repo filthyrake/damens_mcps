@@ -5,6 +5,11 @@ import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
+# Test configuration constants
+TEST_SECRET_KEY = 'test-secret-key-minimum-32-characters-long-for-security-purposes'
+TEST_ADMIN_USER = 'admin'
+TEST_ADMIN_PASS = 'admin123'  # Default password from JWTAuthManager._create_default_users()
+
 
 class TestHTTPServerImports:
     """Test HTTP server imports."""
@@ -37,7 +42,7 @@ class TestHTTPServerCreation:
         with patch.dict(os.environ, {
             'TRUENAS_HOST': 'test.example.com',
             'TRUENAS_API_KEY': 'test-api-key',
-            'SECRET_KEY': 'test-secret-key-minimum-32-characters-long-for-security-purposes'
+            'SECRET_KEY': TEST_SECRET_KEY
         }):
             yield
     
@@ -83,7 +88,7 @@ class TestHTTPServerEndpoints:
         with patch.dict(os.environ, {
             'TRUENAS_HOST': 'test.example.com',
             'TRUENAS_API_KEY': 'test-api-key',
-            'SECRET_KEY': 'test-secret-key-minimum-32-characters-long-for-security-purposes'
+            'SECRET_KEY': TEST_SECRET_KEY
         }):
             from src.http_server import create_app
             app = create_app()
@@ -119,11 +124,10 @@ class TestHTTPServerEndpoints:
     
     @pytest.mark.skip(reason="Bcrypt compatibility issue in test environment")
     def test_auth_login_endpoint_success(self, client):
-        """Test successful login."""
-        # Use default admin credentials
+        """Test successful login with default admin credentials from JWTAuthManager."""
         response = client.post("/auth/login", json={
-            "username": "admin",
-            "password": "admin123"
+            "username": TEST_ADMIN_USER,
+            "password": TEST_ADMIN_PASS
         })
         assert response.status_code == 200
         data = response.json()
@@ -160,7 +164,7 @@ class TestHTTPServerAuthentication:
         with patch.dict(os.environ, {
             'TRUENAS_HOST': 'test.example.com',
             'TRUENAS_API_KEY': 'test-api-key',
-            'SECRET_KEY': 'test-secret-key-minimum-32-characters-long-for-security-purposes',
+            'SECRET_KEY': TEST_SECRET_KEY,
             'ADMIN_TOKEN': 'test-admin-token'
         }):
             from src.http_server import create_app
@@ -191,11 +195,11 @@ class TestHTTPServerAuthentication:
     
     @pytest.mark.skip(reason="Bcrypt compatibility issue in test environment")
     def test_authenticated_tools_list(self, client):
-        """Test listing tools with authentication."""
-        # First login
+        """Test listing tools with authentication using default credentials."""
+        # First login with default credentials
         login_response = client.post("/auth/login", json={
-            "username": "admin",
-            "password": "admin123"
+            "username": TEST_ADMIN_USER,
+            "password": TEST_ADMIN_PASS
         })
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
