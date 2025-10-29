@@ -467,6 +467,44 @@ class JWTAuthManager:
     def get_current_active_user_dependency(self):
         """Get the get_current_active_user dependency function."""
         return self.get_current_active_user
+    
+    def create_user(self, username: str, password: str, email: Optional[str] = None, full_name: Optional[str] = None) -> User:
+        """Create a new user.
+        
+        Args:
+            username: Username
+            password: Password
+            email: Email address
+            full_name: Full name
+            
+        Returns:
+            Created user
+            
+        Raises:
+            ValueError: If user already exists
+        """
+        if username in self.users_db:
+            raise ValueError("User already exists")
+        
+        hashed_password = self.get_password_hash(password)
+        user_in_db = UserInDB(
+            username=username,
+            email=email,
+            full_name=full_name,
+            disabled=False,
+            hashed_password=hashed_password
+        )
+        self.users_db[username] = user_in_db
+        # Return User object without hashed_password
+        return User(**user_in_db.model_dump(exclude={'hashed_password'}))
+    
+    def list_users(self) -> list[User]:
+        """List all users.
+        
+        Returns:
+            List of users
+        """
+        return [User(**user.model_dump(exclude={'hashed_password'})) for user in self.users_db.values()]
 
 
 # Global JWT auth manager instance for dependency injection
@@ -497,40 +535,3 @@ def get_current_active_user_dependency(current_user: User = Depends(get_current_
     """Dependency function to get current active user."""
     auth_manager = get_jwt_auth_manager()
     return auth_manager.get_current_active_user(current_user)
-    
-    def create_user(self, username: str, password: str, email: Optional[str] = None, full_name: Optional[str] = None) -> User:
-        """Create a new user.
-        
-        Args:
-            username: Username
-            password: Password
-            email: Email address
-            full_name: Full name
-            
-        Returns:
-            Created user
-            
-        Raises:
-            ValueError: If user already exists
-        """
-        if username in self.users_db:
-            raise ValueError("User already exists")
-        
-        hashed_password = self.get_password_hash(password)
-        user = UserInDB(
-            username=username,
-            email=email,
-            full_name=full_name,
-            disabled=False,
-            hashed_password=hashed_password
-        )
-        self.users_db[username] = user
-        return user
-    
-    def list_users(self) -> list[User]:
-        """List all users.
-        
-        Returns:
-            List of users
-        """
-        return [User(**user.dict(exclude={'hashed_password'})) for user in self.users_db.values()]
