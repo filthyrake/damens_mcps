@@ -2,6 +2,7 @@
 Validation utilities for pfSense MCP Server.
 """
 
+import html
 import ipaddress
 import re
 from typing import Any, Dict, List, Optional, Union
@@ -24,6 +25,36 @@ def validate_ip_address(ip: str) -> bool:
         return False
 
 
+def validate_cidr(cidr: str) -> bool:
+    """
+    Validate if a string is a valid CIDR notation (e.g., 192.168.1.0/24).
+    
+    Args:
+        cidr: CIDR notation string to validate
+        
+    Returns:
+        True if valid CIDR notation, False otherwise
+    """
+    try:
+        ipaddress.ip_network(cidr, strict=False)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def validate_ip_or_cidr(address: str) -> bool:
+    """
+    Validate if a string is a valid IP address or CIDR notation.
+    
+    Args:
+        address: IP address or CIDR notation string to validate
+        
+    Returns:
+        True if valid IP or CIDR, False otherwise
+    """
+    return validate_ip_address(address) or validate_cidr(address)
+
+
 def validate_port(port: Union[int, str]) -> bool:
     """
     Validate if a port number is valid.
@@ -39,6 +70,70 @@ def validate_port(port: Union[int, str]) -> bool:
         return 1 <= port_num <= 65535
     except (ValueError, TypeError):
         return False
+
+
+def validate_port_range(port_range: str) -> bool:
+    """
+    Validate if a port range is valid (e.g., "8000-9000" or "80").
+    
+    Args:
+        port_range: Port range string to validate
+        
+    Returns:
+        True if valid port or port range, False otherwise
+    """
+    if not isinstance(port_range, str):
+        return False
+    
+    # Check if it's a single port
+    if '-' not in port_range:
+        return validate_port(port_range)
+    
+    # Check if it's a port range
+    parts = port_range.split('-')
+    if len(parts) != 2:
+        return False
+    
+    try:
+        start_port = int(parts[0].strip())
+        end_port = int(parts[1].strip())
+        
+        # Validate both ports are in valid range
+        if not (1 <= start_port <= 65535 and 1 <= end_port <= 65535):
+            return False
+        
+        # Start port should be less than or equal to end port
+        return start_port <= end_port
+    except (ValueError, TypeError):
+        return False
+
+
+def validate_protocol(protocol: str) -> bool:
+    """
+    Validate if a protocol string is valid for firewall rules.
+    
+    Args:
+        protocol: Protocol string to validate (e.g., 'tcp', 'udp', 'icmp', 'any')
+        
+    Returns:
+        True if valid protocol, False otherwise
+    """
+    if not protocol or not isinstance(protocol, str):
+        return False
+    
+    # Common protocols used in pfSense
+    valid_protocols = [
+        'tcp', 'udp', 'icmp', 'esp', 'ah', 'gre', 'ipv6', 'igmp',
+        'pim', 'ospf', 'sctp', 'any', 'icmpv6', 'tcp/udp'
+    ]
+    
+    # Protocol must be alphanumeric or forward slash (for tcp/udp)
+    # No special characters that could be used for injection
+    if not re.match(r'^[a-zA-Z0-9/]+$', protocol):
+        return False
+    
+    # Check if it's in the list of valid protocols (case-insensitive)
+    return protocol.lower() in valid_protocols
 
 
 def validate_mac_address(mac: str) -> bool:
@@ -98,19 +193,25 @@ def validate_firewall_rule_params(params: Dict[str, Any]) -> List[str]:
     if 'direction' in params and params['direction'] not in ['in', 'out']:
         errors.append("Invalid direction. Must be 'in' or 'out'")
     
-    # Validate source/destination if provided
+    # Validate protocol if provided
+    if 'protocol' in params and params['protocol']:
+        if not validate_protocol(params['protocol']):
+            errors.append("Invalid protocol. Must be a valid protocol (tcp, udp, icmp, etc.)")
+    
+    # Validate source/destination if provided (supports both IP and CIDR)
     if 'source' in params and params['source']:
-        if not validate_ip_address(params['source']) and params['source'] != 'any':
-            errors.append("Invalid source address")
+        if not validate_ip_or_cidr(params['source']) and params['source'] != 'any':
+            errors.append("Invalid source address. Must be a valid IP address or CIDR notation (e.g., 192.168.1.0/24)")
     
     if 'destination' in params and params['destination']:
-        if not validate_ip_address(params['destination']) and params['destination'] != 'any':
-            errors.append("Invalid destination address")
+        if not validate_ip_or_cidr(params['destination']) and params['destination'] != 'any':
+            errors.append("Invalid destination address. Must be a valid IP address or CIDR notation (e.g., 192.168.1.0/24)")
     
-    # Validate port if provided
+    # Validate port if provided (supports both single port and ranges)
     if 'port' in params and params['port']:
-        if not validate_port(params['port']):
-            errors.append("Invalid port number")
+        port_value = str(params['port'])
+        if not validate_port_range(port_value):
+            errors.append("Invalid port. Must be a valid port number (1-65535) or port range (e.g., 8000-9000)")
     
     return errors
 
@@ -285,3 +386,36 @@ def validate_config(config: Dict[str, Any]) -> List[str]:
         errors.append("Either api_key or username/password must be provided")
     
     return errors
+
+
+def sanitize_for_api(value: str) -> str:
+    """
+    Sanitize a string value for safe use in API calls.
+    
+    Removes dangerous characters and escapes HTML entities to prevent injection attacks.
+    
+    Args:
+        value: String to sanitize
+        
+    Returns:
+        Sanitized string
+    """
+    if not value or not isinstance(value, str):
+        return ""
+    
+    # Remove control characters and dangerous patterns
+    # Remove null bytes
+    cleaned = value.replace('\x00', '')
+    
+    # Remove other control characters except newlines and tabs
+    cleaned = ''.join(char for char in cleaned if char == '\n' or char == '\t' or not (0 <= ord(char) < 32))
+    
+    # Remove dangerous shell characters that could be used for command injection
+    dangerous_chars = ['<', '>', '"', "'", ';', '|', '`', '$', '(', ')', '&', '\n', '\r']
+    for char in dangerous_chars:
+        cleaned = cleaned.replace(char, '')
+    
+    # Escape HTML entities
+    cleaned = html.escape(cleaned)
+    
+    return cleaned.strip()
