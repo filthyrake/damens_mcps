@@ -2,13 +2,15 @@
 
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 # Test configuration constants
 TEST_SECRET_KEY = 'test-secret-key-minimum-32-characters-long-for-security-purposes'
 TEST_ADMIN_USER = 'admin'
-TEST_ADMIN_PASS = 'admin123'  # Default password from JWTAuthManager._create_default_users()
+# Note: This matches the default password created by JWTAuthManager._create_default_users()
+# for testing purposes only. In production, change this password immediately.
+TEST_ADMIN_PASS = 'admin123'
 
 
 class TestHTTPServerImports:

@@ -1,10 +1,8 @@
 """HTTP server for TrueNAS MCP Server."""
 
-import asyncio
-import json
 import logging
-import os
-from datetime import timedelta
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Depends, status
@@ -14,7 +12,7 @@ from pydantic import BaseModel
 import uvicorn
 
 from .server import TrueNASMCPServer
-from .auth import JWTAuthManager, User
+from .auth import JWTAuthManager
 from .config import load_settings, Settings
 from .utils.logging import setup_logging
 
@@ -99,27 +97,12 @@ def create_app() -> FastAPI:
         logger.error(f"Failed to load settings: {e}")
         raise
     
-    # Create FastAPI app
-    app = FastAPI(
-        title="TrueNAS MCP Server",
-        description="HTTP-based Model Context Protocol server for TrueNAS Scale management",
-        version="0.1.0"
-    )
-    
-    # CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=app_settings.cors_origins,
-        allow_credentials=app_settings.cors_allow_credentials,
-        allow_methods=app_settings.cors_allow_methods,
-        allow_headers=app_settings.cors_allow_headers,
-    )
-    
-    @app.on_event("startup")
-    async def startup_event():
-        """Initialize the server on startup."""
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Manage application lifespan (startup and shutdown)."""
         global truenas_server, jwt_auth_manager
         
+        # Startup
         # Setup logging
         setup_logging(
             level=app_settings.log_level,
@@ -152,11 +135,28 @@ def create_app() -> FastAPI:
             logger.info("TrueNAS MCP HTTP server initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize server: {e}")
-    
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Cleanup on shutdown."""
+        
+        yield
+        
+        # Shutdown
         logger.info("TrueNAS MCP HTTP server shutting down")
+    
+    # Create FastAPI app with lifespan
+    app = FastAPI(
+        title="TrueNAS MCP Server",
+        description="HTTP-based Model Context Protocol server for TrueNAS Scale management",
+        version="0.1.0",
+        lifespan=lifespan
+    )
+    
+    # CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_settings.cors_origins,
+        allow_credentials=app_settings.cors_allow_credentials,
+        allow_methods=app_settings.cors_allow_methods,
+        allow_headers=app_settings.cors_allow_headers,
+    )
     
     @app.get("/")
     async def root():
@@ -171,36 +171,20 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         """Health check endpoint."""
-        try:
-            if truenas_server is None:
-                return {
-                    "status": "error",
-                    "message": "Server not initialized",
-                    "truenas_connection": "unknown"
-                }
-            
-            # Try to get TrueNAS system info to verify connection
-            try:
-                # This is a basic check - could be enhanced to actually test connection
-                return {
-                    "status": "healthy",
-                    "truenas_connection": "configured",
-                    "timestamp": None  # Could add actual timestamp
-                }
-            except Exception as e:
-                logger.error(f"TrueNAS connection check failed: {e}")
-                return {
-                    "status": "degraded",
-                    "message": "TrueNAS connection issue",
-                    "truenas_connection": "error"
-                }
-        except Exception as e:
-            logger.error(f"Health check error: {e}")
+        if truenas_server is None:
             return {
                 "status": "error",
-                "message": "Health check failed",
-                "truenas_connection": "unknown"
+                "message": "Server not initialized",
+                "truenas_connection": "unknown",
+                "timestamp": datetime.utcnow().isoformat()
             }
+        
+        # Basic health check - connection is configured
+        return {
+            "status": "healthy",
+            "truenas_connection": "configured",
+            "timestamp": datetime.utcnow().isoformat()
+        }
     
     @app.post("/auth/login")
     async def login(request: LoginRequest):
@@ -322,7 +306,7 @@ def create_app() -> FastAPI:
             logger.error(f"Error calling tool {request.name}: {e}")
             # Return a generic error message to avoid exposing stack traces
             return {
-                "content": [{"type": "text", "text": "Tool execution failed. Check server logs for details."}],
+                "content": [{"type": "text", "text": f"Tool '{request.name}' execution failed. Check server logs for details."}],
                 "isError": True
             }
     
@@ -335,7 +319,15 @@ def run_server(
     reload: bool = False,
     log_level: str = "info"
 ):
-    """Run the HTTP server.
+    """Run the HTTP server programmatically.
+    
+    Note: The canonical way to start the server is via the CLI:
+        python -m src.http_cli serve
+    
+    This function is provided for:
+    - Programmatic server startup in custom deployments
+    - Development/testing when direct execution is needed
+    - Integration with other Python applications
     
     Args:
         host: Host to bind to
@@ -355,5 +347,6 @@ def run_server(
 
 
 if __name__ == "__main__":
-    # For development/testing
+    # For development/testing only
+    # Production usage: python -m src.http_cli serve
     run_server()
