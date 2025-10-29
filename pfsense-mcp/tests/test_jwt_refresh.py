@@ -9,6 +9,9 @@ from src.pfsense_client import HTTPPfSenseClient
 from src.auth import PfSenseAuthError
 from src.exceptions import PfSenseConfigurationError
 
+# Test constant: 4 minutes in seconds (within the 5-minute default refresh buffer)
+WITHIN_REFRESH_BUFFER_SECONDS = 240
+
 
 class TestJWTTokenRefresh:
     """Test cases for JWT token refresh functionality."""
@@ -63,7 +66,7 @@ class TestJWTTokenRefresh:
         """Test that _token_expired returns True within refresh buffer."""
         client = HTTPPfSenseClient(jwt_config)
         # Set expiry to 4 minutes from now (within 5 minute buffer)
-        client.jwt_token_expiry = time.time() + 240
+        client.jwt_token_expiry = time.time() + WITHIN_REFRESH_BUFFER_SECONDS
         assert client._token_expired() is True
     
     @pytest.mark.asyncio

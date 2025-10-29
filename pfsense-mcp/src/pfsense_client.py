@@ -40,6 +40,11 @@ except ImportError:
 
 logger = get_logger(__name__)
 
+# JWT token configuration constants
+DEFAULT_JWT_TOKEN_LIFETIME = 3600  # seconds (1 hour)
+DEFAULT_JWT_TOKEN_REFRESH_BUFFER = 300  # seconds (5 minutes)
+MAX_JWT_REFRESH_RETRIES = 3
+
 
 class HTTPPfSenseClient:
     """
@@ -63,10 +68,10 @@ class HTTPPfSenseClient:
         self.base_url = self.auth.get_base_url()
         self.jwt_token: Optional[str] = None
         self.jwt_token_expiry: Optional[float] = None
-        # JWT token lifetime - configurable, defaults to 3600 seconds (1 hour)
+        # JWT token lifetime - configurable, defaults to DEFAULT_JWT_TOKEN_LIFETIME
         # Can be overridden via config if pfSense uses different expiry
-        self.jwt_token_lifetime = int(config.get("jwt_token_lifetime", 3600))  # seconds
-        self.jwt_token_refresh_buffer = int(config.get("jwt_token_refresh_buffer", 300))  # seconds
+        self.jwt_token_lifetime = int(config.get("jwt_token_lifetime", DEFAULT_JWT_TOKEN_LIFETIME))
+        self.jwt_token_refresh_buffer = int(config.get("jwt_token_refresh_buffer", DEFAULT_JWT_TOKEN_REFRESH_BUFFER))
     
     def _token_expired(self) -> bool:
         """
@@ -109,7 +114,7 @@ class HTTPPfSenseClient:
         self.jwt_token_expiry = None
         
         # Retry logic with exponential backoff
-        max_retries = 3
+        max_retries = MAX_JWT_REFRESH_RETRIES
         for attempt in range(max_retries):
             try:
                 self.jwt_token = await self.auth.get_jwt_token()
