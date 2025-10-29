@@ -3,7 +3,7 @@
 import asyncio
 import time
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, patch
 from src.http_pfsense_server import get_pfsense_client
 
 
