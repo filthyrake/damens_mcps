@@ -152,12 +152,28 @@ def validate_and_convert_vmid(vmid: Union[int, str]) -> int:
         if vmid_int < 100 or vmid_int > 999999:
             raise ValueError("VMID must be between 100 and 999999")
         return vmid_int
-    except (ValueError, TypeError):
-        raise ValueError("VMID must be a valid integer")
+    except (ValueError, TypeError) as e:
+        if "invalid literal" in str(e).lower():
+            raise ValueError("VMID must be a valid integer between 100 and 999999")
+        raise ValueError("VMID must be between 100 and 999999")
 
 
-def validate_node_name(node: str) -> str:
-    """Validate node name.
+def validate_node_name(node: str) -> bool:
+    """Validate node name (boolean check).
+    
+    Args:
+        node: Node name
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not node or not isinstance(node, str):
+        return False
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', node)) and len(node) <= 128
+
+
+def validate_and_convert_node_name(node: str) -> str:
+    """Validate and return node name.
     
     Args:
         node: Node name
@@ -168,13 +184,27 @@ def validate_node_name(node: str) -> str:
     Raises:
         ValueError: If node name is invalid
     """
-    if not node or not re.match(r'^[a-zA-Z0-9\-_]+$', node):
+    if not validate_node_name(node):
         raise ValueError("Node name must contain only alphanumeric characters, hyphens, and underscores")
     return node
 
 
-def validate_storage_name(storage: str) -> str:
-    """Validate storage name.
+def validate_storage_name(storage: str) -> bool:
+    """Validate storage name (boolean check).
+    
+    Args:
+        storage: Storage name
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not storage or not isinstance(storage, str):
+        return False
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', storage)) and len(storage) <= 128
+
+
+def validate_and_convert_storage_name(storage: str) -> str:
+    """Validate and return storage name.
     
     Args:
         storage: Storage name
@@ -185,7 +215,7 @@ def validate_storage_name(storage: str) -> str:
     Raises:
         ValueError: If storage name is invalid
     """
-    if not storage or not re.match(r'^[a-zA-Z0-9\-_]+$', storage):
+    if not validate_storage_name(storage):
         raise ValueError("Storage name must contain only alphanumeric characters, hyphens, and underscores")
     return storage
 
