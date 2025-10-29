@@ -487,15 +487,16 @@ class JWTAuthManager:
             raise ValueError("User already exists")
         
         hashed_password = self.get_password_hash(password)
-        user = UserInDB(
+        user_in_db = UserInDB(
             username=username,
             email=email,
             full_name=full_name,
             disabled=False,
             hashed_password=hashed_password
         )
-        self.users_db[username] = user
-        return user
+        self.users_db[username] = user_in_db
+        # Return User object without hashed_password
+        return User(**user_in_db.model_dump(exclude={'hashed_password'}))
     
     def list_users(self) -> list[User]:
         """List all users.
