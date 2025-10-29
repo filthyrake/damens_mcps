@@ -467,36 +467,6 @@ class JWTAuthManager:
     def get_current_active_user_dependency(self):
         """Get the get_current_active_user dependency function."""
         return self.get_current_active_user
-
-
-# Global JWT auth manager instance for dependency injection
-_jwt_auth_manager: Optional[JWTAuthManager] = None
-
-
-def get_jwt_auth_manager() -> JWTAuthManager:
-    """Get the global JWT auth manager instance."""
-    global _jwt_auth_manager
-    if _jwt_auth_manager is None:
-        raise RuntimeError("JWT auth manager not initialized")
-    return _jwt_auth_manager
-
-
-def set_jwt_auth_manager(auth_manager: JWTAuthManager) -> None:
-    """Set the global JWT auth manager instance."""
-    global _jwt_auth_manager
-    _jwt_auth_manager = auth_manager
-
-
-def get_current_user_dependency(token: str = Depends(security)) -> User:
-    """Dependency function to get current user from token."""
-    auth_manager = get_jwt_auth_manager()
-    return auth_manager.get_current_user(token)
-
-
-def get_current_active_user_dependency(current_user: User = Depends(get_current_user_dependency)) -> User:
-    """Dependency function to get current active user."""
-    auth_manager = get_jwt_auth_manager()
-    return auth_manager.get_current_active_user(current_user)
     
     def create_user(self, username: str, password: str, email: Optional[str] = None, full_name: Optional[str] = None) -> User:
         """Create a new user.
@@ -533,4 +503,34 @@ def get_current_active_user_dependency(current_user: User = Depends(get_current_
         Returns:
             List of users
         """
-        return [User(**user.dict(exclude={'hashed_password'})) for user in self.users_db.values()]
+        return [User(**user.model_dump(exclude={'hashed_password'})) for user in self.users_db.values()]
+
+
+# Global JWT auth manager instance for dependency injection
+_jwt_auth_manager: Optional[JWTAuthManager] = None
+
+
+def get_jwt_auth_manager() -> JWTAuthManager:
+    """Get the global JWT auth manager instance."""
+    global _jwt_auth_manager
+    if _jwt_auth_manager is None:
+        raise RuntimeError("JWT auth manager not initialized")
+    return _jwt_auth_manager
+
+
+def set_jwt_auth_manager(auth_manager: JWTAuthManager) -> None:
+    """Set the global JWT auth manager instance."""
+    global _jwt_auth_manager
+    _jwt_auth_manager = auth_manager
+
+
+def get_current_user_dependency(token: str = Depends(security)) -> User:
+    """Dependency function to get current user from token."""
+    auth_manager = get_jwt_auth_manager()
+    return auth_manager.get_current_user(token)
+
+
+def get_current_active_user_dependency(current_user: User = Depends(get_current_user_dependency)) -> User:
+    """Dependency function to get current active user."""
+    auth_manager = get_jwt_auth_manager()
+    return auth_manager.get_current_active_user(current_user)
