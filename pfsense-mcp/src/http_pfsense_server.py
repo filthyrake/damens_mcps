@@ -78,6 +78,15 @@ class SilentStdout:
     
     def fileno(self):
         return self.original_stdout.fileno()
+    
+    def close(self):
+        """Explicitly close the null_output file handle."""
+        if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
+            self.null_output.close()
+    
+    def __del__(self):
+        """Ensure file handle is properly closed on cleanup."""
+        self.close()
 
 # Set up the filter
 sys.stdout = SilentStdout()
@@ -107,6 +116,15 @@ class SilentStderr:
     
     def fileno(self):
         return self.original_stderr.fileno()
+    
+    def close(self):
+        """Explicitly close the file handle if needed."""
+        if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
+            self.null_output.close()
+    
+    def __del__(self):
+        """Ensure file handle is properly closed on cleanup."""
+        self.close()
 
 sys.stderr = SilentStderr()
 
@@ -662,10 +680,28 @@ async def initialize_pfsense_client() -> Optional[HTTPPfSenseClient]:
         return None
 
 
-async def main():
-    """Main entry point for the MCP server."""
+async def get_client() -> Optional[HTTPPfSenseClient]:
+    """
+    Get the pfSense client with proper synchronization.
+    
+    This function ensures coroutine-safe (concurrency-safe) access to the global client instance
+    by using an asyncio lock. If the client hasn't been initialized yet,
+    it will initialize it.
+    
+    Returns:
+        The pfSense client instance, or None if initialization fails
+    """
     global pfsense_client
     
+    lock = _get_client_lock()
+    async with lock:
+        if not pfsense_client:
+            pfsense_client = await initialize_pfsense_client()
+        return pfsense_client
+
+
+async def main():
+    """Main entry point for the MCP server."""
     try:
         # Initialize pfSense client with lock protection
         async with _client_lock:

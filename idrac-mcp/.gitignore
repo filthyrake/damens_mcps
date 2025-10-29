@@ -1,0 +1,99 @@
+# =============================================================================
+# iDRAC MCP Server - Sensitive Files
+# =============================================================================
+# This .gitignore protects against accidental commits of credential files
+# See SECURITY.md for detailed information on credential management
+#
+# CRITICAL: These files contain sensitive data and must NEVER be committed
+# =============================================================================
+
+# Credential Files (CRITICAL - Contains plain text or encrypted passwords)
+.env
+.env.local
+.env.*.local
+config.json
+fleet_servers.json
+
+# Encryption Keys (CRITICAL - Protects encrypted fleet passwords)
+.fleet_key
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Python Virtual Environments
+.venv/
+venv/
+.env/
+env/
+ENV/
+.Python
+
+# Python Cache and Build Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.cache
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and Temporary Files
+*.log
+logs/
+log/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Database Files (if any future use)
+*.db
+*.sqlite
+*.sqlite3
+
+# =============================================================================
+# ALLOWED FILES (Negation Patterns)
+# =============================================================================
+# These example/template files are safe to commit and should be tracked
+
+!config.example.json
+!env.example
+!*.example
+!*.example.json
+!examples/*.json
