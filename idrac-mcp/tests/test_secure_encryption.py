@@ -181,12 +181,16 @@ class TestPasswordBasedEncryption:
             config_file = os.path.join(tmpdir, "test_fleet.json")
             key_file = os.path.join(tmpdir, ".test_key")
             
+            # Test with empty string
             with pytest.raises(ValueError, match="Master password cannot be empty"):
                 SecureMultiServerManager(
                     config_file=config_file,
                     key_file=key_file,
                     master_password=""
                 )
+            
+            # Test with None will trigger interactive prompt (not tested here)
+            # This is covered by integration tests
     
     def test_multiple_sessions_same_password(self):
         """Test that multiple sessions with same password can access data."""

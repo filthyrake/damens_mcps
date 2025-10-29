@@ -61,6 +61,11 @@ class SecureMultiServerManager:
             return
         
         # New password-based key derivation approach
+        # Validate empty password provided explicitly
+        if master_password == "":
+            raise ValueError("Master password cannot be empty")
+        
+        # Check if we need to prompt for password
         if master_password is None:
             print("🔐 Setting up password-based encryption for fleet management...")
             master_password = getpass.getpass("Enter a master password for fleet encryption: ")
@@ -69,8 +74,8 @@ class SecureMultiServerManager:
             if master_password != confirm_password:
                 raise ValueError("Passwords do not match")
             
-        if not master_password:
-            raise ValueError("Master password cannot be empty")
+            if not master_password:
+                raise ValueError("Master password cannot be empty")
         
         # Check if config file exists and load salt from it
         if self.config_file.exists():
@@ -86,8 +91,9 @@ class SecureMultiServerManager:
                     # Generate new salt
                     self.salt = os.urandom(16)
                     print("🔑 Generated new salt for key derivation")
-            except Exception as e:
-                print(f"⚠️  Could not load existing config, generating new salt: {e}")
+            except Exception:
+                # Don't expose config details for security reasons
+                print("⚠️  Could not load existing configuration, generating new salt")
                 self.salt = os.urandom(16)
         else:
             # Generate new salt for first-time setup
