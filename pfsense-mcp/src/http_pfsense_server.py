@@ -130,36 +130,7 @@ sys.stderr = SilentStderr()
 
 # Global client instance with synchronization lock
 pfsense_client: Optional[HTTPPfSenseClient] = None
-_client_lock: Optional[asyncio.Lock] = None
-
-
-def _get_client_lock() -> asyncio.Lock:
-    """
-    Get or create the client lock for the current event loop.
-    
-    This function handles the case where the lock may have been created in a different
-    event loop (e.g., during testing). If the existing lock is incompatible with the
-    current event loop, a new lock is created.
-    
-    Returns:
-        An asyncio.Lock instance valid for the current event loop
-    """
-    global _client_lock
-    
-    # If no lock exists, create one
-    if _client_lock is None:
-        _client_lock = asyncio.Lock()
-        return _client_lock
-    
-    try:
-        # Check if existing lock is compatible with current event loop
-        # by checking if locked() works without raising RuntimeError
-        _ = _client_lock.locked()
-        return _client_lock
-    except RuntimeError:
-        # Lock is bound to a different event loop, create a new one
-        _client_lock = asyncio.Lock()
-        return _client_lock
+_client_lock = asyncio.Lock()
 
 
 class HTTPPfSenseMCPServer:
@@ -519,8 +490,7 @@ class HTTPPfSenseMCPServer:
         Returns:
             Tool result as CallToolResult
         """
-        # Get client with proper synchronization
-        client = await get_client()
+        client = await get_pfsense_client()
         
         if not client:
             return CallToolResult(
@@ -665,6 +635,23 @@ class HTTPPfSenseMCPServer:
             )
 
 
+async def get_pfsense_client() -> Optional[HTTPPfSenseClient]:
+    """
+    Get the pfSense client instance with async-safe synchronization.
+    
+    Note: This function returns a reference to the shared client instance.
+    The client instance itself (HTTPPfSenseClient) is safe for concurrent use
+    once obtained, as it uses aiohttp's ClientSession which handles concurrent
+    requests internally. The lock here protects only the read of the global
+    reference to prevent reading a partially initialized or None value.
+    
+    Returns:
+        Initialized HTTPPfSenseClient or None if not initialized
+    """
+    async with _client_lock:
+        return pfsense_client
+
+
 async def initialize_pfsense_client() -> Optional[HTTPPfSenseClient]:
     """
     Initialize the pfSense client from environment variables.
@@ -716,9 +703,9 @@ async def get_client() -> Optional[HTTPPfSenseClient]:
 async def main():
     """Main entry point for the MCP server."""
     try:
-        # Initialize pfSense client using the synchronized get_client function
-        # This ensures proper initialization with lock protection
-        await get_client()
+        # Initialize pfSense client with lock protection
+        async with _client_lock:
+            pfsense_client = await initialize_pfsense_client()
         
         # Create MCP server
         server = HTTPPfSenseMCPServer()
@@ -760,10 +747,9 @@ async def main():
     except Exception as e:
         sys.exit(1)
     finally:
-        # Clean up client directly without triggering initialization
-        global pfsense_client
-        if pfsense_client:
-            await pfsense_client.close()
+        async with _client_lock:
+            if pfsense_client:
+                await pfsense_client.close()
 
 
 if __name__ == "__main__":
