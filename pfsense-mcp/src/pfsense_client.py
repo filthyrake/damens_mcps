@@ -66,8 +66,6 @@ class HTTPPfSenseClient:
         # JWT tokens typically last 3600 seconds, refresh 5 minutes before expiry
         self.jwt_token_lifetime = 3600  # seconds
         self.jwt_token_refresh_buffer = 300  # seconds (5 minutes)
-        
-        pass
     
     def _token_expired(self) -> bool:
         """
@@ -88,9 +86,7 @@ class HTTPPfSenseClient:
         Ensure we have a valid JWT token, refreshing if necessary.
         
         Implements retry logic with exponential backoff for transient failures.
-        
-        Raises:
-            PfSenseAuthError: If token acquisition fails after all retries
+        Falls back to basic authentication if token acquisition fails after all retries.
         """
         # If we have API key auth, no need for JWT token
         if self.auth.api_key:
@@ -100,16 +96,16 @@ class HTTPPfSenseClient:
         if not (self.auth.username and self.auth.password):
             return
         
-        # Check if token is expired or missing
+        # Check if token is valid and not expired
         if self.jwt_token and not self._token_expired():
-            # Token is still valid
+            # Token is still valid, no need to refresh
             return
         
-        # Clear expired token
-        if self.jwt_token and self._token_expired():
+        # Token is missing or expired, clear it for refresh
+        if self.jwt_token:
             logger.info("JWT token expired, refreshing...")
-            self.jwt_token = None
-            self.jwt_token_expiry = None
+        self.jwt_token = None
+        self.jwt_token_expiry = None
         
         # Retry logic with exponential backoff
         max_retries = 3
@@ -167,8 +163,6 @@ class HTTPPfSenseClient:
             headers = self.auth.get_auth_headers()
         
         try:
-            pass
-            
             async with self.session.request(
                 method=method,
                 url=url,
