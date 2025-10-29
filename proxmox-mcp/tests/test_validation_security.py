@@ -2,9 +2,9 @@
 
 import pytest
 from src.utils.validation import (
-    validate_vmid,
-    validate_node_name,
-    validate_storage_name,
+    is_valid_vmid,
+    is_valid_node_name,
+    is_valid_storage_name,
     validate_snapshot_name,
     validate_cores_range,
     validate_memory_range
@@ -26,7 +26,7 @@ class TestVMIDValidation:
         ]
         
         for vmid in valid_vmids:
-            assert validate_vmid(vmid) is True, f"Expected VMID '{vmid}' to be valid"
+            assert is_valid_vmid(vmid) is True, f"Expected VMID '{vmid}' to be valid"
     
     def test_invalid_vmids(self):
         """Test invalid VMIDs."""
@@ -47,18 +47,18 @@ class TestVMIDValidation:
         ]
         
         for vmid in invalid_vmids:
-            assert validate_vmid(vmid) is False, f"Expected VMID '{vmid}' to be invalid"
+            assert is_valid_vmid(vmid) is False, f"Expected VMID '{vmid}' to be invalid"
     
     def test_vmid_range_boundaries(self):
         """Test VMID range boundaries."""
         # Just below valid range
-        assert validate_vmid(99) is False
+        assert is_valid_vmid(99) is False
         # Start of valid range
-        assert validate_vmid(100) is True
+        assert is_valid_vmid(100) is True
         # End of valid range
-        assert validate_vmid(999999) is True
+        assert is_valid_vmid(999999) is True
         # Just above valid range
-        assert validate_vmid(1000000) is False
+        assert is_valid_vmid(1000000) is False
 
 
 class TestNodeNameValidation:
@@ -77,7 +77,7 @@ class TestNodeNameValidation:
         ]
         
         for name in valid_names:
-            assert validate_node_name(name) is True, f"Expected node name '{name}' to be valid"
+            assert is_valid_node_name(name) is True, f"Expected node name '{name}' to be valid"
     
     def test_invalid_node_names_with_injection(self):
         """Test invalid node names with injection attempts."""
@@ -101,7 +101,7 @@ class TestNodeNameValidation:
         ]
         
         for name in invalid_names:
-            assert validate_node_name(name) is False, f"Expected node name '{name}' to be invalid"
+            assert is_valid_node_name(name) is False, f"Expected node name '{name}' to be invalid"
 
 
 class TestStorageNameValidation:
@@ -120,7 +120,7 @@ class TestStorageNameValidation:
         ]
         
         for name in valid_names:
-            assert validate_storage_name(name) is True, f"Expected storage name '{name}' to be valid"
+            assert is_valid_storage_name(name) is True, f"Expected storage name '{name}' to be valid"
     
     def test_invalid_storage_names(self):
         """Test invalid storage names with injection attempts."""
@@ -142,7 +142,7 @@ class TestStorageNameValidation:
         ]
         
         for name in invalid_names:
-            assert validate_storage_name(name) is False, f"Expected storage name '{name}' to be invalid"
+            assert is_valid_storage_name(name) is False, f"Expected storage name '{name}' to be invalid"
 
 
 class TestValidationIntegration:
@@ -154,15 +154,15 @@ class TestValidationIntegration:
         node = "pve"
         vmid = "100"
         
-        assert validate_node_name(node) is True
-        assert validate_vmid(vmid) is True
+        assert is_valid_node_name(node) is True
+        assert is_valid_vmid(vmid) is True
         
         # Invalid VM operation (injection attempt)
         malicious_node = "pve; rm -rf /"
         malicious_vmid = "100`id`"
         
-        assert validate_node_name(malicious_node) is False
-        assert validate_vmid(malicious_vmid) is False
+        assert is_valid_node_name(malicious_node) is False
+        assert is_valid_vmid(malicious_vmid) is False
     
     def test_storage_operation_parameters(self):
         """Test typical storage operation parameters."""
@@ -170,13 +170,13 @@ class TestValidationIntegration:
         node = "pve"
         storage = "local-lvm"
         
-        assert validate_node_name(node) is True
-        assert validate_storage_name(storage) is True
+        assert is_valid_node_name(node) is True
+        assert is_valid_storage_name(storage) is True
         
         # Invalid storage operation (path traversal)
         malicious_storage = "../../../etc/storage"
         
-        assert validate_storage_name(malicious_storage) is False
+        assert is_valid_storage_name(malicious_storage) is False
     
     def test_snapshot_operation_parameters(self):
         """Test typical snapshot operation parameters."""
@@ -185,14 +185,14 @@ class TestValidationIntegration:
         vmid = 12345
         snapname = "pre-update"
         
-        assert validate_node_name(node) is True
-        assert validate_vmid(vmid) is True
+        assert is_valid_node_name(node) is True
+        assert is_valid_vmid(vmid) is True
         # snapname would need its own validator if we add one
         
         # Invalid snapshot operation
         malicious_node = "node && reboot"
         
-        assert validate_node_name(malicious_node) is False
+        assert is_valid_node_name(malicious_node) is False
 
 
 class TestSecurityScenarios:
@@ -213,7 +213,7 @@ class TestSecurityScenarios:
         
         for pattern in command_injection_patterns:
             test_input = f"node{pattern}"
-            assert validate_node_name(test_input) is False, \
+            assert is_valid_node_name(test_input) is False, \
                 f"Command injection pattern should be blocked: {pattern}"
     
     def test_path_traversal_prevention(self):
@@ -228,9 +228,9 @@ class TestSecurityScenarios:
         ]
         
         for pattern in path_traversal_patterns:
-            assert validate_node_name(pattern) is False, \
+            assert is_valid_node_name(pattern) is False, \
                 f"Path traversal pattern should be blocked: {pattern}"
-            assert validate_storage_name(pattern) is False, \
+            assert is_valid_storage_name(pattern) is False, \
                 f"Path traversal pattern should be blocked: {pattern}"
 
 

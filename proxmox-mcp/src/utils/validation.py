@@ -119,8 +119,8 @@ def validate_container_config(config: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(f"Invalid container configuration: {e}")
 
 
-def validate_vmid(vmid: Union[int, str]) -> bool:
-    """Validate VM/Container ID (boolean check).
+def is_valid_vmid(vmid: Union[int, str]) -> bool:
+    """Check if VM/Container ID is valid (boolean check).
     
     Args:
         vmid: VM/Container ID
@@ -135,7 +135,7 @@ def validate_vmid(vmid: Union[int, str]) -> bool:
         return False
 
 
-def validate_and_convert_vmid(vmid: Union[int, str]) -> int:
+def validate_vmid(vmid: Union[int, str]) -> int:
     """Validate and convert VM/Container ID to integer.
     
     Args:
@@ -149,17 +149,17 @@ def validate_and_convert_vmid(vmid: Union[int, str]) -> int:
     """
     try:
         vmid_int = int(vmid)
-        if vmid_int < 100 or vmid_int > 999999:
-            raise ValueError("VMID must be between 100 and 999999")
-        return vmid_int
-    except (ValueError, TypeError) as e:
-        if "invalid literal" in str(e).lower():
-            raise ValueError("VMID must be a valid integer between 100 and 999999")
+    except (ValueError, TypeError):
+        raise ValueError("VMID must be a valid integer between 100 and 999999")
+    
+    if vmid_int < 100 or vmid_int > 999999:
         raise ValueError("VMID must be between 100 and 999999")
+    
+    return vmid_int
 
 
-def validate_node_name(node: str) -> bool:
-    """Validate node name (boolean check).
+def is_valid_node_name(node: str) -> bool:
+    """Check if node name is valid (boolean check).
     
     Args:
         node: Node name
@@ -172,7 +172,7 @@ def validate_node_name(node: str) -> bool:
     return bool(re.match(r'^[a-zA-Z0-9\-_]+$', node)) and len(node) <= 128
 
 
-def validate_and_convert_node_name(node: str) -> str:
+def validate_node_name(node: str) -> str:
     """Validate and return node name.
     
     Args:
@@ -184,13 +184,13 @@ def validate_and_convert_node_name(node: str) -> str:
     Raises:
         ValueError: If node name is invalid
     """
-    if not validate_node_name(node):
+    if not is_valid_node_name(node):
         raise ValueError("Node name must contain only alphanumeric characters, hyphens, and underscores")
     return node
 
 
-def validate_storage_name(storage: str) -> bool:
-    """Validate storage name (boolean check).
+def is_valid_storage_name(storage: str) -> bool:
+    """Check if storage name is valid (boolean check).
     
     Args:
         storage: Storage name
@@ -203,7 +203,7 @@ def validate_storage_name(storage: str) -> bool:
     return bool(re.match(r'^[a-zA-Z0-9\-_]+$', storage)) and len(storage) <= 128
 
 
-def validate_and_convert_storage_name(storage: str) -> str:
+def validate_storage_name(storage: str) -> str:
     """Validate and return storage name.
     
     Args:
@@ -215,7 +215,7 @@ def validate_and_convert_storage_name(storage: str) -> str:
     Raises:
         ValueError: If storage name is invalid
     """
-    if not validate_storage_name(storage):
+    if not is_valid_storage_name(storage):
         raise ValueError("Storage name must contain only alphanumeric characters, hyphens, and underscores")
     return storage
 

@@ -20,9 +20,9 @@ import urllib3
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 try:
     from utils.validation import (
-        validate_vmid, 
-        validate_node_name, 
-        validate_storage_name,
+        is_valid_vmid, 
+        is_valid_node_name, 
+        is_valid_storage_name,
         validate_snapshot_name,
         validate_cores_range,
         validate_memory_range
@@ -816,12 +816,12 @@ class WorkingProxmoxMCPServer:
                 "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
                 "isError": True
             }
-        if not validate_node_name(node):
+        if not is_valid_node_name(node):
             return {
                 "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                 "isError": True
             }
-        if not validate_vmid(vmid):
+        if not is_valid_vmid(vmid):
             return {
                 "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
                 "isError": True
@@ -1223,7 +1223,7 @@ class WorkingProxmoxMCPServer:
                         "isError": True
                     }
                 # Validate node name
-                if not validate_node_name(node):
+                if not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
@@ -1237,7 +1237,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_list_vms":
                 node = arguments.get('node')
                 # Validate node name if provided
-                if node and not validate_node_name(node):
+                if node and not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
@@ -1258,12 +1258,12 @@ class WorkingProxmoxMCPServer:
                         "isError": True
                     }
                 # Validate inputs to prevent injection attacks
-                if not validate_node_name(node):
+                if not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
-                if not validate_vmid(vmid):
+                if not is_valid_vmid(vmid):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
                         "isError": True
@@ -1283,12 +1283,12 @@ class WorkingProxmoxMCPServer:
                         "isError": True
                     }
                 # Validate inputs to prevent injection attacks
-                if not validate_node_name(node):
+                if not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
-                if not validate_vmid(vmid):
+                if not is_valid_vmid(vmid):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
                         "isError": True
@@ -1308,13 +1308,13 @@ class WorkingProxmoxMCPServer:
                         "isError": True
                     }
                 # Validate node name
-                if not validate_node_name(node):
+                if not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
                 vmid = arguments.get('vmid')
-                if vmid and not validate_vmid(vmid):
+                if vmid and not is_valid_vmid(vmid):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
                         "isError": True
@@ -1335,7 +1335,7 @@ class WorkingProxmoxMCPServer:
                     }
                 # Validate storage name if provided
                 storage = arguments.get('storage')
-                if storage and not validate_storage_name(storage):
+                if storage and not is_valid_storage_name(storage):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid storage name '{storage}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
@@ -1409,7 +1409,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_list_containers":
                 node = arguments.get('node')
                 # Validate node name if provided
-                if node and not validate_node_name(node):
+                if node and not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
@@ -1448,7 +1448,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_list_storage":
                 node = arguments.get('node')
                 # Validate node name if provided
-                if node and not validate_node_name(node):
+                if node and not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
@@ -1463,7 +1463,7 @@ class WorkingProxmoxMCPServer:
             elif name == "proxmox_get_storage_usage":
                 node = arguments.get('node')
                 # Validate node name if provided
-                if node and not validate_node_name(node):
+                if node and not is_valid_node_name(node):
                     return {
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
