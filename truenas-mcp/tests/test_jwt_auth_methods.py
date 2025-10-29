@@ -1,4 +1,4 @@
-"""Test JWTAuthManager methods that were previously malformed."""
+"""Test JWTAuthManager methods and user management functionality."""
 
 import pytest
 import sys
