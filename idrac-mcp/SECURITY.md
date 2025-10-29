@@ -45,58 +45,101 @@ The basic `working_mcp_server.py` uses a simple JSON configuration file where **
 
 ## Method 2: Encrypted Fleet Management (Recommended) ✅
 
-### Security Level: **MEDIUM** - Better for Multi-Server Environments
+### Security Level: **HIGH** - Secure Password-Based Encryption
 
-The secure fleet CLI (`secure_fleet_cli.py`) provides encrypted password storage using Fernet (AES-128-CBC).
+The secure fleet CLI (`secure_fleet_cli.py`) provides encrypted password storage using Fernet (AES-128-CBC) with **password-based key derivation** (PBKDF2-SHA256).
 
 ### ✅ Security Features
 - **Encrypted passwords** using Fernet symmetric encryption (AES-128)
-- **Separate encryption key** stored in `.fleet_key`
+- **Password-based key derivation** using PBKDF2-SHA256 with 480,000 iterations (OWASP 2023 recommendation)
+- **No encryption key stored on disk** - key is derived from your master password each time
 - **Secure password prompts** (no command-line exposure)
-- **Both sensitive files** are in `.gitignore`
+- **Salt stored with encrypted config** (safe - useless without password)
 - **Multi-server management** with centralized credential handling
+- **Backward compatible** with legacy `.fleet_key` files (with security warnings)
 
 ### 📦 Installation
 
 ```bash
 # Install the cryptography dependency
-pip install cryptography
+pip install cryptography click
 ```
 
 ### 🚀 Usage
 
 ```bash
-# Initialize fleet management (first time only)
+# Initialize fleet management (first time - will prompt for master password)
 python secure_fleet_cli.py init
 
-# Add a server (password will be prompted securely)
+# Add a server (master password + server password will be prompted)
 python secure_fleet_cli.py add server1 192.168.1.100 root
 
-# List configured servers
+# List configured servers (master password will be prompted)
 python secure_fleet_cli.py list
 
-# Get system info from a server
-python secure_fleet_cli.py system-info server1
+# Get system info from a server (master password will be prompted)
+python secure_fleet_cli.py info server1
+
+# Use environment variable to avoid repeated password prompts
+export IDRAC_FLEET_PASSWORD="your-master-password"
+python secure_fleet_cli.py list
 ```
 
 ### 🔐 Protected Files
-- `fleet_servers.json` - Server configurations with encrypted passwords
-- `.fleet_key` - Encryption key (automatically generated)
+- `fleet_servers.json` - Server configurations with encrypted passwords and salt
+- `.fleet_key` - **DEPRECATED** - Legacy encryption key file (no longer created)
 - Both are automatically excluded via `.gitignore`
 
-### ⚠️ Important Limitations
+### 🔒 Security Improvements (Version 2.0)
 
-**Even with encryption, this method has limitations:**
+**What changed from v1.0:**
 
-1. **Encryption key on disk** - The `.fleet_key` file is stored unencrypted on the same system
-   - If an attacker gains access to the system, they can decrypt passwords
-   - This is **symmetric encryption**, not a password manager
+1. **No persistent encryption key** - The encryption key is no longer stored on disk
+   - Key is derived from your master password using PBKDF2-SHA256
+   - 480,000 iterations (OWASP 2023 recommendation for password-based key derivation)
+   - Even if attacker gains file access, passwords cannot be decrypted without master password
 
-2. **No master password** - The encryption key is not password-protected
-   - Anyone with filesystem access can decrypt credentials
-   - Consider this "obfuscation plus access control" rather than true security
+2. **Master password required** - You must provide the master password for each session
+   - Can be provided via `--password` flag
+   - Can be set via `IDRAC_FLEET_PASSWORD` environment variable
+   - Will be prompted interactively if not provided
 
-3. **Key management** - If you lose `.fleet_key`, all passwords are irrecoverable
+3. **Salt storage** - Unique salt stored with encrypted config
+   - Salt is not sensitive (useless without password)
+   - Prevents rainbow table attacks
+   - Different salt per configuration file
+
+### ⚠️ Migration from v1.0
+
+If you have an existing `.fleet_key` file (v1.0):
+
+**Option 1: Continue using legacy key (less secure)**
+- The CLI will automatically detect and use the existing `.fleet_key`
+- You'll see a security warning on each use
+- No migration needed, but security is compromised
+
+**Option 2: Migrate to password-based encryption (recommended)**
+```bash
+# 1. Export your current server configs
+python secure_fleet_cli.py list > servers_backup.txt
+
+# 2. Remove the legacy key file
+rm .fleet_key
+
+# 3. Initialize with new password-based encryption
+python secure_fleet_cli.py init
+
+# 4. Re-add your servers
+python secure_fleet_cli.py add server1 192.168.1.100 root
+# ... repeat for each server
+```
+
+### ✅ Benefits Over Legacy Approach
+
+1. **No key theft** - Attacker needs your master password, not just file access
+2. **Password strength matters** - Strong master password = strong encryption
+3. **No false security** - Clear that password is the security boundary
+4. **Compliance friendly** - Meets many security standards for credential storage
 
 ---
 
@@ -220,10 +263,10 @@ Before deploying to production:
 | Method | Security | Use Case | Recommendation |
 |--------|----------|----------|----------------|
 | `config.json` | ⚠️ LOW | Development/Testing | Local testing only |
-| Encrypted Fleet | 🔶 MEDIUM | Small deployments | Better, but still limited |
-| External Secrets | ✅ HIGH | Production | **Recommended** |
+| Encrypted Fleet (v2.0) | ✅ HIGH | Production & Development | **Recommended for most users** |
+| External Secrets | ✅ VERY HIGH | Enterprise Production | **Best for enterprise** |
 
-**Remember:** The secure fleet CLI is better than plain text, but it's not a substitute for proper enterprise secret management. Choose the method appropriate for your risk tolerance and environment.
+**Version 2.0 Update:** The encrypted fleet management now uses password-based key derivation (PBKDF2-SHA256) with no persistent key on disk, significantly improving security over the legacy v1.0 approach.
 
 ---
 

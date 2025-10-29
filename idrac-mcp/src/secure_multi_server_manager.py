@@ -24,51 +24,88 @@ except ImportError:
 class SecureMultiServerManager:
     """Manages multiple iDRAC servers with encrypted password storage."""
     
-    def __init__(self, config_file: str = "fleet_servers.json", key_file: str = ".fleet_key"):
+    def __init__(self, config_file: str = "fleet_servers.json", key_file: str = ".fleet_key", master_password: Optional[str] = None):
         """Initialize the secure multi-server manager.
         
         Args:
             config_file: Path to the encrypted servers configuration file
-            key_file: Path to the encryption key file
+            key_file: Path to the encryption key file (deprecated, kept for backward compatibility)
+            master_password: Master password for deriving encryption key (required for new setup)
         """
         self.config_file = Path(config_file)
         self.key_file = Path(key_file)
         self.fernet = None
         self.servers = {}
-        self._initialize_encryption()
+        self.salt = None  # Salt for key derivation
+        self._initialize_encryption(master_password)
         self.load_config()
     
-    def _initialize_encryption(self):
-        """Initialize encryption key."""
+    def _initialize_encryption(self, master_password: Optional[str] = None):
+        """Initialize encryption key using password-based key derivation.
+        
+        Args:
+            master_password: Master password for key derivation. If None and needed, will prompt.
+        """
+        # Check for legacy key file (backward compatibility)
         if self.key_file.exists():
-            # Load existing key
+            print("⚠️  WARNING: Legacy encryption key file detected (.fleet_key)")
+            print("    This file stores the encryption key unencrypted on disk.")
+            print("    For better security, consider migrating to password-based encryption.")
+            print("    See SECURITY.md for migration instructions.")
+            print()
+            
+            # Load existing key for backward compatibility
             with open(self.key_file, 'rb') as f:
                 key = f.read()
             self.fernet = Fernet(key)
+            return
+        
+        # New password-based key derivation approach
+        if master_password is None:
+            print("🔐 Setting up password-based encryption for fleet management...")
+            master_password = getpass.getpass("Enter a master password for fleet encryption: ")
+            confirm_password = getpass.getpass("Confirm master password: ")
+            
+            if master_password != confirm_password:
+                raise ValueError("Passwords do not match")
+            
+        if not master_password:
+            raise ValueError("Master password cannot be empty")
+        
+        # Check if config file exists and load salt from it
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, 'r') as f:
+                    config_data = json.load(f)
+                
+                # Load salt from config
+                if 'salt' in config_data:
+                    self.salt = base64.b64decode(config_data['salt'])
+                    print("✅ Loaded existing salt from configuration")
+                else:
+                    # Generate new salt
+                    self.salt = os.urandom(16)
+                    print("🔑 Generated new salt for key derivation")
+            except Exception as e:
+                print(f"⚠️  Could not load existing config, generating new salt: {e}")
+                self.salt = os.urandom(16)
         else:
-            # Generate new key
-            print("🔐 Setting up encryption for fleet management...")
-            password = getpass.getpass("Enter a master password for fleet encryption: ")
-            if not password:
-                raise ValueError("Master password cannot be empty")
-            
-            # Generate key from password
-            salt = os.urandom(16)
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt,
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-            self.fernet = Fernet(key)
-            
-            # Save key (in production, you might want to store this more securely)
-            with open(self.key_file, 'wb') as f:
-                f.write(key)
-            
-            print(f"✅ Encryption key saved to {self.key_file}")
-            print("⚠️  Keep this key file secure! If lost, you'll need to reconfigure all servers.")
+            # Generate new salt for first-time setup
+            self.salt = os.urandom(16)
+            print("🔑 Generated new salt for key derivation")
+        
+        # Derive key from password using PBKDF2 (OWASP 2023 recommendation: 480,000 iterations)
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=self.salt,
+            iterations=480000,  # OWASP 2023 recommendation for PBKDF2-SHA256
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
+        self.fernet = Fernet(key)
+        
+        print("✅ Encryption key derived from password")
+        print("🔒 No encryption key stored on disk - password required for each session")
     
     def _encrypt_password(self, password: str) -> str:
         """Encrypt a password."""
@@ -99,7 +136,7 @@ class SecureMultiServerManager:
             self.servers = {}
     
     def save_config(self):
-        """Save server configurations to encrypted file."""
+        """Save server configurations to encrypted file with salt."""
         try:
             config = {"servers": self.servers}
             config_json = json.dumps(config)
@@ -107,10 +144,11 @@ class SecureMultiServerManager:
             # Encrypt the data
             encrypted_data = self.fernet.encrypt(config_json.encode())
             
-            # Save encrypted data
+            # Save encrypted data with salt
             with open(self.config_file, 'w') as f:
                 json.dump({
-                    'version': '1.0',
+                    'version': '2.0',  # Version 2.0 includes salt for password-based encryption
+                    'salt': base64.b64encode(self.salt).decode() if self.salt else None,
                     'data': encrypted_data.decode()
                 }, f, indent=2)
             
@@ -360,8 +398,11 @@ class SecureMultiServerManager:
         print("🔐 Creating sample encrypted configuration...")
         print("⚠️  You'll need to set a master password for encryption")
         
-        # This will trigger the encryption setup
-        self._initialize_encryption()
+        # Note: _initialize_encryption was already called in __init__
+        # If salt wasn't generated yet, we need to ensure we have one
+        if self.salt is None:
+            self.salt = os.urandom(16)
+            print("🔑 Generated new salt for key derivation")
         
         sample_config = {
             "servers": {
@@ -390,5 +431,6 @@ class SecureMultiServerManager:
         self.save_config()
         
         print(f"✅ Created sample encrypted configuration at {self.config_file}")
-        print("💡 Edit the file to add your actual server details")
-        print("🔐 Passwords are now encrypted and secure")
+        print("💡 Edit the passwords using the CLI commands")
+        print("🔐 Passwords are encrypted with password-based key derivation")
+        print("🔒 No encryption key stored on disk - password required for each session")
