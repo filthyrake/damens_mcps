@@ -1,7 +1,14 @@
 """Tests for Proxmox validation utilities."""
 
 import pytest
-from src.utils.validation import validate_vmid, validate_node_name, validate_storage_name
+from src.utils.validation import (
+    is_valid_vmid,
+    is_valid_node_name,
+    is_valid_storage_name,
+    validate_snapshot_name,
+    validate_cores_range,
+    validate_memory_range
+)
 
 
 class TestVMIDValidation:
@@ -19,7 +26,7 @@ class TestVMIDValidation:
         ]
         
         for vmid in valid_vmids:
-            assert validate_vmid(vmid) is True, f"Expected VMID '{vmid}' to be valid"
+            assert is_valid_vmid(vmid) is True, f"Expected VMID '{vmid}' to be valid"
     
     def test_invalid_vmids(self):
         """Test invalid VMIDs."""
@@ -40,18 +47,18 @@ class TestVMIDValidation:
         ]
         
         for vmid in invalid_vmids:
-            assert validate_vmid(vmid) is False, f"Expected VMID '{vmid}' to be invalid"
+            assert is_valid_vmid(vmid) is False, f"Expected VMID '{vmid}' to be invalid"
     
     def test_vmid_range_boundaries(self):
         """Test VMID range boundaries."""
         # Just below valid range
-        assert validate_vmid(99) is False
+        assert is_valid_vmid(99) is False
         # Start of valid range
-        assert validate_vmid(100) is True
+        assert is_valid_vmid(100) is True
         # End of valid range
-        assert validate_vmid(999999) is True
+        assert is_valid_vmid(999999) is True
         # Just above valid range
-        assert validate_vmid(1000000) is False
+        assert is_valid_vmid(1000000) is False
 
 
 class TestNodeNameValidation:
@@ -70,7 +77,7 @@ class TestNodeNameValidation:
         ]
         
         for name in valid_names:
-            assert validate_node_name(name) is True, f"Expected node name '{name}' to be valid"
+            assert is_valid_node_name(name) is True, f"Expected node name '{name}' to be valid"
     
     def test_invalid_node_names_with_injection(self):
         """Test invalid node names with injection attempts."""
@@ -94,7 +101,7 @@ class TestNodeNameValidation:
         ]
         
         for name in invalid_names:
-            assert validate_node_name(name) is False, f"Expected node name '{name}' to be invalid"
+            assert is_valid_node_name(name) is False, f"Expected node name '{name}' to be invalid"
 
 
 class TestStorageNameValidation:
@@ -113,7 +120,7 @@ class TestStorageNameValidation:
         ]
         
         for name in valid_names:
-            assert validate_storage_name(name) is True, f"Expected storage name '{name}' to be valid"
+            assert is_valid_storage_name(name) is True, f"Expected storage name '{name}' to be valid"
     
     def test_invalid_storage_names(self):
         """Test invalid storage names with injection attempts."""
@@ -135,7 +142,7 @@ class TestStorageNameValidation:
         ]
         
         for name in invalid_names:
-            assert validate_storage_name(name) is False, f"Expected storage name '{name}' to be invalid"
+            assert is_valid_storage_name(name) is False, f"Expected storage name '{name}' to be invalid"
 
 
 class TestValidationIntegration:
@@ -147,15 +154,15 @@ class TestValidationIntegration:
         node = "pve"
         vmid = "100"
         
-        assert validate_node_name(node) is True
-        assert validate_vmid(vmid) is True
+        assert is_valid_node_name(node) is True
+        assert is_valid_vmid(vmid) is True
         
         # Invalid VM operation (injection attempt)
         malicious_node = "pve; rm -rf /"
         malicious_vmid = "100`id`"
         
-        assert validate_node_name(malicious_node) is False
-        assert validate_vmid(malicious_vmid) is False
+        assert is_valid_node_name(malicious_node) is False
+        assert is_valid_vmid(malicious_vmid) is False
     
     def test_storage_operation_parameters(self):
         """Test typical storage operation parameters."""
@@ -163,13 +170,13 @@ class TestValidationIntegration:
         node = "pve"
         storage = "local-lvm"
         
-        assert validate_node_name(node) is True
-        assert validate_storage_name(storage) is True
+        assert is_valid_node_name(node) is True
+        assert is_valid_storage_name(storage) is True
         
         # Invalid storage operation (path traversal)
         malicious_storage = "../../../etc/storage"
         
-        assert validate_storage_name(malicious_storage) is False
+        assert is_valid_storage_name(malicious_storage) is False
     
     def test_snapshot_operation_parameters(self):
         """Test typical snapshot operation parameters."""
@@ -178,14 +185,14 @@ class TestValidationIntegration:
         vmid = 12345
         snapname = "pre-update"
         
-        assert validate_node_name(node) is True
-        assert validate_vmid(vmid) is True
+        assert is_valid_node_name(node) is True
+        assert is_valid_vmid(vmid) is True
         # snapname would need its own validator if we add one
         
         # Invalid snapshot operation
         malicious_node = "node && reboot"
         
-        assert validate_node_name(malicious_node) is False
+        assert is_valid_node_name(malicious_node) is False
 
 
 class TestSecurityScenarios:
@@ -206,7 +213,7 @@ class TestSecurityScenarios:
         
         for pattern in command_injection_patterns:
             test_input = f"node{pattern}"
-            assert validate_node_name(test_input) is False, \
+            assert is_valid_node_name(test_input) is False, \
                 f"Command injection pattern should be blocked: {pattern}"
     
     def test_path_traversal_prevention(self):
@@ -221,10 +228,139 @@ class TestSecurityScenarios:
         ]
         
         for pattern in path_traversal_patterns:
-            assert validate_node_name(pattern) is False, \
+            assert is_valid_node_name(pattern) is False, \
                 f"Path traversal pattern should be blocked: {pattern}"
-            assert validate_storage_name(pattern) is False, \
+            assert is_valid_storage_name(pattern) is False, \
                 f"Path traversal pattern should be blocked: {pattern}"
+
+
+class TestSnapshotNameValidation:
+    """Test snapshot name validation."""
+    
+    def test_valid_snapshot_names(self):
+        """Test valid snapshot names."""
+        valid_names = [
+            "snapshot1",
+            "before-update",
+            "backup_2024",
+            "pre-upgrade",
+            "test_snapshot",
+            "SNAPSHOT",
+            "snapshot-123_test"
+        ]
+        
+        for name in valid_names:
+            assert validate_snapshot_name(name) is True, f"Expected snapshot name '{name}' to be valid"
+    
+    def test_invalid_snapshot_names(self):
+        """Test invalid snapshot names with injection attempts."""
+        invalid_names = [
+            "",  # Empty
+            None,  # None
+            123,  # Not a string
+            "snapshot; rm -rf /",  # Command injection
+            "snapshot && reboot",  # Command injection
+            "snapshot | cat /etc/passwd",  # Command injection
+            "snapshot`whoami`",  # Command injection
+            "snapshot$(id)",  # Command injection
+            "../../../etc/passwd",  # Path traversal
+            "snapshot/../../../etc",  # Path traversal
+            "snapshot with spaces",  # Spaces not allowed
+            "snapshot.with.dots",  # Dots not allowed
+            "snapshot/with/slashes",  # Slashes not allowed
+            "snapshot\\with\\backslashes",  # Backslashes not allowed
+            "snapshot@host",  # Special chars not allowed
+            "snapshot#123",  # Special chars not allowed
+            "a" * 150,  # Too long
+        ]
+        
+        for name in invalid_names:
+            assert validate_snapshot_name(name) is False, f"Expected snapshot name '{name}' to be invalid"
+
+
+class TestCoresRangeValidation:
+    """Test CPU cores range validation."""
+    
+    def test_valid_cores(self):
+        """Test valid CPU cores values."""
+        valid_cores = [1, 2, 4, 8, 16, 32, 64, 128, "1", "64", "128"]
+        
+        for cores in valid_cores:
+            assert validate_cores_range(cores) is True, f"Expected cores '{cores}' to be valid"
+    
+    def test_invalid_cores(self):
+        """Test invalid CPU cores values."""
+        invalid_cores = [
+            0,  # Too small
+            -1,  # Negative
+            129,  # Too large
+            1000,  # Way too large
+            "not-a-number",  # Not numeric
+            "8; rm -rf /",  # Injection attempt
+            "",  # Empty string
+            None,  # None
+            [],  # List
+            {},  # Dict
+        ]
+        
+        for cores in invalid_cores:
+            assert validate_cores_range(cores) is False, f"Expected cores '{cores}' to be invalid"
+    
+    def test_cores_boundaries(self):
+        """Test CPU cores boundary values."""
+        assert validate_cores_range(0) is False  # Below minimum
+        assert validate_cores_range(1) is True   # Minimum
+        assert validate_cores_range(128) is True # Maximum
+        assert validate_cores_range(129) is False # Above maximum
+
+
+class TestMemoryRangeValidation:
+    """Test memory range validation."""
+    
+    def test_valid_memory(self):
+        """Test valid memory values."""
+        valid_memory = [
+            64,      # Minimum
+            512,     # Common
+            1024,    # 1GB
+            2048,    # 2GB
+            4096,    # 4GB
+            8192,    # 8GB
+            16384,   # 16GB
+            1048576, # Maximum (1TB)
+            "512",
+            "1024",
+            "8192"
+        ]
+        
+        for memory in valid_memory:
+            assert validate_memory_range(memory) is True, f"Expected memory '{memory}' to be valid"
+    
+    def test_invalid_memory(self):
+        """Test invalid memory values."""
+        invalid_memory = [
+            0,  # Too small
+            63,  # Below minimum
+            -1,  # Negative
+            1048577,  # Above maximum (1TB + 1)
+            10000000,  # Way too large
+            "not-a-number",  # Not numeric
+            "512; rm -rf /",  # Injection attempt
+            "",  # Empty string
+            None,  # None
+            [],  # List
+            {},  # Dict
+        ]
+        
+        for memory in invalid_memory:
+            assert validate_memory_range(memory) is False, f"Expected memory '{memory}' to be invalid"
+    
+    def test_memory_boundaries(self):
+        """Test memory boundary values."""
+        assert validate_memory_range(63) is False      # Below minimum
+        assert validate_memory_range(64) is True       # Minimum (64MB)
+        assert validate_memory_range(1048576) is True  # Maximum (1TB)
+        assert validate_memory_range(1048577) is False # Above maximum
 
 
 if __name__ == "__main__":

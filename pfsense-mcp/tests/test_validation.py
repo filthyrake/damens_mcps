@@ -8,7 +8,12 @@ from src.utils.validation import (
     validate_id,
     validate_ip_address,
     validate_port,
-    validate_vlan_id
+    validate_vlan_id,
+    validate_cidr,
+    validate_ip_or_cidr,
+    validate_port_range,
+    validate_protocol,
+    sanitize_for_api
 )
 
 
@@ -235,6 +240,183 @@ class TestVLANIDValidation:
         
         for vlan_id in invalid_ids:
             assert validate_vlan_id(vlan_id) is False, f"Expected VLAN ID '{vlan_id}' to be invalid"
+
+
+class TestCIDRValidation:
+    """Test CIDR notation validation."""
+    
+    def test_valid_cidr(self):
+        """Test valid CIDR notations."""
+        valid_cidrs = [
+            "192.168.1.0/24",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.1.1/32",
+            "0.0.0.0/0",
+            "2001:db8::/32",
+            "fe80::/10"
+        ]
+        
+        for cidr in valid_cidrs:
+            assert validate_cidr(cidr) is True, f"Expected CIDR '{cidr}' to be valid"
+    
+    def test_invalid_cidr(self):
+        """Test invalid CIDR notations."""
+        invalid_cidrs = [
+            "",
+            "192.168.1.0/",  # Missing prefix length
+            "192.168.1.0/33",  # Invalid prefix length
+            "256.256.256.0/24",  # Invalid IP
+            "192.168.1.0/24; rm -rf /",  # Injection attempt
+            None
+        ]
+        
+        for cidr in invalid_cidrs:
+            assert validate_cidr(cidr) is False, f"Expected CIDR '{cidr}' to be invalid"
+
+
+class TestIPOrCIDRValidation:
+    """Test combined IP/CIDR validation."""
+    
+    def test_valid_ip_or_cidr(self):
+        """Test valid IPs and CIDRs."""
+        valid_values = [
+            "192.168.1.1",
+            "192.168.1.0/24",
+            "10.0.0.0/8",
+            "::1",
+            "2001:db8::/32"
+        ]
+        
+        for value in valid_values:
+            assert validate_ip_or_cidr(value) is True, f"Expected '{value}' to be valid"
+    
+    def test_invalid_ip_or_cidr(self):
+        """Test invalid values."""
+        invalid_values = [
+            "",
+            "not-an-ip",
+            "192.168.1.0/33",
+            "256.256.256.0/24",
+            None
+        ]
+        
+        for value in invalid_values:
+            assert validate_ip_or_cidr(value) is False, f"Expected '{value}' to be invalid"
+
+
+class TestPortRangeValidation:
+    """Test port range validation."""
+    
+    def test_valid_single_ports(self):
+        """Test valid single ports."""
+        valid_ports = ["80", "443", "8080", "1", "65535"]
+        
+        for port in valid_ports:
+            assert validate_port_range(port) is True, f"Expected port '{port}' to be valid"
+    
+    def test_valid_port_ranges(self):
+        """Test valid port ranges."""
+        valid_ranges = [
+            "8000-9000",
+            "1-65535",
+            "80-443",
+            "1000-2000"
+        ]
+        
+        for port_range in valid_ranges:
+            assert validate_port_range(port_range) is True, f"Expected port range '{port_range}' to be valid"
+    
+    def test_invalid_port_ranges(self):
+        """Test invalid port ranges."""
+        invalid_ranges = [
+            "",
+            "0",
+            "65536",
+            "9000-8000",  # Reversed range
+            "80-",  # Missing end
+            "-80",  # Missing start
+            "80-443-8080",  # Too many parts
+            "80; rm -rf /",  # Injection attempt
+            None
+        ]
+        
+        for port_range in invalid_ranges:
+            assert validate_port_range(port_range) is False, f"Expected port range '{port_range}' to be invalid"
+
+
+class TestProtocolValidation:
+    """Test protocol validation."""
+    
+    def test_valid_protocols(self):
+        """Test valid protocols."""
+        valid_protocols = [
+            "tcp",
+            "udp",
+            "icmp",
+            "esp",
+            "ah",
+            "gre",
+            "any",
+            "tcp/udp",
+            "TCP",  # Case insensitive
+            "UDP"
+        ]
+        
+        for protocol in valid_protocols:
+            assert validate_protocol(protocol) is True, f"Expected protocol '{protocol}' to be valid"
+    
+    def test_invalid_protocols(self):
+        """Test invalid protocols."""
+        invalid_protocols = [
+            "",
+            None,
+            123,
+            "invalid",
+            "tcp; rm -rf /",  # Injection attempt
+            "tcp && reboot",  # Injection attempt
+            "tcp | cat /etc/passwd",  # Injection attempt
+            "tcp`whoami`",  # Injection attempt
+            "tcp$(id)",  # Injection attempt
+            "tcp<script>",  # XSS attempt
+        ]
+        
+        for protocol in invalid_protocols:
+            assert validate_protocol(protocol) is False, f"Expected protocol '{protocol}' to be invalid"
+
+
+class TestSanitizeForAPI:
+    """Test API input sanitization."""
+    
+    def test_remove_dangerous_characters(self):
+        """Test removal of dangerous characters."""
+        test_cases = [
+            ("normal text", "normal text"),
+            ("text<script>alert(1)</script>", "textalert(1)"),
+            ("text; rm -rf /", "text rm -rf "),
+            ("text && reboot", "text  reboot"),
+            ("text | cat /etc/passwd", "text  cat etcpasswd"),
+            ("text`whoami`", "textwhoami"),
+            ("text$(id)", "textid"),
+        ]
+        
+        for input_val, expected in test_cases:
+            result = sanitize_for_api(input_val)
+            # Check that dangerous chars are removed
+            assert '<' not in result
+            assert '>' not in result
+            assert ';' not in result
+            assert '|' not in result
+            assert '`' not in result
+            assert '$' not in result
+            assert '(' not in result
+            assert ')' not in result
+    
+    def test_handle_edge_cases(self):
+        """Test edge cases."""
+        assert sanitize_for_api("") == ""
+        assert sanitize_for_api(None) == ""
+        assert sanitize_for_api("   spaces   ") != ""  # Should strip
 
 
 if __name__ == "__main__":

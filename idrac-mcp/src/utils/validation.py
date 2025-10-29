@@ -172,3 +172,67 @@ def validate_mac_address(mac: str) -> bool:
     """
     pattern = r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
     return bool(re.match(pattern, mac))
+
+
+def validate_server_id(server_id: str) -> bool:
+    """Validate server ID format.
+    
+    Server IDs should only contain alphanumeric characters, hyphens, and underscores.
+    This prevents injection attacks and path traversal.
+    
+    Args:
+        server_id: Server ID to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not server_id or not isinstance(server_id, str):
+        return False
+    
+    # Only allow alphanumeric, hyphens, and underscores
+    # No special characters that could be used for injection
+    pattern = r'^[a-zA-Z0-9_-]+$'
+    return bool(re.match(pattern, server_id)) and len(server_id) <= 128
+
+
+def safe_get_field(data: Dict[str, Any], field: str, default: Any = None) -> Any:
+    """Safely get a field from a dictionary with existence checking.
+    
+    Useful for handling Redfish API responses where fields may not always exist.
+    
+    Args:
+        data: Dictionary to get field from
+        field: Field name to retrieve
+        default: Default value if field doesn't exist
+        
+    Returns:
+        Field value or default
+    """
+    if not isinstance(data, dict):
+        return default
+    
+    return data.get(field, default)
+
+
+def safe_get_nested_field(data: Dict[str, Any], *fields: str, default: Any = None) -> Any:
+    """Safely get a nested field from a dictionary with existence checking.
+    
+    Args:
+        data: Dictionary to get nested field from
+        *fields: Field path (e.g., 'a', 'b', 'c' for data['a']['b']['c'])
+        default: Default value if field doesn't exist
+        
+    Returns:
+        Field value or default
+    """
+    current = data
+    
+    for field in fields:
+        if not isinstance(current, dict):
+            return default
+        
+        current = current.get(field)
+        if current is None:
+            return default
+    
+    return current

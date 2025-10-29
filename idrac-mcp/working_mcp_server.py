@@ -15,6 +15,19 @@ from typing import Any, Dict
 from urllib3.exceptions import InsecureRequestWarning
 from requests.auth import HTTPBasicAuth
 
+# Import validation utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'utils'))
+try:
+    from validation import validate_server_id
+except ImportError:
+    # Fallback if validation module not available
+    def validate_server_id(server_id: str) -> bool:
+        """Fallback validation for server ID."""
+        import re
+        if not server_id or not isinstance(server_id, str):
+            return False
+        return bool(re.match(r'^[a-zA-Z0-9_-]+$', server_id)) and len(server_id) <= 128
+
 def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
     print(f"DEBUG: {message}", file=sys.stderr)
@@ -628,6 +641,30 @@ class WorkingIDracMCPServer:
         ]
         debug_print(f"Created {len(self.tools)} tools")
     
+    def _validate_and_get_server_id(self, arguments: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+        """Validate and get server ID from arguments.
+        
+        Returns:
+            Tuple of (server_id, error_response). If error_response is not None, it should be returned.
+        """
+        server_id = arguments.get("server_id", self.default_server)
+        
+        # Validate server_id format
+        if not validate_server_id(server_id):
+            return None, {
+                "content": [{"type": "text", "text": f"Error: Invalid server ID format. Server ID must contain only alphanumeric characters, hyphens, and underscores."}],
+                "isError": True
+            }
+        
+        # Check if server exists
+        if server_id not in self.idrac_clients:
+            return None, {
+                "content": [{"type": "text", "text": f"Error: Server with ID '{server_id}' not found."}],
+                "isError": True
+            }
+        
+        return server_id, None
+    
     def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool by name."""
         debug_print(f"Calling tool: {name}")
@@ -635,39 +672,39 @@ class WorkingIDracMCPServer:
             if name == "list_servers":
                 result = {"servers": list(self.servers.keys())}
             elif name == "test_connection":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].test_connection()
             elif name == "get_system_info":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].get_system_info()
             elif name == "get_power_status":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].get_power_status()
             elif name == "power_on":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].power_on()
             elif name == "power_off":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].power_off()
             elif name == "force_power_off":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].force_power_off()
             elif name == "restart":
-                server_id = arguments.get("server_id", self.default_server)
-                if server_id not in self.idrac_clients:
-                    return {"error": f"Server with ID '{server_id}' not found."}
+                server_id, error = self._validate_and_get_server_id(arguments)
+                if error:
+                    return error
                 result = self.idrac_clients[server_id].restart()
             else:
                 result = {"error": f"Unknown tool: {name}"}
