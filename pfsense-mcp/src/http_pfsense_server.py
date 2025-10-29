@@ -116,20 +116,37 @@ _client_lock: Optional[asyncio.Lock] = None
 
 
 def _get_client_lock() -> asyncio.Lock:
-    """Get or create the client lock for the current event loop."""
-    global _client_lock
-    try:
-        # Try to use existing lock
-        if _client_lock is not None:
-            asyncio.get_running_loop()
-            return _client_lock
-    except RuntimeError:
-        # No event loop running or lock is from different loop
-        pass
+    """
+    Get or create the client lock for the current event loop.
     
-    # Create new lock for current event loop
-    _client_lock = asyncio.Lock()
-    return _client_lock
+    This function handles the case where the lock may have been created in a different
+    event loop (e.g., during testing). If the existing lock is incompatible with the
+    current event loop, a new lock is created.
+    
+    Returns:
+        An asyncio.Lock instance valid for the current event loop
+    """
+    global _client_lock
+    
+    # If no lock exists, create one
+    if _client_lock is None:
+        _client_lock = asyncio.Lock()
+        return _client_lock
+    
+    try:
+        # Check if existing lock is compatible with current event loop
+        loop = asyncio.get_running_loop()
+        # Try to access the lock's internal loop - if it differs, we'll get RuntimeError
+        if hasattr(_client_lock, '_loop') and _client_lock._loop is not None:
+            if _client_lock._loop is not loop:
+                # Lock is bound to a different event loop, create a new one
+                _client_lock = asyncio.Lock()
+        return _client_lock
+    except RuntimeError:
+        # No event loop is running - this shouldn't happen in async context
+        # but if it does, create a new lock
+        _client_lock = asyncio.Lock()
+        return _client_lock
 
 
 class HTTPPfSenseMCPServer:
@@ -730,10 +747,10 @@ async def main():
     except Exception as e:
         sys.exit(1)
     finally:
-        # Clean up client with proper synchronization
-        client = await get_client()
-        if client:
-            await client.close()
+        # Clean up client directly without triggering initialization
+        global pfsense_client
+        if pfsense_client:
+            await pfsense_client.close()
 
 
 if __name__ == "__main__":

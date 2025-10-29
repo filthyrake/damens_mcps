@@ -76,7 +76,11 @@ class TestConcurrentAccess:
             results = await asyncio.gather(*tasks)
             
             # All calls should succeed
-            assert all(not r.isError for r in results), "All tool calls should succeed"
+            failed_results = [(i, r) for i, r in enumerate(results) if r.isError]
+            assert not failed_results, \
+                f"Expected all tool calls to succeed, but {len(failed_results)} failed: " + \
+                ", ".join([f"task {i}: {r.content[0].text if r.content else 'unknown error'}" 
+                          for i, r in failed_results])
             
             # Verify the mock client methods were called
             assert mock_client.get_system_info.call_count == 2
