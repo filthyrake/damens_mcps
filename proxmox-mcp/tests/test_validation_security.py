@@ -1,7 +1,14 @@
 """Tests for Proxmox validation utilities."""
 
 import pytest
-from src.utils.validation import validate_vmid, validate_node_name, validate_storage_name
+from src.utils.validation import (
+    validate_vmid,
+    validate_node_name,
+    validate_storage_name,
+    validate_snapshot_name,
+    validate_cores_range,
+    validate_memory_range
+)
 
 
 class TestVMIDValidation:
@@ -225,6 +232,135 @@ class TestSecurityScenarios:
                 f"Path traversal pattern should be blocked: {pattern}"
             assert validate_storage_name(pattern) is False, \
                 f"Path traversal pattern should be blocked: {pattern}"
+
+
+class TestSnapshotNameValidation:
+    """Test snapshot name validation."""
+    
+    def test_valid_snapshot_names(self):
+        """Test valid snapshot names."""
+        valid_names = [
+            "snapshot1",
+            "before-update",
+            "backup_2024",
+            "pre-upgrade",
+            "test_snapshot",
+            "SNAPSHOT",
+            "snapshot-123_test"
+        ]
+        
+        for name in valid_names:
+            assert validate_snapshot_name(name) is True, f"Expected snapshot name '{name}' to be valid"
+    
+    def test_invalid_snapshot_names(self):
+        """Test invalid snapshot names with injection attempts."""
+        invalid_names = [
+            "",  # Empty
+            None,  # None
+            123,  # Not a string
+            "snapshot; rm -rf /",  # Command injection
+            "snapshot && reboot",  # Command injection
+            "snapshot | cat /etc/passwd",  # Command injection
+            "snapshot`whoami`",  # Command injection
+            "snapshot$(id)",  # Command injection
+            "../../../etc/passwd",  # Path traversal
+            "snapshot/../../../etc",  # Path traversal
+            "snapshot with spaces",  # Spaces not allowed
+            "snapshot.with.dots",  # Dots not allowed
+            "snapshot/with/slashes",  # Slashes not allowed
+            "snapshot\\with\\backslashes",  # Backslashes not allowed
+            "snapshot@host",  # Special chars not allowed
+            "snapshot#123",  # Special chars not allowed
+            "a" * 150,  # Too long
+        ]
+        
+        for name in invalid_names:
+            assert validate_snapshot_name(name) is False, f"Expected snapshot name '{name}' to be invalid"
+
+
+class TestCoresRangeValidation:
+    """Test CPU cores range validation."""
+    
+    def test_valid_cores(self):
+        """Test valid CPU cores values."""
+        valid_cores = [1, 2, 4, 8, 16, 32, 64, 128, "1", "64", "128"]
+        
+        for cores in valid_cores:
+            assert validate_cores_range(cores) is True, f"Expected cores '{cores}' to be valid"
+    
+    def test_invalid_cores(self):
+        """Test invalid CPU cores values."""
+        invalid_cores = [
+            0,  # Too small
+            -1,  # Negative
+            129,  # Too large
+            1000,  # Way too large
+            "not-a-number",  # Not numeric
+            "8; rm -rf /",  # Injection attempt
+            "",  # Empty string
+            None,  # None
+            [],  # List
+            {},  # Dict
+        ]
+        
+        for cores in invalid_cores:
+            assert validate_cores_range(cores) is False, f"Expected cores '{cores}' to be invalid"
+    
+    def test_cores_boundaries(self):
+        """Test CPU cores boundary values."""
+        assert validate_cores_range(0) is False  # Below minimum
+        assert validate_cores_range(1) is True   # Minimum
+        assert validate_cores_range(128) is True # Maximum
+        assert validate_cores_range(129) is False # Above maximum
+
+
+class TestMemoryRangeValidation:
+    """Test memory range validation."""
+    
+    def test_valid_memory(self):
+        """Test valid memory values."""
+        valid_memory = [
+            64,      # Minimum
+            512,     # Common
+            1024,    # 1GB
+            2048,    # 2GB
+            4096,    # 4GB
+            8192,    # 8GB
+            16384,   # 16GB
+            1048576, # Maximum (1TB)
+            "512",
+            "1024",
+            "8192"
+        ]
+        
+        for memory in valid_memory:
+            assert validate_memory_range(memory) is True, f"Expected memory '{memory}' to be valid"
+    
+    def test_invalid_memory(self):
+        """Test invalid memory values."""
+        invalid_memory = [
+            0,  # Too small
+            63,  # Below minimum
+            -1,  # Negative
+            1048577,  # Above maximum (1TB + 1)
+            10000000,  # Way too large
+            "not-a-number",  # Not numeric
+            "512; rm -rf /",  # Injection attempt
+            "",  # Empty string
+            None,  # None
+            [],  # List
+            {},  # Dict
+        ]
+        
+        for memory in invalid_memory:
+            assert validate_memory_range(memory) is False, f"Expected memory '{memory}' to be invalid"
+    
+    def test_memory_boundaries(self):
+        """Test memory boundary values."""
+        assert validate_memory_range(63) is False      # Below minimum
+        assert validate_memory_range(64) is True       # Minimum (64MB)
+        assert validate_memory_range(1048576) is True  # Maximum (1TB)
+        assert validate_memory_range(1048577) is False # Above maximum
 
 
 if __name__ == "__main__":

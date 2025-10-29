@@ -19,7 +19,14 @@ import urllib3
 # Import validation functions
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 try:
-    from utils.validation import validate_vmid, validate_node_name, validate_storage_name
+    from utils.validation import (
+        validate_vmid, 
+        validate_node_name, 
+        validate_storage_name,
+        validate_snapshot_name,
+        validate_cores_range,
+        validate_memory_range
+    )
     from exceptions import (
         ProxmoxError,
         ProxmoxConnectionError,
@@ -1312,8 +1319,27 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
                         "isError": True
                     }
+                # Validate cores
                 cores = arguments.get('cores', '1')
+                if not validate_cores_range(cores):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid cores '{cores}'. Must be between 1 and 128"}],
+                        "isError": True
+                    }
+                # Validate memory
                 memory = arguments.get('memory', '512')
+                if not validate_memory_range(memory):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid memory '{memory}'. Must be between 64 and 1048576 MB"}],
+                        "isError": True
+                    }
+                # Validate storage name if provided
+                storage = arguments.get('storage')
+                if storage and not validate_storage_name(storage):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid storage name '{storage}'. Must be alphanumeric with hyphens/underscores"}],
+                        "isError": True
+                    }
                 result = self.proxmox_client.create_vm(node, name, vmid, cores, memory)
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
@@ -1461,6 +1487,12 @@ class WorkingProxmoxMCPServer:
                 error = self._validate_node_and_vmid(node, vmid)
                 if error:
                     return error
+                # Validate snapshot name
+                if not validate_snapshot_name(snapname):
+                    return {
+                        "content": [{"type": "text", "text": f"Error: Invalid snapshot name '{snapname}'. Must be alphanumeric with hyphens/underscores, max 128 characters"}],
+                        "isError": True
+                    }
                 description = arguments.get('description', '')
                 result = self.proxmox_client.create_snapshot(node, int(vmid), snapname, description)
                 result_text = json.dumps(result, indent=2, default=str)

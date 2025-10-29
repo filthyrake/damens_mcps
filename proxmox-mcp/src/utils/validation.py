@@ -22,18 +22,30 @@ class VMConfig(BaseModel):
     def validate_name(cls, v):
         if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
             raise ValueError('VM name must contain only alphanumeric characters, hyphens, and underscores')
+        if len(v) > 128:
+            raise ValueError('VM name must not exceed 128 characters')
         return v
     
     @validator('cores')
     def validate_cores(cls, v):
+        if not isinstance(v, int):
+            try:
+                v = int(v)
+            except (ValueError, TypeError):
+                raise ValueError('CPU cores must be an integer')
         if v < 1 or v > 128:
             raise ValueError('CPU cores must be between 1 and 128')
         return v
     
     @validator('memory')
     def validate_memory(cls, v):
+        if not isinstance(v, int):
+            try:
+                v = int(v)
+            except (ValueError, TypeError):
+                raise ValueError('Memory must be an integer')
         if v < 64 or v > 1048576:  # 64MB to 1TB
-            raise ValueError('Memory must be between 64MB and 1TB')
+            raise ValueError('Memory must be between 64MB and 1TB (1048576MB)')
         return v
     
     @validator('disk_size')
@@ -107,8 +119,24 @@ def validate_container_config(config: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(f"Invalid container configuration: {e}")
 
 
-def validate_vmid(vmid: Union[int, str]) -> int:
-    """Validate VM/Container ID.
+def validate_vmid(vmid: Union[int, str]) -> bool:
+    """Validate VM/Container ID (boolean check).
+    
+    Args:
+        vmid: VM/Container ID
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        vmid_int = int(vmid)
+        return 100 <= vmid_int <= 999999
+    except (ValueError, TypeError):
+        return False
+
+
+def validate_and_convert_vmid(vmid: Union[int, str]) -> int:
+    """Validate and convert VM/Container ID to integer.
     
     Args:
         vmid: VM/Container ID
@@ -160,6 +188,65 @@ def validate_storage_name(storage: str) -> str:
     if not storage or not re.match(r'^[a-zA-Z0-9\-_]+$', storage):
         raise ValueError("Storage name must contain only alphanumeric characters, hyphens, and underscores")
     return storage
+
+
+def validate_snapshot_name(snapshot: str) -> bool:
+    """Validate snapshot name.
+    
+    Snapshot names should only contain alphanumeric characters, hyphens, and underscores.
+    This prevents injection attacks and ensures compatibility.
+    
+    Args:
+        snapshot: Snapshot name
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    if not snapshot or not isinstance(snapshot, str):
+        return False
+    
+    # Only allow alphanumeric, hyphens, and underscores
+    # No special characters that could be used for injection
+    if not re.match(r'^[a-zA-Z0-9\-_]+$', snapshot):
+        return False
+    
+    # Reasonable length limit
+    if len(snapshot) < 1 or len(snapshot) > 128:
+        return False
+    
+    return True
+
+
+def validate_cores_range(cores: Union[int, str]) -> bool:
+    """Validate CPU cores range.
+    
+    Args:
+        cores: Number of CPU cores
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        cores_int = int(cores)
+        return 1 <= cores_int <= 128
+    except (ValueError, TypeError):
+        return False
+
+
+def validate_memory_range(memory: Union[int, str]) -> bool:
+    """Validate memory range.
+    
+    Args:
+        memory: Memory in MB
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        memory_int = int(memory)
+        return 64 <= memory_int <= 1048576  # 64MB to 1TB
+    except (ValueError, TypeError):
+        return False
 
 
 def validate_network_config(config: Dict[str, Any]) -> Dict[str, Any]:
