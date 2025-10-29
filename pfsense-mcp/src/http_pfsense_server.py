@@ -110,8 +110,9 @@ class SilentStderr:
 
 sys.stderr = SilentStderr()
 
-# Global client instance
+# Global client instance with synchronization lock
 pfsense_client: Optional[HTTPPfSenseClient] = None
+_client_lock = asyncio.Lock()
 
 
 class HTTPPfSenseMCPServer:
@@ -471,9 +472,9 @@ class HTTPPfSenseMCPServer:
         Returns:
             Tool result as CallToolResult
         """
-        global pfsense_client
+        client = await get_pfsense_client()
         
-        if not pfsense_client:
+        if not client:
             return CallToolResult(
                 content=[TextContent(type="text", text="Error: pfSense client not initialized")],
                 isError=True
@@ -482,15 +483,15 @@ class HTTPPfSenseMCPServer:
         try:
             
             if name == "get_system_info":
-                result = await pfsense_client.get_system_info()
+                result = await client.get_system_info()
             elif name == "get_system_health":
-                result = await pfsense_client.get_system_health()
+                result = await client.get_system_health()
             elif name == "get_interfaces":
-                result = await pfsense_client.get_interfaces()
+                result = await client.get_interfaces()
             elif name == "get_services":
-                result = await pfsense_client.get_services()
+                result = await client.get_services()
             elif name == "get_firewall_rules":
-                result = await pfsense_client.get_firewall_rules()
+                result = await client.get_firewall_rules()
             elif name == "create_firewall_rule":
                 # Validate parameters
                 errors = validate_firewall_rule_params(arguments)
@@ -499,7 +500,7 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text=f"Validation errors: {', '.join(errors)}")],
                         isError=True
                     )
-                result = await pfsense_client.create_firewall_rule(arguments)
+                result = await client.create_firewall_rule(arguments)
             elif name == "delete_firewall_rule":
                 rule_id = arguments.get("rule_id", "")
                 if not rule_id or not validate_id(rule_id):
@@ -507,12 +508,12 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: rule_id is required and must be alphanumeric with hyphens/underscores")],
                         isError=True
                     )
-                result = await pfsense_client.delete_firewall_rule(rule_id)
+                result = await client.delete_firewall_rule(rule_id)
             elif name == "get_firewall_logs":
                 limit = arguments.get("limit", 100)
-                result = await pfsense_client.get_firewall_logs(limit)
+                result = await client.get_firewall_logs(limit)
             elif name == "get_vlans":
-                result = await pfsense_client.get_vlans()
+                result = await client.get_vlans()
             elif name == "create_vlan":
                 # Validate parameters
                 errors = validate_vlan_params(arguments)
@@ -521,7 +522,7 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text=f"Validation errors: {', '.join(errors)}")],
                         isError=True
                     )
-                result = await pfsense_client.create_vlan(arguments)
+                result = await client.create_vlan(arguments)
             elif name == "delete_vlan":
                 vlan_id = arguments.get("vlan_id", "")
                 if not vlan_id or not validate_id(vlan_id):
@@ -529,13 +530,13 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: vlan_id is required and must be alphanumeric with hyphens/underscores")],
                         isError=True
                     )
-                result = await pfsense_client.delete_vlan(vlan_id)
+                result = await client.delete_vlan(vlan_id)
             elif name == "get_dhcp_leases":
-                result = await pfsense_client.get_dhcp_leases()
+                result = await client.get_dhcp_leases()
             elif name == "get_dns_servers":
-                result = await pfsense_client.get_dns_servers()
+                result = await client.get_dns_servers()
             elif name == "get_installed_packages":
-                result = await pfsense_client.get_installed_packages()
+                result = await client.get_installed_packages()
             elif name == "install_package":
                 package_name = arguments.get("package_name", "")
                 if not package_name or not validate_package_name(package_name):
@@ -543,7 +544,7 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores")],
                         isError=True
                     )
-                result = await pfsense_client.install_package(package_name)
+                result = await client.install_package(package_name)
             elif name == "remove_package":
                 package_name = arguments.get("package_name", "")
                 if not package_name or not validate_package_name(package_name):
@@ -551,15 +552,15 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: package_name is required and must be alphanumeric with dots, hyphens, or underscores")],
                         isError=True
                     )
-                result = await pfsense_client.remove_package(package_name)
+                result = await client.remove_package(package_name)
             elif name == "get_package_updates":
-                result = await pfsense_client.get_package_updates()
+                result = await client.get_package_updates()
             elif name == "get_vpn_status":
-                result = await pfsense_client.get_vpn_status()
+                result = await client.get_vpn_status()
             elif name == "get_openvpn_servers":
-                result = await pfsense_client.get_openvpn_servers()
+                result = await client.get_openvpn_servers()
             elif name == "get_openvpn_clients":
-                result = await pfsense_client.get_openvpn_clients()
+                result = await client.get_openvpn_clients()
             elif name == "restart_vpn_service":
                 service_name = arguments.get("service_name", "")
                 if not service_name or not validate_service_name(service_name):
@@ -567,7 +568,7 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: service_name is required and must be alphanumeric with hyphens or underscores")],
                         isError=True
                     )
-                result = await pfsense_client.restart_vpn_service(service_name)
+                result = await client.restart_vpn_service(service_name)
             elif name == "create_backup":
                 backup_name = arguments.get("backup_name", "")
                 if not backup_name or not validate_backup_name(backup_name):
@@ -575,7 +576,7 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: backup_name is required and must be alphanumeric with dots, hyphens, or underscores")],
                         isError=True
                     )
-                result = await pfsense_client.create_backup(backup_name)
+                result = await client.create_backup(backup_name)
             elif name == "restore_backup":
                 backup_id = arguments.get("backup_id", "")
                 if not backup_id or not validate_id(backup_id):
@@ -583,11 +584,11 @@ class HTTPPfSenseMCPServer:
                         content=[TextContent(type="text", text="Error: backup_id is required and must be alphanumeric with hyphens or underscores")],
                         isError=True
                     )
-                result = await pfsense_client.restore_backup(backup_id)
+                result = await client.restore_backup(backup_id)
             elif name == "get_backup_list":
-                result = await pfsense_client.get_backup_list()
+                result = await client.get_backup_list()
             elif name == "test_connection":
-                success = await pfsense_client.test_connection()
+                success = await client.test_connection()
                 result = {"connected": success}
             else:
                 return CallToolResult(
@@ -614,6 +615,17 @@ class HTTPPfSenseMCPServer:
                 content=[TextContent(type="text", text=f"Unexpected error: {str(e)}")],
                 isError=True
             )
+
+
+async def get_pfsense_client() -> Optional[HTTPPfSenseClient]:
+    """
+    Get the pfSense client instance with thread-safe synchronization.
+    
+    Returns:
+        Initialized HTTPPfSenseClient or None if not initialized
+    """
+    async with _client_lock:
+        return pfsense_client
 
 
 async def initialize_pfsense_client() -> Optional[HTTPPfSenseClient]:
@@ -649,8 +661,9 @@ async def main():
     global pfsense_client
     
     try:
-        # Initialize pfSense client (may be None if connection fails)
-        pfsense_client = await initialize_pfsense_client()
+        # Initialize pfSense client with lock protection
+        async with _client_lock:
+            pfsense_client = await initialize_pfsense_client()
         
         # Create MCP server
         server = HTTPPfSenseMCPServer()
@@ -692,8 +705,9 @@ async def main():
     except Exception as e:
         sys.exit(1)
     finally:
-        if pfsense_client:
-            await pfsense_client.close()
+        client = await get_pfsense_client()
+        if client:
+            await client.close()
 
 
 if __name__ == "__main__":
