@@ -26,6 +26,7 @@ def mock_proxmox_client(mock_proxmox_config, monkeypatch):
     
     # Mock the _authenticate method to avoid actual API calls
     def mock_authenticate(self):
+        """Mock authentication to prevent actual API calls during testing."""
         pass
     
     monkeypatch.setattr(ProxmoxClient, '_authenticate', mock_authenticate)

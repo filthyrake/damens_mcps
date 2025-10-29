@@ -5,7 +5,7 @@ It uses synchronous HTTP requests with the requests library for maximum compatib
 
 This implementation uses individual parameters for initialization. The previous
 async/proxmoxer-based implementation that used a config dictionary has been replaced
-with this proven synchronous implementation.
+with this production-tested synchronous implementation.
 
 Example usage:
     client = ProxmoxClient(
