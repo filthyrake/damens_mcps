@@ -91,8 +91,8 @@ class TestDeleteArpEntryURLInjection:
             # The URL should contain properly encoded parameters
             assert url.startswith("/api/v2/diagnostics/arp_table/entry?")
             assert "ip=192.168.1.1" in url
-            # Verify no raw string interpolation occurred
-            assert f"?ip={test_ip}" not in url or url == f"/api/v2/diagnostics/arp_table/entry?ip={test_ip}"
+            # Verify urlencode was used (result is same as manual for simple IPs)
+            assert url == "/api/v2/diagnostics/arp_table/entry?ip=192.168.1.1"
     
     @pytest.mark.asyncio
     async def test_delete_arp_entry_no_parameter_injection(self, mock_client):
