@@ -33,6 +33,6 @@ passlib>=1.7.4,<2.0.0
 python-jose>=3.4.0,<4.0.0
 
 # Validation and logging - for src/utils/validation.py and src/utils/logging.py
-# Note: Using pydantic v1 for compatibility with existing validator decorators
-pydantic>=1.10.0,<2.0.0
+# Updated to Pydantic v2 with field_validator syntax
+pydantic>=2.0.0,<3.0.0
 structlog>=23.0.0,<24.0.0
