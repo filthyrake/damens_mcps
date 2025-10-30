@@ -99,10 +99,10 @@ class SilentStderr:
     
     def write(self, text):
         # Silently discard all stderr output
-        return
+        return 0
     
     def flush(self):
-        return
+        pass
     
     def fileno(self):
         return self.original_stderr.fileno()
