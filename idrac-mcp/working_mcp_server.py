@@ -32,6 +32,40 @@ def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
     print(f"DEBUG: {message}", file=sys.stderr)
 
+def create_example_config(config_path: str = 'config.json') -> None:
+    """Create an example configuration file."""
+    example_config = {
+        "idrac_servers": {
+            "server1": {
+                "name": "Production Server 1",
+                "host": "192.168.1.100",
+                "port": 443,
+                "protocol": "https",
+                "username": "root",
+                "password": "your_password_here",
+                "ssl_verify": False
+            },
+            "server2": {
+                "name": "Production Server 2",
+                "host": "192.168.1.101",
+                "port": 443,
+                "protocol": "https",
+                "username": "root",
+                "password": "your_password_here",
+                "ssl_verify": False
+            }
+        },
+        "default_server": "server1",
+        "server": {
+            "port": 8000,
+            "debug": True
+        }
+    }
+    
+    with open(config_path, 'w') as f:
+        json.dump(example_config, f, indent=2)
+
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from JSON file."""
     # Try multiple possible config file locations
@@ -62,15 +96,10 @@ def load_config() -> Dict[str, Any]:
     except Exception as e:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}")
 
-# Load configuration
-config = load_config()
-
 # Suppress SSL warnings only for self-signed certificates when explicitly configured
 # This is more targeted than global suppression
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-debug_print("Server starting...")
 
 # Completely suppress all output
 import logging
@@ -396,15 +425,15 @@ class IDracClient:
 class WorkingIDracMCPServer:
     """Working MCP server for iDRAC integration."""
     
-    def __init__(self):
+    def __init__(self, config: Dict[str, Any]):
         debug_print("Initializing server...")
         
-        # Load configuration from JSON file
+        # Extract server configuration from provided config dictionary
         config_data = config.get('idrac_servers', {})
         default_server = config.get('default_server')
         
         if not config_data:
-            raise ValueError("No iDRAC servers configured in config.json")
+            raise ValueError("No iDRAC servers configured in the configuration file")
         
         if default_server and default_server not in config_data:
             raise ValueError(f"Default server '{default_server}' not found in configuration")
@@ -840,7 +869,36 @@ class WorkingIDracMCPServer:
 def main():
     """Main entry point."""
     debug_print("Starting main...")
-    server = WorkingIDracMCPServer()
+    
+    try:
+        config = load_config()
+    except FileNotFoundError as e:
+        print("❌ Configuration file 'config.json' not found!", file=sys.stderr)
+        print(f"   Tried: {e}", file=sys.stderr)
+        print("\n📝 Creating example configuration file...", file=sys.stderr)
+        try:
+            # Try to create in the script directory first
+            config_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.json')
+            create_example_config(config_path)
+            print(f"✅ Example configuration created at: {config_path}", file=sys.stderr)
+            print("\n📋 Next steps:", file=sys.stderr)
+            print("   1. Edit 'config.json' with your iDRAC server details", file=sys.stderr)
+            print("   2. Update the host, username, and password for each server", file=sys.stderr)
+            print("   3. Run the server again", file=sys.stderr)
+        except Exception as create_error:
+            print(f"❌ Failed to create example config: {create_error}", file=sys.stderr)
+            print("\n💡 Please create a 'config.json' file manually with your iDRAC server details", file=sys.stderr)
+            print("   See README.md for configuration instructions", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"❌ Configuration error: {e}", file=sys.stderr)
+        print("\n💡 Please check your config.json file for valid JSON syntax", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Unexpected error loading configuration: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    server = WorkingIDracMCPServer(config)
     server.run()
 
 
