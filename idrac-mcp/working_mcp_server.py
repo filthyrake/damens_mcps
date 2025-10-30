@@ -428,12 +428,12 @@ class WorkingIDracMCPServer:
     def __init__(self, config: Dict[str, Any]):
         debug_print("Initializing server...")
         
-        # Load configuration from JSON file
+        # Extract server configuration from provided config dictionary
         config_data = config.get('idrac_servers', {})
         default_server = config.get('default_server')
         
         if not config_data:
-            raise ValueError("No iDRAC servers configured in config.json")
+            raise ValueError("No iDRAC servers configured in the configuration file")
         
         if default_server and default_server not in config_data:
             raise ValueError(f"Default server '{default_server}' not found in configuration")
@@ -887,7 +887,8 @@ def main():
             print("   3. Run the server again", file=sys.stderr)
         except Exception as create_error:
             print(f"❌ Failed to create example config: {create_error}", file=sys.stderr)
-            print("\n💡 Please create 'config.json' manually using 'config.example.json' as a template", file=sys.stderr)
+            print("\n💡 Please create a 'config.json' file manually with your iDRAC server details", file=sys.stderr)
+            print("   See README.md for configuration instructions", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:
         print(f"❌ Configuration error: {e}", file=sys.stderr)
