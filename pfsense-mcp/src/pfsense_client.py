@@ -4,23 +4,20 @@ pfSense API Client for MCP Server.
 
 import asyncio
 import json
-import ssl
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin, urlencode
 
 import aiohttp
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientSession
 
 try:
     from .auth import PfSenseAuth, PfSenseAuthError
     from .utils.logging import get_logger
     from .utils.validation import validate_config, validate_ip_address
     from .exceptions import (
-        PfSenseError,
         PfSenseAPIError,
         PfSenseConnectionError,
-        PfSenseAuthenticationError,
         PfSenseTimeoutError,
         PfSenseConfigurationError
     )
@@ -30,10 +27,8 @@ except ImportError:
     from utils.logging import get_logger
     from utils.validation import validate_config, validate_ip_address
     from exceptions import (
-        PfSenseError,
         PfSenseAPIError,
         PfSenseConnectionError,
-        PfSenseAuthenticationError,
         PfSenseTimeoutError,
         PfSenseConfigurationError
     )

@@ -4,7 +4,7 @@ Authentication utilities for pfSense MCP Server.
 
 import base64
 import ssl
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 from urllib.parse import urljoin
 
 import aiohttp
@@ -63,7 +63,6 @@ class PfSenseAuth:
             if not self.ssl_verify:
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
-                pass
         
         # Create session with timeout
         timeout = ClientTimeout(total=30, connect=10)
@@ -192,12 +191,12 @@ class PfSenseAuth:
                             continue
                         else:
                             continue
-                except Exception as e:
+                except Exception:
                     continue
             
             return False
                     
-        except Exception as e:
+        except Exception:
             return False
     
     async def close(self):
@@ -211,6 +210,7 @@ class PfSenseAuth:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         # Note: This won't work with async context, but provides sync compatibility
+        # Sync context manager cannot handle async cleanup
         pass
     
     async def __aenter__(self):

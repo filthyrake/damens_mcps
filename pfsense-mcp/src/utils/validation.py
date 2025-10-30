@@ -5,7 +5,7 @@ Validation utilities for pfSense MCP Server.
 import html
 import ipaddress
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 
 def validate_ip_address(ip: str) -> bool:

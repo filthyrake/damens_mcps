@@ -23,15 +23,11 @@ from mcp.types import (
     InitializeRequest,
     Tool,
     TextContent,
-    ImageContent,
-    EmbeddedResource,
-    LoggingLevel,
 )
 from mcp.shared.message import SessionMessage
 
 try:
     from .pfsense_client import HTTPPfSenseClient, PfSenseAPIError
-    from .utils.logging import setup_logging, get_logger
     from .utils.validation import (
         validate_firewall_rule_params,
         validate_vlan_params,
@@ -43,7 +39,6 @@ try:
 except ImportError:
     # Fallback for direct execution
     from pfsense_client import HTTPPfSenseClient, PfSenseAPIError
-    from utils.logging import setup_logging, get_logger
     from utils.validation import (
         validate_firewall_rule_params,
         validate_vlan_params,
@@ -53,13 +48,6 @@ except ImportError:
         validate_id
     )
 
-# Set up logging to stderr only (not stdout to avoid breaking MCP protocol)
-import sys
-import os
-
-# Completely suppress all output except JSON responses
-import sys
-import os
 
 # Create a completely silent stdout that only allows JSON
 class SilentStdout:
@@ -88,6 +76,7 @@ class SilentStdout:
         """Ensure file handle is properly closed on cleanup."""
         self.close()
 
+
 # Set up the filter
 sys.stdout = SilentStdout()
 
@@ -101,6 +90,7 @@ logger = logging.getLogger("pfsense-mcp")
 logger.addHandler(logging.NullHandler())
 logger.setLevel(logging.CRITICAL)
 
+
 # Also suppress stderr for any remaining output
 class SilentStderr:
     def __init__(self):
@@ -109,7 +99,7 @@ class SilentStderr:
     
     def write(self, text):
         # Silently discard all stderr output
-        pass
+        return 0
     
     def flush(self):
         pass
@@ -125,6 +115,7 @@ class SilentStderr:
     def __del__(self):
         """Ensure file handle is properly closed on cleanup."""
         self.close()
+
 
 sys.stderr = SilentStderr()
 
@@ -676,7 +667,7 @@ async def initialize_pfsense_client() -> Optional[HTTPPfSenseClient]:
             return client
         else:
             return None
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -740,11 +731,9 @@ async def main():
                     sys.stdout = SilentStdout()
                 elif isinstance(request, SessionMessage):
                     # Handle session messages (ignore for now)
-                    pass
-                else:
-                    pass
+                    continue
                     
-    except Exception as e:
+    except Exception:
         sys.exit(1)
     finally:
         async with _client_lock:
