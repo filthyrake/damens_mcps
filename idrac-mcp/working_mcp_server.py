@@ -878,7 +878,7 @@ def main():
         print("\n📝 Creating example configuration file...", file=sys.stderr)
         try:
             # Try to create in the script directory first
-            config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+            config_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.json')
             create_example_config(config_path)
             print(f"✅ Example configuration created at: {config_path}", file=sys.stderr)
             print("\n📋 Next steps:", file=sys.stderr)
