@@ -7,10 +7,8 @@ from fastapi.testclient import TestClient
 
 # Test configuration constants
 TEST_SECRET_KEY = 'test-secret-key-minimum-32-characters-long-for-security-purposes'
-TEST_ADMIN_USER = 'admin'
-# Note: This matches the default password created by JWTAuthManager._create_default_users()
-# for testing purposes only. In production, change this password immediately.
-TEST_ADMIN_PASS = 'admin123'
+TEST_ADMIN_USER = 'test_admin'
+TEST_ADMIN_PASS = 'test_secure_password_123'
 
 
 class TestHTTPServerImports:
@@ -44,7 +42,9 @@ class TestHTTPServerCreation:
         with patch.dict(os.environ, {
             'TRUENAS_HOST': 'test.example.com',
             'TRUENAS_API_KEY': 'test-api-key',
-            'SECRET_KEY': TEST_SECRET_KEY
+            'SECRET_KEY': TEST_SECRET_KEY,
+            'ADMIN_USERNAME': TEST_ADMIN_USER,
+            'ADMIN_PASSWORD': TEST_ADMIN_PASS
         }):
             yield
     
@@ -90,7 +90,9 @@ class TestHTTPServerEndpoints:
         with patch.dict(os.environ, {
             'TRUENAS_HOST': 'test.example.com',
             'TRUENAS_API_KEY': 'test-api-key',
-            'SECRET_KEY': TEST_SECRET_KEY
+            'SECRET_KEY': TEST_SECRET_KEY,
+            'ADMIN_USERNAME': TEST_ADMIN_USER,
+            'ADMIN_PASSWORD': TEST_ADMIN_PASS
         }):
             from src.http_server import create_app
             app = create_app()
@@ -167,7 +169,9 @@ class TestHTTPServerAuthentication:
             'TRUENAS_HOST': 'test.example.com',
             'TRUENAS_API_KEY': 'test-api-key',
             'SECRET_KEY': TEST_SECRET_KEY,
-            'ADMIN_TOKEN': 'test-admin-token'
+            'ADMIN_TOKEN': 'test-admin-token',
+            'ADMIN_USERNAME': TEST_ADMIN_USER,
+            'ADMIN_PASSWORD': TEST_ADMIN_PASS
         }):
             from src.http_server import create_app
             app = create_app()

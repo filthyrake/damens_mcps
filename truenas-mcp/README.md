@@ -78,6 +78,8 @@ A **portable, HTTP-based** Model Context Protocol (MCP) server that provides an 
    TRUENAS_HOST=your-truenas-host.example.com
    TRUENAS_API_KEY=your-api-key-here
    SECRET_KEY=your-generated-secret-key
+   ADMIN_USERNAME=your-admin-username
+   ADMIN_PASSWORD=your-secure-admin-password
    ```
 
 4. **Start server**:
@@ -130,10 +132,13 @@ kubectl create secret generic truenas-mcp-secrets \
 | `TRUENAS_USERNAME` | Username for authentication | - | Yes* |
 | `TRUENAS_PASSWORD` | Password for authentication | - | Yes* |
 | `SECRET_KEY` | JWT secret key | - | Yes |
+| `ADMIN_USERNAME` | MCP admin username for JWT auth | - | Yes** |
+| `ADMIN_PASSWORD` | MCP admin password for JWT auth | - | Yes** |
 | `SERVER_PORT` | MCP server port | 8000 | No |
 | `DEBUG` | Enable debug mode | false | No |
 
-*Either API key or username/password is required.
+*Either API key or username/password is required for TrueNAS authentication.
+**Required for JWT authentication. Used to create the MCP admin user.
 
 ### Using the CLI
 
@@ -178,9 +183,9 @@ Create a JSON configuration file:
 
 2. **Get a JWT token**:
    ```bash
-   # Login with default credentials
+   # Login (you will be prompted for username and password)
    python -m src.http_cli login
-   
+
    # Or create token with admin token
    python -m src.http_cli create-token --admin-token your-admin-token
    ```
@@ -338,7 +343,9 @@ result = await call_tool("truenas_storage_create_dataset", {
 
 ## Security Considerations
 
+- **Credential Management**: All credentials must be provided via environment variables. No default or hardcoded credentials exist
 - **API Key Management**: Store API keys securely and rotate them regularly
+- **Admin Credentials**: Set strong, unique values for `ADMIN_USERNAME` and `ADMIN_PASSWORD` in your `.env` file
 - **SSL Verification**: Always verify SSL certificates in production
 - **Input Validation**: All inputs are validated and sanitized
 - **Audit Logging**: All operations are logged for security auditing

@@ -320,16 +320,32 @@ class JWTAuthManager:
         self._create_default_users()
     
     def _create_default_users(self) -> None:
-        """Create default users for development."""
-        # Create a default admin user
+        """Create admin user from environment variables.
+
+        Requires ADMIN_USERNAME and ADMIN_PASSWORD environment variables to be set.
+        This removes the security risk of hardcoded credentials.
+        """
+        admin_username = os.environ.get("ADMIN_USERNAME")
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+
+        if not admin_username or not admin_password:
+            logger.warning(
+                "ADMIN_USERNAME and ADMIN_PASSWORD environment variables not set. "
+                "No default admin user will be created. "
+                "JWT authentication will require creating users programmatically or via API."
+            )
+            return
+
+        # Create admin user from environment variables
         admin_user = UserInDB(
-            username="admin",
-            email="admin@truenas-mcp.local",
+            username=admin_username,
+            email=f"{admin_username}@truenas-mcp.local",
             full_name="Administrator",
             disabled=False,
-            hashed_password=pwd_context.hash("admin123")  # TODO: Change in production!
+            hashed_password=pwd_context.hash(admin_password)
         )
         self.users_db[admin_user.username] = admin_user
+        logger.info(f"Created admin user: {admin_username}")
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash.
