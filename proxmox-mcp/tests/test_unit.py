@@ -284,3 +284,40 @@ class TestServerMock:
             assert isinstance(description, str)
             assert len(description) > 10, f"Tool {tool['name']} has very short description"
             assert 'TODO' not in description, f"Tool {tool['name']} has TODO in description"
+    
+    @patch('working_proxmox_server.load_config')
+    @patch('working_proxmox_server.ProxmoxClient')
+    @patch('sys.stdin')
+    @patch('sys.stdout')
+    def test_json_parse_error_handling(self, mock_stdout, mock_stdin, mock_client_class, mock_load_config, mock_proxmox_config):
+        """Test that JSON parse errors are handled gracefully without NameError."""
+        from working_proxmox_server import WorkingProxmoxMCPServer
+        import io
+        
+        mock_load_config.return_value = mock_proxmox_config
+        mock_client_instance = Mock()
+        mock_client_class.return_value = mock_client_instance
+        
+        # Simulate malformed JSON input
+        malformed_json = "{ this is not valid json }\n"
+        mock_stdin.__iter__ = lambda self: iter([malformed_json])
+        
+        # Create a StringIO to capture output
+        output_capture = io.StringIO()
+        mock_stdout.write = output_capture.write
+        mock_stdout.flush = Mock()
+        
+        server = WorkingProxmoxMCPServer()
+        
+        # This should not raise NameError for undefined request_id
+        # The server.run() will attempt to process the malformed JSON and handle the error
+        try:
+            server.run()
+        except StopIteration:
+            # Expected when stdin is exhausted
+            pass
+        except NameError as e:
+            # This should not happen after the fix
+            pytest.fail(f"NameError occurred: {e}. request_id was not initialized before JSON parse error.")
+        
+        # The test passes if no NameError is raised

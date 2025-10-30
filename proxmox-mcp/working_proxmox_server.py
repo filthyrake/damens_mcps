@@ -927,6 +927,7 @@ class WorkingProxmoxMCPServer:
 
                 debug_print(f"Received line: {line}")
 
+                request_id = None  # Initialize before try block to handle JSON parse errors
                 try:
                     request = json.loads(line)
                     debug_print(f"Parsed request: {request}")
