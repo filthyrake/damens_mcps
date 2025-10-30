@@ -3,21 +3,18 @@ pfSense Web Interface Client for MCP Server.
 Works with pfSense versions that don't have REST API available.
 """
 
-import json
 import re
-import ssl
-from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin, urlparse
+from typing import Any, Dict, Optional
+from urllib.parse import urljoin
 
-import aiohttp
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientSession
 
 try:
-    from .auth import PfSenseAuth, PfSenseAuthError
+    from .auth import PfSenseAuth
     from .utils.logging import get_logger
 except ImportError:
     # Fallback for direct execution
-    from auth import PfSenseAuth, PfSenseAuthError
+    from auth import PfSenseAuth
     from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -243,16 +240,11 @@ class WebPfSenseClient:
     async def get_interfaces(self) -> Dict[str, Any]:
         """Get network interfaces information."""
         try:
-            html = await self._get_page_content("/interfaces.php")
-            
-            interfaces = {}
-            
-            # Look for interface information
-            interface_patterns = [
-                r'<td[^>]*>([^<]+)</td>\s*<td[^>]*>([^<]+)</td>\s*<td[^>]*>([^<]+)</td>'
-            ]
+            # Fetch the interfaces page
+            await self._get_page_content("/interfaces.php")
             
             # This is a simplified extraction - would need more sophisticated parsing
+            # to extract actual interface data from the HTML
             return {
                 "interfaces": "Available (requires detailed parsing)",
                 "note": "Interface details available via web interface"
@@ -280,7 +272,7 @@ class WebPfSenseClient:
             
             return False
             
-        except Exception as e:
+        except Exception:
             return False
     
     async def close(self):
