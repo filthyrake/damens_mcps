@@ -4,7 +4,7 @@ import os
 from typing import Optional
 from pathlib import Path
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -17,13 +17,15 @@ class TrueNASConfig(BaseModel):
     password: Optional[str] = Field(None, description="Password for authentication")
     verify_ssl: bool = Field(True, description="Whether to verify SSL certificates")
     
-    @validator('host')
+    @field_validator('host')
+    @classmethod
     def validate_host(cls, v):
         if not v:
             raise ValueError("Host cannot be empty")
         return v
     
-    @validator('port')
+    @field_validator('port')
+    @classmethod
     def validate_port(cls, v):
         if not 1 <= v <= 65535:
             raise ValueError("Port must be between 1 and 65535")
@@ -37,7 +39,8 @@ class ServerConfig(BaseModel):
     debug: bool = Field(False, description="Enable debug mode")
     reload: bool = Field(False, description="Enable auto-reload")
     
-    @validator('port')
+    @field_validator('port')
+    @classmethod
     def validate_port(cls, v):
         if not 1 <= v <= 65535:
             raise ValueError("Port must be between 1 and 65535")
@@ -51,7 +54,8 @@ class AuthConfig(BaseModel):
     access_token_expire_minutes: int = Field(30, description="Token expiry in minutes")
     admin_token: Optional[str] = Field(None, description="Admin token for initial setup")
     
-    @validator('secret_key')
+    @field_validator('secret_key')
+    @classmethod
     def validate_secret_key(cls, v):
         if len(v) < 32:
             raise ValueError("Secret key must be at least 32 characters long")
@@ -112,19 +116,22 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = False
     
-    @validator('truenas_host')
+    @field_validator('truenas_host')
+    @classmethod
     def validate_truenas_host(cls, v):
         if not v:
             raise ValueError("TRUENAS_HOST cannot be empty")
         return v
     
-    @validator('secret_key')
+    @field_validator('secret_key')
+    @classmethod
     def validate_secret_key(cls, v):
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long")
         return v
     
-    @validator('truenas_port', 'server_port')
+    @field_validator('truenas_port', 'server_port')
+    @classmethod
     def validate_ports(cls, v):
         if not 1 <= v <= 65535:
             raise ValueError("Port must be between 1 and 65535")

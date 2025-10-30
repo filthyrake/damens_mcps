@@ -3,7 +3,7 @@
 import re
 from typing import Dict, Any, Optional
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 
 class IDracConfig(BaseModel):
@@ -17,19 +17,22 @@ class IDracConfig(BaseModel):
     ssl_verify: bool = False
     ssl_cert_path: Optional[str] = None
     
-    @validator('host')
+    @field_validator('host')
+    @classmethod
     def validate_host(cls, v):
         if not re.match(r'^[a-zA-Z0-9\-\.]+$', v):
             raise ValueError('Host must contain only alphanumeric characters, hyphens, and dots')
         return v
     
-    @validator('port')
+    @field_validator('port')
+    @classmethod
     def validate_port(cls, v):
         if not 1 <= v <= 65535:
             raise ValueError('Port must be between 1 and 65535')
         return v
     
-    @validator('protocol')
+    @field_validator('protocol')
+    @classmethod
     def validate_protocol(cls, v):
         if v not in ['http', 'https']:
             raise ValueError('Protocol must be either http or https')
@@ -43,14 +46,16 @@ class PowerOperation(BaseModel):
     force: bool = False
     timeout: int = 60
     
-    @validator('operation')
+    @field_validator('operation')
+    @classmethod
     def validate_operation(cls, v):
         valid_operations = ['on', 'off', 'cycle', 'graceful_shutdown', 'force_off']
         if v not in valid_operations:
             raise ValueError(f'Operation must be one of: {", ".join(valid_operations)}')
         return v
     
-    @validator('timeout')
+    @field_validator('timeout')
+    @classmethod
     def validate_timeout(cls, v):
         if not 10 <= v <= 300:
             raise ValueError('Timeout must be between 10 and 300 seconds')
@@ -65,7 +70,8 @@ class UserConfig(BaseModel):
     privilege: str = "Administrator"
     enabled: bool = True
     
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def validate_username(cls, v):
         if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
             raise ValueError('Username must contain only alphanumeric characters, hyphens, and underscores')
@@ -73,13 +79,15 @@ class UserConfig(BaseModel):
             raise ValueError('Username must be between 3 and 16 characters')
         return v
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         return v
     
-    @validator('privilege')
+    @field_validator('privilege')
+    @classmethod
     def validate_privilege(cls, v):
         valid_privileges = ['Administrator', 'Operator', 'ReadOnly']
         if v not in valid_privileges:

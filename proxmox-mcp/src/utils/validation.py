@@ -3,7 +3,7 @@
 import re
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ValidationError, validator
+from pydantic import BaseModel, ValidationError, field_validator
 
 
 class VMConfig(BaseModel):
@@ -18,7 +18,8 @@ class VMConfig(BaseModel):
     network_model: str = "virtio"
     bridge: str = "vmbr0"
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
             raise ValueError('VM name must contain only alphanumeric characters, hyphens, and underscores')
@@ -26,7 +27,8 @@ class VMConfig(BaseModel):
             raise ValueError('VM name must not exceed 128 characters')
         return v
     
-    @validator('cores')
+    @field_validator('cores')
+    @classmethod
     def validate_cores(cls, v):
         # Use the standalone validation function for consistency
         if not isinstance(v, int):
@@ -39,7 +41,8 @@ class VMConfig(BaseModel):
             raise ValueError('CPU cores must be between 1 and 128')
         return v
     
-    @validator('memory')
+    @field_validator('memory')
+    @classmethod
     def validate_memory(cls, v):
         # Use the standalone validation function for consistency
         if not isinstance(v, int):
@@ -52,7 +55,8 @@ class VMConfig(BaseModel):
             raise ValueError('Memory must be between 64MB and 1TB (1048576MB)')
         return v
     
-    @validator('disk_size')
+    @field_validator('disk_size')
+    @classmethod
     def validate_disk_size(cls, v):
         if not re.match(r'^\d+[KMGTP]?$', v):
             raise ValueError('Disk size must be in format: number[KMGTP] (e.g., 10G, 100M)')
@@ -72,13 +76,15 @@ class ContainerConfig(BaseModel):
     password: Optional[str] = None
     ssh_keys: Optional[str] = None
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
             raise ValueError('Container name must contain only alphanumeric characters, hyphens, and underscores')
         return v
     
-    @validator('ostemplate')
+    @field_validator('ostemplate')
+    @classmethod
     def validate_ostemplate(cls, v):
         if not v or not v.strip():
             raise ValueError('OS template is required')
