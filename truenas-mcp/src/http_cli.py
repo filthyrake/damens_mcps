@@ -146,8 +146,8 @@ def health(url: str):
 
 @cli.command()
 @click.option("--url", default="http://localhost:8000", help="Server URL")
-@click.option("--username", default="admin", help="Username")
-@click.option("--password", default="admin123", help="Password (change default in production)")
+@click.option("--username", prompt=True, help="Username")
+@click.option("--password", prompt=True, hide_input=True, help="Password")
 def login(url: str, username: str, password: str):
     """Login to get an access token."""
     try:
