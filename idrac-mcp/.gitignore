@@ -25,6 +25,7 @@ fleet_servers.json
 # Python Virtual Environments
 .venv/
 venv/
+test_venv/
 .env/
 env/
 ENV/

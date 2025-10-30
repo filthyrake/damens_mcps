@@ -1,5 +1,38 @@
-# Core dependencies for working_mcp_server.py (pure JSON-RPC)
+# =============================================================================
+# Core dependencies for working_mcp_server.py (canonical implementation)
+# =============================================================================
+# These are the ONLY dependencies required for the canonical JSON-RPC server
 requests>=2.31.0,<3.0.0
-urllib3>=2.0.0,<3.0.0
+urllib3>=2.0.6,<3.0.0
 python-dotenv>=1.0.0,<2.0.0
-cryptography>=41.0.0,<43.0.0
+
+# =============================================================================
+# Optional dependencies for additional components
+# =============================================================================
+# The following dependencies are only needed if using optional components
+# like CLI tools (fleet_cli.py, secure_fleet_cli.py, src/cli.py),
+# HTTP server (src/http_server.py), or extended client features (src/idrac_client.py)
+#
+# To install with optional dependencies:
+#   pip install -r requirements.txt
+#
+# To install only core dependencies for working_mcp_server.py:
+#   pip install requests urllib3 python-dotenv
+
+# HTTP clients - for async operations in src/idrac_client.py
+aiohttp>=3.9.4,<4.0.0
+httpx>=0.25.0,<1.0.0
+
+# CLI frameworks - for fleet_cli.py, secure_fleet_cli.py, src/cli.py
+click>=8.1.0,<9.0.0
+rich>=13.0.0,<14.0.0
+
+# Security and authentication - for src/auth.py and src/http_server.py
+cryptography>=42.0.4,<43.0.0
+passlib>=1.7.4,<2.0.0
+python-jose>=3.4.0,<4.0.0
+
+# Validation and logging - for src/utils/validation.py and src/utils/logging.py
+# Note: Using pydantic v1 for compatibility with existing validator decorators
+pydantic>=1.10.0,<2.0.0
+structlog>=23.0.0,<24.0.0
