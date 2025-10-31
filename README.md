@@ -93,9 +93,12 @@ TRUENAS_PASSWORD=your-password
 
 ## 🐳 Docker Deployment
 
-Most projects support Docker deployment:
+Docker deployment is available for **TrueNAS MCP** and **Proxmox MCP** projects:
 
 ```bash
+# Navigate to project with Docker support
+cd truenas-mcp  # or proxmox-mcp
+
 # Build and run with Docker Compose
 docker-compose -f docker/docker-compose.yml up -d
 
@@ -104,11 +107,25 @@ docker build -f docker/Dockerfile -t mcp-server .
 docker run -p 8000:8000 --env-file .env mcp-server
 ```
 
+**Docker Support by Project:**
+
+| Project | Docker Support | K8s Support |
+|---------|----------------|-------------|
+| TrueNAS MCP | ✅ Yes | ✅ Yes |
+| Proxmox MCP | ✅ Yes | ✅ Yes |
+| pfSense MCP | ❌ No | ❌ No |
+| iDRAC MCP | ❌ No | ❌ No |
+
+> **Note:** pfSense and iDRAC projects are designed for direct Python execution due to their specific deployment requirements and are not currently containerized.
+
 ## ☸️ Kubernetes Deployment
 
-Kubernetes manifests are provided for production deployment:
+Kubernetes manifests are provided for **TrueNAS MCP** and **Proxmox MCP**:
 
 ```bash
+# Navigate to project with K8s support
+cd truenas-mcp  # or proxmox-mcp
+
 # Deploy to Kubernetes
 kubectl apply -f k8s/
 
