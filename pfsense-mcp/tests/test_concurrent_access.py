@@ -16,7 +16,7 @@ class TestConcurrentAccess:
         
         # Reset global state for test
         src.http_pfsense_server.pfsense_client = None
-        src.http_pfsense_server._client_lock = None
+        src.http_pfsense_server._client_lock = asyncio.Lock()
         
         # Mock the initialize_pfsense_client function
         mock_client = AsyncMock()
@@ -49,10 +49,6 @@ class TestConcurrentAccess:
         import src.http_pfsense_server
         from src.http_pfsense_server import HTTPPfSenseMCPServer
         
-        # Reset global state for test
-        src.http_pfsense_server.pfsense_client = None
-        src.http_pfsense_server._client_lock = None
-        
         # Create a mock client
         mock_client = AsyncMock()
         mock_client.test_connection = AsyncMock(return_value=True)
@@ -60,32 +56,35 @@ class TestConcurrentAccess:
         mock_client.get_interfaces = AsyncMock(return_value=[{"name": "wan"}])
         mock_client.get_services = AsyncMock(return_value=[{"name": "dhcp"}])
         
-        with patch('src.http_pfsense_server.initialize_pfsense_client', return_value=mock_client):
-            # Initialize server
-            server = HTTPPfSenseMCPServer()
-            
-            # Make concurrent tool calls
-            tasks = [
-                server._call_tool("get_system_info", {}),
-                server._call_tool("get_interfaces", {}),
-                server._call_tool("get_services", {}),
-                server._call_tool("get_system_info", {}),
-                server._call_tool("get_interfaces", {}),
-            ]
-            
-            results = await asyncio.gather(*tasks)
-            
-            # All calls should succeed
-            failed_results = [(i, r) for i, r in enumerate(results) if r.isError]
-            assert not failed_results, \
-                f"Expected all tool calls to succeed, but {len(failed_results)} failed: " + \
-                ", ".join([f"task {i}: {r.content[0].text if r.content and len(r.content) > 0 else 'unknown error'}" 
-                          for i, r in failed_results])
-            
-            # Verify the mock client methods were called
-            assert mock_client.get_system_info.call_count == 2
-            assert mock_client.get_interfaces.call_count == 2
-            assert mock_client.get_services.call_count == 1
+        # Set the global client to our mock
+        src.http_pfsense_server.pfsense_client = mock_client
+        src.http_pfsense_server._client_lock = asyncio.Lock()
+        
+        # Initialize server
+        server = HTTPPfSenseMCPServer()
+        
+        # Make concurrent tool calls
+        tasks = [
+            server._call_tool("get_system_info", {}),
+            server._call_tool("get_interfaces", {}),
+            server._call_tool("get_services", {}),
+            server._call_tool("get_system_info", {}),
+            server._call_tool("get_interfaces", {}),
+        ]
+        
+        results = await asyncio.gather(*tasks)
+        
+        # All calls should succeed
+        failed_results = [(i, r) for i, r in enumerate(results) if r.isError]
+        assert not failed_results, \
+            f"Expected all tool calls to succeed, but {len(failed_results)} failed: " + \
+            ", ".join([f"task {i}: {r.content[0].text if r.content and len(r.content) > 0 else 'unknown error'}" 
+                      for i, r in failed_results])
+        
+        # Verify the mock client methods were called
+        assert mock_client.get_system_info.call_count == 2
+        assert mock_client.get_interfaces.call_count == 2
+        assert mock_client.get_services.call_count == 1
     
     @pytest.mark.asyncio
     async def test_lock_prevents_race_condition(self):
@@ -95,7 +94,7 @@ class TestConcurrentAccess:
         
         # Reset global state for test
         src.http_pfsense_server.pfsense_client = None
-        src.http_pfsense_server._client_lock = None  # Reset the lock too
+        src.http_pfsense_server._client_lock = asyncio.Lock()  # Reset the lock too
         
         initialization_order = []
         
@@ -125,7 +124,7 @@ class TestConcurrentAccess:
         
         # Reset global state for test
         src.http_pfsense_server.pfsense_client = None
-        src.http_pfsense_server._client_lock = None
+        src.http_pfsense_server._client_lock = asyncio.Lock()
         
         # Mock initialize to return None (failed initialization)
         with patch('src.http_pfsense_server.initialize_pfsense_client', return_value=None):
@@ -140,7 +139,7 @@ class TestConcurrentAccess:
         
         # Reset global state for test
         src.http_pfsense_server.pfsense_client = None
-        src.http_pfsense_server._client_lock = None
+        src.http_pfsense_server._client_lock = asyncio.Lock()
         
         mock_client = AsyncMock()
         mock_client.test_connection = AsyncMock(return_value=True)

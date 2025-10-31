@@ -684,8 +684,7 @@ async def get_client() -> Optional[HTTPPfSenseClient]:
     """
     global pfsense_client
     
-    lock = _get_client_lock()
-    async with lock:
+    async with _client_lock:
         if not pfsense_client:
             pfsense_client = await initialize_pfsense_client()
         return pfsense_client
