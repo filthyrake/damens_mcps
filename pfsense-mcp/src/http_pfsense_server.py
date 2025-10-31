@@ -693,6 +693,7 @@ async def get_client() -> Optional[HTTPPfSenseClient]:
 
 async def main():
     """Main entry point for the MCP server."""
+    global pfsense_client
     try:
         # Initialize pfSense client with lock protection
         async with _client_lock:
