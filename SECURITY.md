@@ -349,6 +349,6 @@ For security-related questions or concerns:
 
 ---
 
-**Last Updated:** 2024-10-31
+**Last Updated:** 2025-10-31
 
 **Remember: Security is a continuous process, not a one-time configuration.**
