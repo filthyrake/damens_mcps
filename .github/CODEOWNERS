@@ -1,0 +1,50 @@
+# CODEOWNERS file for damens_mcps repository
+# 
+# This file defines individuals or teams responsible for code in this repository.
+# When a PR is opened, GitHub will automatically request reviews from the appropriate owners.
+#
+# Syntax: <file-pattern> @username1 @username2 @team-name
+#
+# More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+# These users will be requested for review unless a more specific rule matches
+* @filthyrake
+
+# Repository-level files
+/README.md @filthyrake
+/CONTRIBUTING.md @filthyrake
+/SECURITY.md @filthyrake
+/LICENSE @filthyrake
+/.github/ @filthyrake
+
+# Documentation files
+*.md @filthyrake
+/docs/ @filthyrake
+
+# CI/CD and workflows
+/.github/workflows/ @filthyrake
+/.github/dependabot.yml @filthyrake
+
+# Project-specific ownership
+# Add additional owners as the project grows
+
+# pfSense MCP
+/pfsense-mcp/ @filthyrake
+
+# TrueNAS MCP
+/truenas-mcp/ @filthyrake
+
+# iDRAC MCP
+/idrac-mcp/ @filthyrake
+
+# Proxmox MCP
+/proxmox-mcp/ @filthyrake
+
+# Security-sensitive files
+/SECURITY.md @filthyrake
+/*/SECURITY.md @filthyrake
+/.github/ISSUE_TEMPLATE/security_vulnerability.yml @filthyrake
+
+# Test files - require review but can be approved by any maintainer
+/*/tests/ @filthyrake

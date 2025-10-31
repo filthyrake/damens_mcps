@@ -1,0 +1,169 @@
+name: Documentation Improvement
+description: Suggest improvements to documentation
+title: "[DOCS] "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation! Clear docs make the project accessible to everyone.
+
+  - type: dropdown
+    id: project
+    attributes:
+      label: Which project's documentation?
+      description: Select the project or area needing documentation improvement
+      options:
+        - pfSense MCP
+        - TrueNAS MCP
+        - iDRAC MCP
+        - Proxmox MCP
+        - Repository (root README, CONTRIBUTING, etc.)
+        - All projects
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Documentation Type
+      description: What kind of documentation needs improvement?
+      options:
+        - README
+        - API Reference
+        - Setup/Installation Guide
+        - Usage Examples
+        - Troubleshooting
+        - Contributing Guide
+        - Security Documentation
+        - Code Comments/Docstrings
+        - Architecture/Design Docs
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What's the problem with the current documentation?
+      options:
+        - Missing documentation
+        - Incorrect/outdated information
+        - Unclear/confusing explanation
+        - Missing examples
+        - Broken links
+        - Typo/grammar issue
+        - Needs more detail
+        - Needs better organization
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is the documentation that needs improvement?
+      placeholder: |
+        Example:
+        - File: README.md, section "Installation"
+        - File: pfsense-mcp/docs/API_REFERENCE.md
+        - URL: [link to specific section]
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Current Problem
+      description: What's wrong with the current documentation? What's missing or unclear?
+      placeholder: |
+        Example: The installation section doesn't explain how to...
+        Or: The API reference for tool X is missing information about...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should the documentation be improved?
+      placeholder: |
+        Example:
+        - Add a section explaining...
+        - Update the example to show...
+        - Clarify that parameter X should be...
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Proposed Content (optional)
+      description: If you have specific text or examples to add, include them here
+      placeholder: |
+        You can write the proposed documentation content here, including:
+        - Explanatory text
+        - Code examples
+        - Configuration snippets
+      render: markdown
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this documentation improvement?
+      options:
+        - Critical (blocks user onboarding/usage)
+        - High (causes significant confusion)
+        - Medium (would help many users)
+        - Low (minor improvement)
+    validations:
+      required: true
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who would benefit from this documentation improvement?
+      placeholder: |
+        Example:
+        - New users trying to get started
+        - Advanced users looking for specific features
+        - Contributors wanting to add features
+        - System administrators deploying in production
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or references
+      placeholder: |
+        - Screenshots showing the confusing part
+        - Links to related documentation
+        - Examples from other projects
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to help with this documentation?
+      options:
+        - label: I can submit a PR with the documentation changes
+          required: false
+        - label: I can help review documentation PRs
+          required: false
+        - label: I can provide technical details but need help with writing
+          required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify the following before submitting
+      options:
+        - label: I have searched for similar documentation issues
+          required: true
+        - label: I have checked that this documentation doesn't already exist elsewhere
+          required: true
