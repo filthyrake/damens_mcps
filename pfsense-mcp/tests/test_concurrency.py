@@ -155,17 +155,21 @@ class TestMainFunctionInitialization:
         assert 'global pfsense_client' in source, \
             "main() function must declare 'global pfsense_client' to properly set the global variable"
         
-        # Verify it's not just in a comment
+        # Verify it's an actual code statement (not in a comment or string)
+        # Simple check: look for the line as actual code
         lines = source.split('\n')
         found_global_declaration = False
+        
         for line in lines:
             stripped = line.strip()
-            # Skip comments and docstrings
-            if stripped.startswith('#') or stripped.startswith('"""') or stripped.startswith("'''"):
+            # Skip obvious comments
+            if stripped.startswith('#'):
                 continue
-            if 'global pfsense_client' in stripped and not stripped.startswith('#'):
+            # Check for the global declaration as a statement
+            # It should be on its own line or at the start of the statement
+            if stripped == 'global pfsense_client':
                 found_global_declaration = True
                 break
         
         assert found_global_declaration, \
-            "main() must have an actual 'global pfsense_client' statement, not just in comments"
+            "main() must have 'global pfsense_client' as a standalone statement"
