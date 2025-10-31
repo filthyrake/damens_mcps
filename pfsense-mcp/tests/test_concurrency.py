@@ -128,3 +128,44 @@ class TestCallToolSynchronization:
             # Should return error when client is not initialized
             assert result.isError is True
             assert "not initialized" in result.content[0].text.lower()
+
+
+class TestMainFunctionInitialization:
+    """Test that main() function properly initializes the global client."""
+    
+    @pytest.mark.asyncio
+    async def test_main_has_global_declaration(self):
+        """Test that main() function has proper global declaration.
+        
+        This test verifies the fix for the race condition issue where main()
+        was missing the 'global pfsense_client' declaration, causing it to
+        create a local variable instead of setting the global client.
+        
+        The fix ensures main() properly declares its intent to modify the
+        global variable, matching the pattern used in get_client().
+        """
+        import inspect
+        from src.http_pfsense_server import main
+        
+        # Get the source code of main()
+        source = inspect.getsource(main)
+        
+        # Verify that main() contains 'global pfsense_client' declaration
+        # This should appear early in the function, before any initialization
+        assert 'global pfsense_client' in source, \
+            "main() function must declare 'global pfsense_client' to properly set the global variable"
+        
+        # Verify it's not just in a comment
+        lines = source.split('\n')
+        found_global_declaration = False
+        for line in lines:
+            stripped = line.strip()
+            # Skip comments and docstrings
+            if stripped.startswith('#') or stripped.startswith('"""') or stripped.startswith("'''"):
+                continue
+            if 'global pfsense_client' in stripped and not stripped.startswith('#'):
+                found_global_declaration = True
+                break
+        
+        assert found_global_declaration, \
+            "main() must have an actual 'global pfsense_client' statement, not just in comments"
