@@ -73,7 +73,7 @@ repos:
         language: system
         types: [text]
         args: ['--baseline', '.secrets.baseline']
-        exclude: package.lock.json
+        exclude: package-lock.json
       
       # Prevent .env files from being committed
       - id: block-env-files
