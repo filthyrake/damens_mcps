@@ -16,9 +16,11 @@ Example usage:
 
 import json
 import sys
+import warnings
 from typing import Any, Dict, List
 
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 
 from .exceptions import (
     ProxmoxConnectionError,
@@ -34,6 +36,30 @@ from .exceptions import (
 def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
     print(f"DEBUG: {message}", file=sys.stderr)
+
+
+def suppress_insecure_request_warning(ssl_verify: bool):
+    """
+    Context manager to suppress InsecureRequestWarning when SSL verification is disabled.
+    
+    This is a helper to eliminate code duplication and ensure consistent warning handling.
+    """
+    class WarningSuppressionContext:
+        def __init__(self, should_suppress: bool):
+            self.should_suppress = should_suppress
+            self.context = None
+            
+        def __enter__(self):
+            self.context = warnings.catch_warnings()
+            self.context.__enter__()
+            if self.should_suppress:
+                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            return self
+            
+        def __exit__(self, *args):
+            return self.context.__exit__(*args)
+    
+    return WarningSuppressionContext(not ssl_verify)
 
 
 class ProxmoxClient:
@@ -91,6 +117,8 @@ class ProxmoxClient:
         self._authenticate()
 
         debug_print("Created Proxmox client (connection details redacted)")
+        if not ssl_verify:
+            debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
         debug_print(f"SSL Verify: {ssl_verify}")
         debug_print(f"Session headers: {dict(self.session.headers)}")
 
@@ -114,8 +142,10 @@ class ProxmoxClient:
                 'Accept': 'application/json'
             }
             
-            response = self.session.post(self.auth_url, data=auth_data, headers=headers)
-            response.raise_for_status()
+            # Context-specific warning suppression - only suppress when SSL verification is disabled
+            with suppress_insecure_request_warning(self.ssl_verify):
+                response = self.session.post(self.auth_url, data=auth_data, headers=headers)
+                response.raise_for_status()
             auth_result = response.json()
             if auth_result['data']:
                 self.session.cookies.set('PVEAuthCookie', auth_result['data']['ticket'])
@@ -165,8 +195,10 @@ class ProxmoxClient:
             if handler is None:
                 raise ProxmoxValidationError(f"Unsupported HTTP method: {method}")
             
-            response = handler(url, **kwargs)
-            response.raise_for_status()
+            # Context-specific warning suppression - only suppress when SSL verification is disabled
+            with suppress_insecure_request_warning(self.ssl_verify):
+                response = handler(url, **kwargs)
+                response.raise_for_status()
             return response
         except requests.exceptions.ConnectionError as e:
             debug_print(f"Connection error for {method} {endpoint}: {e}")
