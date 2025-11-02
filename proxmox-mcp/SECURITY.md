@@ -432,13 +432,16 @@ Ongoing security practices:
 ### Current Security Constraints
 
 **Authentication:**
-- API keys transmitted with each request (use HTTPS!)
+- Ticket-based authentication (PVEAuthCookie) transmitted with each request (use HTTPS!)
 - No built-in rate limiting (implement at network level)
-- Session management depends on pfSense API
+- Session management depends on Proxmox VE API ticket system (2-hour default expiration)
+- Tickets must be refreshed periodically for long-running operations
 
 **Authorization:**
-- Granular permission control depends on pfSense API
+- Granular permission control depends on Proxmox VE API and PVE realm configuration
 - MCP server inherits API user's full permissions
+- Some operations require root@pam privileges and cannot be delegated
+- Permission model based on Proxmox VE ACLs and user/role assignments
 
 **Encryption:**
 - ✅ **Encrypted password storage now available** (recommended)
@@ -502,6 +505,6 @@ For security concerns, contact:
 
 ---
 
-**Last Updated:** 2024-10-22
+**Last Updated:** 2025-11-02
 
 **Remember: Security is a continuous process, not a one-time task.**
