@@ -37,6 +37,7 @@ try:
         ProxmoxResourceNotFoundError
     )
     from src.proxmox_client import ProxmoxClient
+    from src.secure_config import SecureConfigManager
 except ImportError:
     # Fall back to sys.path modification for direct execution
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -53,6 +54,7 @@ except ImportError:
             ProxmoxResourceNotFoundError
         )
         from proxmox_client import ProxmoxClient
+        from secure_config import SecureConfigManager
     except ImportError as e:
         # Fail fast only if both import strategies fail
         print(f"CRITICAL ERROR: Failed to import required modules: {e}", file=sys.stderr)
@@ -66,7 +68,7 @@ def debug_print(message: str) -> None:
 
 
 def load_config() -> Dict[str, Any]:
-    """Load configuration from JSON file."""
+    """Load configuration from JSON file, supporting both plaintext and encrypted passwords."""
     # Try multiple possible config file locations
     possible_paths: List[str] = [
         'config.json',  # Current directory

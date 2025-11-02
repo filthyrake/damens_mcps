@@ -5,5 +5,22 @@
   "username": "your-username",
   "password": "your-password",
   "realm": "pve",
-  "ssl_verify": false
+  "ssl_verify": false,
+  
+  "_comment": "SECURITY WARNING: The above format stores passwords in PLAINTEXT",
+  "_comment2": "For better security, use encrypted password storage instead:",
+  "_comment3": "1. Copy this file to config.json and fill in your details",
+  "_comment4": "2. Run: python migrate_config.py",
+  "_comment5": "3. This will encrypt the password and create the format below:",
+  
+  "_encrypted_format_example": {
+    "host": "your-proxmox-host.example.com",
+    "port": 8006,
+    "protocol": "https",
+    "username": "your-username",
+    "password_encrypted": "gAAAAABk...<encrypted password>",
+    "salt": "base64-encoded-salt",
+    "realm": "pve",
+    "ssl_verify": false
+  }
 }
