@@ -12,9 +12,29 @@ import os
 import sys
 import warnings
 import requests
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, TypedDict, Literal
 from urllib3.exceptions import InsecureRequestWarning
 from requests.auth import HTTPBasicAuth
+
+# Nested types for create_example_config
+class ServerConfig(TypedDict):
+    name: str
+    host: str
+    port: int
+    protocol: Literal["https"]
+    username: str
+    password: str
+    ssl_verify: bool
+
+class ServerSettings(TypedDict):
+    port: int
+    debug: bool
+
+class ExampleConfig(TypedDict):
+    _comment: str
+    idrac_servers: Dict[str, ServerConfig]
+    default_server: str
+    server: ServerSettings
 
 # Import validation utilities
 _validation_path = os.path.join(os.path.dirname(__file__), 'src', 'utils')
@@ -29,7 +49,7 @@ except ImportError as e:
     print("Ensure the file exists and all dependencies are installed.", file=sys.stderr)
     sys.exit(1)
 
-def debug_print(message: str):
+def debug_print(message: str) -> None:
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
     print(f"DEBUG: {message}", file=sys.stderr)
 
@@ -51,7 +71,7 @@ def redact_sensitive_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
 
 def create_example_config(config_path: str = 'config.json') -> None:
     """Create an example configuration file."""
-    example_config = {
+    example_config: ExampleConfig = {
         "_comment": "IMPORTANT: Always use ssl_verify=true in production to prevent MITM attacks! Only set to false for development/testing with self-signed certificates. See SECURITY.md for proper certificate setup.",
         "idrac_servers": {
             "server1": {
@@ -87,13 +107,13 @@ def create_example_config(config_path: str = 'config.json') -> None:
 def load_config() -> Dict[str, Any]:
     """Load configuration from JSON file."""
     # Try multiple possible config file locations
-    possible_paths = [
+    possible_paths: List[str] = [
         'config.json',  # Current directory
         os.path.join(os.path.dirname(__file__), 'config.json'),  # Same directory as script
         os.path.expanduser('~/.idrac-mcp/config.json'),  # User home directory
     ]
     
-    config_path = None
+    config_path: Optional[str] = None
     for path in possible_paths:
         if os.path.exists(path):
             config_path = path
@@ -106,7 +126,7 @@ def load_config() -> Dict[str, Any]:
     
     try:
         with open(config_path, 'r') as f:
-            config = json.load(f)
+            config: Dict[str, Any] = json.load(f)
         debug_print(f"Configuration loaded successfully from: {config_path}")
         return config
     except json.JSONDecodeError as e:

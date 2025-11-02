@@ -275,7 +275,7 @@ def _is_valid_ip_address(ip: str) -> bool:
         return False
 
 
-def sanitize_input(input_data: Any) -> Any:
+def sanitize_input(input_data: Union[str, Dict[str, object], List[object], object]) -> Union[str, Dict[str, object], List[object], object]:
     """Sanitize input data to prevent injection attacks.
     
     Enhanced sanitization that removes dangerous characters, control characters,
