@@ -166,7 +166,7 @@ pre-commit run --all-files
 
 These hooks will **automatically block commits** that contain credentials or sensitive files.
 
-**Note**: The `.secrets.baseline` file contains known false positives (like example credentials in documentation). If `detect-secrets` flags a false positive, you can update the baseline with `detect-secrets scan --baseline .secrets.baseline`.
+**Note**: The `.secrets.baseline` file contains known false positives (like example credentials in documentation). If `detect-secrets` flags a false positive, you can update the baseline with `detect-secrets scan --update .secrets.baseline`.
 
 ### 6. Verify Setup
 
