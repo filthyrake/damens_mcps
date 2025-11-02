@@ -188,12 +188,24 @@ pytest tests/ --cov=src --cov-report=html
 pytest tests/test_validation.py -v
 ```
 
+### Code Quality Checks
+
+Run code quality checks locally on all projects:
+
+```bash
+# Run all quality checks (black, isort, flake8, mypy, bandit, safety, interrogate)
+./run_code_quality_checks.sh
+```
+
+See [CODE_QUALITY.md](./CODE_QUALITY.md) for detailed code quality standards and tools.
+
 ### CI/CD
 
-Tests run automatically on every push and pull request via GitHub Actions:
+Automated checks run on every push and pull request via GitHub Actions:
 - ✅ All 4 projects tested independently
 - ✅ Coverage reports uploaded to Codecov
 - ✅ Python 3.12 compatibility verified
+- ✅ Code quality checks (linting, formatting, security, type checking)
 
 See [TESTING.md](./TESTING.md) for detailed testing guide and [TEST_COVERAGE_SUMMARY.md](./TEST_COVERAGE_SUMMARY.md) for coverage details.
 

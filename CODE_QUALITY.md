@@ -207,7 +207,19 @@ interrogate src/ -vv --fail-under=40
 
 ### All Projects
 
-Use the provided script or run checks per project as needed.
+Use the provided convenience script to run all checks on all projects:
+
+```bash
+# Run all checks on all projects
+./run_code_quality_checks.sh
+```
+
+This script will:
+- Run all 7 quality checks on each project
+- Create virtual environments if needed
+- Install required dependencies
+- Report any issues found
+- Continue even if checks find issues (warnings only)
 
 ## Gradual Adoption
 
