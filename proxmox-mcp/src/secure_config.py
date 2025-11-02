@@ -152,8 +152,7 @@ class SecureConfigManager:
         if 'password' not in config:
             raise ValueError("Configuration missing 'password' field")
         
-        if not master_password:
-            raise ValueError("Master password required for encryption")
+        
         
         # Generate new salt
         self.salt = self.generate_salt()
