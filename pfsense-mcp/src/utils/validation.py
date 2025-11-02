@@ -167,7 +167,7 @@ def validate_vlan_id(vlan_id: Union[int, str]) -> bool:
         return False
 
 
-def validate_firewall_rule_params(params: Dict[str, Any]) -> List[str]:
+def validate_firewall_rule_params(params: Dict[str, Any]) -> bool:
     """
     Validate firewall rule parameters.
     
@@ -213,10 +213,10 @@ def validate_firewall_rule_params(params: Dict[str, Any]) -> List[str]:
         if not validate_port_range(port_value):
             errors.append("Invalid port. Must be a valid port number (1-65535) or port range (e.g., 8000-9000)")
     
-    return errors
+    return len(errors) == 0
 
 
-def validate_vlan_params(params: Dict[str, Any]) -> List[str]:
+def validate_vlan_params(params: Dict[str, Any]) -> bool:
     """
     Validate VLAN parameters.
     
@@ -237,7 +237,7 @@ def validate_vlan_params(params: Dict[str, Any]) -> List[str]:
     if 'interface' not in params or not params['interface']:
         errors.append("Missing required field: interface")
     
-    return errors
+    return len(errors) == 0
 
 
 def sanitize_string(value: str) -> str:
@@ -356,7 +356,7 @@ def validate_id(id_value: str) -> bool:
     return bool(re.match(pattern, id_value)) and len(id_value) <= 128
 
 
-def validate_config(config: Dict[str, Any]) -> List[str]:
+def validate_config(config: Dict[str, Any]) -> bool:
     """
     Validate pfSense configuration parameters.
     
@@ -385,7 +385,7 @@ def validate_config(config: Dict[str, Any]) -> List[str]:
     if not has_api_key and not has_credentials:
         errors.append("Either api_key or username/password must be provided")
     
-    return errors
+    return len(errors) == 0
 
 
 def sanitize_for_api(value: str) -> str:

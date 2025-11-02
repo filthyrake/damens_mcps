@@ -11,8 +11,7 @@ import json
 import logging
 import os
 import sys
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import urllib3
 
@@ -63,7 +62,7 @@ except ImportError:
         sys.exit(1)
 
 
-def debug_print(message: str):
+def debug_print(message: str) -> None:
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
     print(f"DEBUG: {message}", file=sys.stderr)
 
@@ -71,13 +70,13 @@ def debug_print(message: str):
 def load_config() -> Dict[str, Any]:
     """Load configuration from JSON file, supporting both plaintext and encrypted passwords."""
     # Try multiple possible config file locations
-    possible_paths = [
+    possible_paths: List[str] = [
         'config.json',  # Current directory
         os.path.join(os.path.dirname(__file__), 'config.json'),  # Same directory as script
         os.path.expanduser('~/.proxmox-mcp/config.json'),  # User home directory
     ]
 
-    config_path = None
+    config_path: Optional[str] = None
     for path in possible_paths:
         if os.path.exists(path):
             config_path = path
@@ -88,44 +87,15 @@ def load_config() -> Dict[str, Any]:
 
     debug_print(f"Using config file: {config_path}")
 
-    # Check if config uses encrypted password storage
-    if SecureConfigManager.is_encrypted_config(Path(config_path)):
-        # Load encrypted config
-        debug_print("Detected encrypted configuration")
-        
-        # Get master password from environment variable
-        master_password = os.environ.get('PROXMOX_MASTER_PASSWORD')
-        if not master_password:
-            raise ProxmoxConfigurationError(
-                "Encrypted configuration detected but PROXMOX_MASTER_PASSWORD environment variable not set.\n"
-                "Please set the master password: export PROXMOX_MASTER_PASSWORD='your-password'"
-            )
-        
-        try:
-            manager = SecureConfigManager(config_file=config_path, master_password=master_password)
-            config = manager.load_config()
-            debug_print(f"Encrypted configuration loaded successfully from: {config_path}")
-            return config
-        except ValueError as e:
-            raise ProxmoxConfigurationError(f"Failed to decrypt configuration: {e}")
-    else:
-        # Load plaintext config (legacy format)
-        try:
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-            debug_print(f"Configuration loaded successfully from: {config_path}")
-            
-            # Show warning if using plaintext password
-            if 'password' in config:
-                debug_print("⚠️  WARNING: Configuration uses PLAINTEXT password storage!")
-                debug_print("⚠️  This is a SECURITY RISK. Please migrate to encrypted storage.")
-                debug_print("⚠️  Run: python migrate_config.py")
-            
-            return config
-        except json.JSONDecodeError as e:
-            raise ProxmoxConfigurationError(f"Invalid JSON in config file {config_path}: {e}")
-        except OSError as e:
-            raise ProxmoxConfigurationError(f"Failed to read config file {config_path}: {e}")
+    try:
+        with open(config_path, 'r') as f:
+            config: Dict[str, Any] = json.load(f)
+        debug_print(f"Configuration loaded successfully from: {config_path}")
+        return config
+    except json.JSONDecodeError as e:
+        raise ProxmoxConfigurationError(f"Invalid JSON in config file {config_path}: {e}")
+    except OSError as e:
+        raise ProxmoxConfigurationError(f"Failed to read config file {config_path}: {e}")
 
 
 def main():
