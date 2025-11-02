@@ -5,7 +5,6 @@ import sys
 import os
 from io import StringIO
 from unittest.mock import patch, Mock, MagicMock
-import requests
 
 # Add parent directory to path to import the server module
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -27,7 +26,7 @@ class TestDebugRedaction:
         """Test that IDracClient.__init__ redacts sensitive headers in debug logs."""
         with patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             # Create client with credentials
-            client = IDracClient(
+            IDracClient(
                 host="192.168.1.100",
                 port=443,
                 protocol="https",
@@ -54,7 +53,7 @@ class TestDebugRedaction:
     def test_client_init_redacts_auth_credentials(self):
         """Test that auth credentials are not logged."""
         with patch('sys.stderr', new_callable=StringIO) as mock_stderr:
-            client = IDracClient(
+            IDracClient(
                 host="192.168.1.100",
                 port=443,
                 protocol="https",
@@ -95,6 +94,7 @@ class TestDebugRedaction:
                 try:
                     client._make_request('GET', '/test')
                 except Exception:
+                    # Ignore exceptions: this test only verifies debug log redaction, not request success.
                     pass
                 
                 output = mock_stderr.getvalue()
@@ -133,6 +133,7 @@ class TestDebugRedaction:
                 try:
                     client._make_request('GET', '/test')
                 except Exception:
+                    # Ignore exceptions: this test only verifies debug log redaction, not request success.
                     pass
                 
                 output = mock_stderr.getvalue()
@@ -171,6 +172,8 @@ class TestDebugRedaction:
                 try:
                     client._make_request('GET', '/test')
                 except Exception:
+                    # Ignore exceptions here because we're only testing log redaction,
+                    # not the success of the request.
                     pass
                 
                 output = mock_stderr.getvalue()
@@ -209,6 +212,7 @@ class TestDebugRedaction:
                 try:
                     client._make_request('GET', '/test')
                 except Exception:
+                    # Ignore exceptions: this test only verifies debug log redaction, not request success.
                     pass
                 
                 output = mock_stderr.getvalue()
@@ -250,6 +254,8 @@ class TestDebugRedaction:
                 try:
                     client._make_request('GET', '/test')
                 except Exception:
+                    # Exception is ignored because this test only verifies debug log redaction,
+                    # not the outcome of the request.
                     pass
                 
                 output = mock_stderr.getvalue()
@@ -269,18 +275,9 @@ class TestRedactionHelpers:
         """Test that sensitive headers are properly redacted."""
         from working_mcp_server import IDracClient
         
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer secret_token',
-            'Cookie': 'session=12345',
-            'X-Auth-Token': 'auth_token',
-            'User-Agent': 'Test'
-        }
-        
         # Create a client to test the redaction logic
         with patch('sys.stderr', new_callable=StringIO) as mock_stderr:
-            client = IDracClient(
+            IDracClient(
                 host="192.168.1.100",
                 port=443,
                 protocol="https",
