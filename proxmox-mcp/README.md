@@ -17,12 +17,21 @@
    # Edit config.json with your Proxmox details
    ```
 
-3. **Start Server:**
+3. **🔒 Secure Your Credentials (Recommended):**
+   ```bash
+   # Migrate to encrypted password storage
+   python migrate_config.py
+   
+   # Set master password
+   export PROXMOX_MASTER_PASSWORD='your-master-password'
+   ```
+
+4. **Start Server:**
    ```bash
    .venv/bin/python working_proxmox_server.py
    ```
 
-4. **Test Connection:**
+5. **Test Connection:**
    ```bash
    .venv/bin/python test_server.py
    ```
@@ -125,10 +134,38 @@ PROXMOX_SSL_VERIFY=false
 
 ## 🔒 **Security Features**
 
+### **Encrypted Password Storage** ✅
+- **Password encryption at rest** using PBKDF2-SHA256 (480k iterations, OWASP 2023)
+- **No encryption key on disk** - derived from master password each session
+- **Migration tool** - Easy conversion: `python migrate_config.py`
+- **Backward compatible** - Plaintext configs still work (with warnings)
+
+### **Additional Security**
 - **No Hardcoded Credentials** - All credentials loaded from config or environment
 - **SSL Verification** - Configurable SSL certificate validation
 - **Authentication** - Secure ticket-based authentication with Proxmox
 - **Input Validation** - All tool inputs validated before execution
+
+### **Configuration Security**
+
+**Recommended: Encrypted Password Storage**
+```bash
+# One-time setup
+python migrate_config.py
+
+# Start server with encrypted config
+export PROXMOX_MASTER_PASSWORD='your-master-password'
+.venv/bin/python working_proxmox_server.py
+```
+
+**Legacy: Plaintext Storage** (deprecated)
+```json
+{
+  "password": "plaintext-password"  // ⚠️ NOT RECOMMENDED
+}
+```
+
+See [SECURITY.md](SECURITY.md) for detailed security best practices.
 
 ## 🧪 **Testing**
 
@@ -161,11 +198,16 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}' | .venv
    - Check username/password combination
    - Ensure user has appropriate permissions
 
-3. **SSL Issues**
+3. **Encrypted Config Issues**
+   - **"Master password required" error**: Set `PROXMOX_MASTER_PASSWORD` environment variable
+   - **"Failed to decrypt password" error**: Wrong master password or corrupted config
+   - **Migration fails**: Ensure config.json has `password` field before migration
+
+4. **SSL Issues**
    - Set `ssl_verify: false` for self-signed certificates
    - Check certificate validity
 
-4. **Tool Not Found**
+5. **Tool Not Found**
    - Restart Claude Desktop completely
    - Verify server is running
    - Check tool names match exactly

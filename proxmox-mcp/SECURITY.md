@@ -10,25 +10,84 @@
 
 ### Credential Management
 
-#### Username/Password Authentication
+#### Password Storage Options
 
-Proxmox uses username/password or API token authentication:
+Proxmox MCP now supports **encrypted password storage** (recommended) and plaintext storage (legacy, deprecated).
 
+##### Option 1: Encrypted Password Storage (Recommended) ✅
+
+**Features:**
+- Password encrypted at rest using Fernet (AES-128-CBC)
+- Key derivation using PBKDF2-SHA256 (480,000 iterations per OWASP 2023)
+- Salt stored in config, encryption key derived from master password
+- No encryption key stored on disk
+- Protection against accidental credential exposure
+
+**Setup:**
+```bash
+# 1. Create plaintext config from example
+cp config.example.json config.json
+# Edit config.json with your credentials
+
+# 2. Migrate to encrypted storage
+python migrate_config.py
+
+# 3. Set master password environment variable
+export PROXMOX_MASTER_PASSWORD='your-master-password'
+
+# 4. Start server
+python working_proxmox_server.py
+```
+
+**Encrypted config format:**
 ```json
-// config.json
 {
   "host": "192.168.1.10",
   "username": "root@pam",
-  "password": "your-password-here"
+  "password_encrypted": "gAAAAABk...<encrypted password>",
+  "salt": "base64-encoded-salt",
+  "realm": "pve",
+  "ssl_verify": false
 }
 ```
 
-**Best Practices:**
+**Security Benefits:**
+- ✅ Password encrypted at rest
+- ✅ Protection against config file exposure
+- ✅ Safe backup and version control (after removing sensitive data)
+- ✅ OWASP compliance (480k iterations)
+- ✅ No key material on disk
+
+##### Option 2: Plaintext Password Storage (Deprecated) ⚠️
+
+**Legacy format** - still supported but **strongly discouraged**:
+
+```json
+{
+  "host": "192.168.1.10",
+  "username": "root@pam",
+  "password": "your-password-here",
+  "realm": "pve",
+  "ssl_verify": false
+}
+```
+
+**⚠️ Security Risks:**
+- Password visible to anyone with file access
+- Version control accidents could expose credentials
+- Backup systems may capture plaintext passwords
+- Container/VM introspection reveals passwords
+
+**Deprecation Warning:** The server will display warnings when using plaintext passwords.
+
+**Migration:** Run `python migrate_config.py` to convert to encrypted storage.
+
+#### Best Practices
+
+**User Account Management:**
 - Use dedicated service accounts instead of root
 - Create user in Proxmox with minimal required permissions
-- Store credentials in secure configuration files with restrictive permissions
-
-#### Storing Credentials Securely
+- Rotate passwords regularly
 
 **Never store credentials in:**
 - Git repositories (use `.gitignore`)
@@ -36,17 +95,19 @@ Proxmox uses username/password or API token authentication:
 - Unencrypted files on shared systems
 - Application logs
 
-**Do store credentials in:**
-- Environment variables (`.env` files not in git)
-- Secure secret management systems (Vault, AWS Secrets Manager)
-- Encrypted configuration files (with separate key management)
-- OS credential stores (keychain, credential manager)
+**Do store credentials using:**
+- ✅ **Encrypted config files** (recommended - use migrate_config.py)
+- ✅ Environment variables for master password
+- ✅ Secure secret management systems (Vault, AWS Secrets Manager)
+- ✅ OS credential stores (keychain, credential manager)
 
 **File Permissions:**
 ```bash
 # Ensure only you can read credential files
-chmod 600 .env
 chmod 600 config.json
+
+# For environment file (if used)
+chmod 600 .env
 ```
 
 ### SSL/TLS Configuration
@@ -380,16 +441,23 @@ Ongoing security practices:
 - MCP server inherits API user's full permissions
 
 **Encryption:**
-- Credentials stored in plain text in `.env` (file permissions critical)
-- No built-in encryption for configuration files
-- Consider external secret management for production
+- ✅ **Encrypted password storage now available** (recommended)
+- Password encryption using PBKDF2-SHA256 (480k iterations, OWASP 2023)
+- Legacy plaintext format still supported (deprecated, shows warnings)
+- Consider external secret management for production environments
+
+### Implemented Security Improvements ✅
+
+- [x] **Encrypted configuration files** - Password encryption at rest
+- [x] **PBKDF2-SHA256 key derivation** - Industry-standard password-based encryption
+- [x] **Migration tooling** - Easy conversion from plaintext to encrypted storage
+- [x] **Zero breaking changes** - Backward compatible with plaintext configs
 
 ### Planned Security Improvements
 
 - [ ] Integration with external secret managers (Vault, AWS Secrets Manager)
 - [ ] Built-in rate limiting
 - [ ] Session token management
-- [ ] Encrypted configuration files
 - [ ] Audit logging framework
 - [ ] Security policy enforcement
 
