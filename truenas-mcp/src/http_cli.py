@@ -42,7 +42,11 @@ def _save_token_securely(token_file: Path, token: str) -> None:
     Raises:
         OSError: If file operations fail
         IOError: If file operations fail
+        ValueError: If token is None or empty
     """
+    if not token:
+        raise ValueError("Token cannot be None or empty")
+
     # Create directory with secure permissions
     token_file.parent.mkdir(exist_ok=True, mode=0o700)
 
@@ -50,15 +54,14 @@ def _save_token_securely(token_file: Path, token: str) -> None:
     # File is created with 0o600 permissions atomically
     # Note: On Windows, granular Unix permissions are not fully supported
     fd = os.open(str(token_file), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    # Use context manager to ensure file is closed even if an exception occurs
     try:
-        f = os.fdopen(fd, "w")
+        with os.fdopen(fd, "w") as f:
+            f.write(token)
     except (OSError, IOError):
-        # Close fd if fdopen fails to avoid fd leak
+        # If os.fdopen fails, close fd to avoid fd leak
         os.close(fd)
         raise
-    # If fdopen succeeds, use context manager for writing
-    with f:
-        f.write(token)
 
 
 @click.group()
@@ -213,7 +216,11 @@ def login(url: str, username: str, password: str):
 
             # Save token to file with secure permissions
             token_file = Path.home() / ".truenas-mcp" / "token.txt"
-            _save_token_securely(token_file, data.get("access_token"))
+            access_token = data.get("access_token")
+            if not access_token:
+                console.print("[bold red]Error:[/bold red] No access token received")
+                sys.exit(1)
+            _save_token_securely(token_file, access_token)
             console.print(f"[green]Token saved to: {token_file}[/green]")
 
         else:
@@ -256,7 +263,11 @@ def create_token(url: str, admin_token: str, username: str):
 
             # Save token to file with secure permissions
             token_file = Path.home() / ".truenas-mcp" / "token.txt"
-            _save_token_securely(token_file, data.get("access_token"))
+            access_token = data.get("access_token")
+            if not access_token:
+                console.print("[bold red]Error:[/bold red] No access token received")
+                sys.exit(1)
+            _save_token_securely(token_file, access_token)
             console.print(f"[green]Token saved to: {token_file}[/green]")
 
         else:
