@@ -149,14 +149,15 @@ python secure_fleet_cli.py disable server2
 python secure_fleet_cli.py remove server2
 ```
 
-### Basic Fleet Management (Less Secure)
+### Basic Fleet Management
 
 ```bash
 # Initialize basic fleet management
 python fleet_cli.py init
 
-# Add servers (password in command line - less secure)
-python fleet_cli.py add server1 10.0.10.11 root yourpassword
+# Add servers (password will be prompted securely)
+python fleet_cli.py add server1 10.0.10.11 root
+# Password will be prompted with hidden input
 
 # Same operations as secure version
 python fleet_cli.py list
@@ -164,6 +165,8 @@ python fleet_cli.py test
 python fleet_cli.py info
 # etc.
 ```
+
+**Note**: As of the latest version, `fleet_cli.py` now uses secure password prompting (just like `secure_fleet_cli.py`). The main difference is that `secure_fleet_cli.py` also encrypts passwords in the configuration file, while `fleet_cli.py` stores them in plain text.
 
 ## 📊 Data Retrieval Examples
 
