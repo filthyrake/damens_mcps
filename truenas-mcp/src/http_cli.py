@@ -29,6 +29,38 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 
+def _save_token_securely(token_file: Path, token: str) -> None:
+    """Save authentication token to file with secure permissions.
+
+    Creates the parent directory with 0o700 permissions and the token file
+    with 0o600 permissions atomically to avoid race conditions.
+
+    Args:
+        token_file: Path to the token file
+        token: Token string to save
+
+    Raises:
+        OSError: If file operations fail
+        IOError: If file operations fail
+    """
+    # Create directory with secure permissions
+    token_file.parent.mkdir(exist_ok=True, mode=0o700)
+
+    # Use os.open with proper permissions to avoid race condition
+    # File is created with 0o600 permissions atomically
+    # Note: On Windows, granular Unix permissions are not fully supported
+    fd = os.open(str(token_file), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    try:
+        f = os.fdopen(fd, "w")
+    except (OSError, IOError):
+        # Close fd if fdopen fails to avoid fd leak
+        os.close(fd)
+        raise
+    # If fdopen succeeds, use context manager for writing
+    with f:
+        f.write(token)
+
+
 @click.group()
 @click.option("--debug", is_flag=True, help="Enable debug mode")
 @click.option("--config", type=click.Path(exists=True), help="Configuration file path")
@@ -181,18 +213,7 @@ def login(url: str, username: str, password: str):
 
             # Save token to file with secure permissions
             token_file = Path.home() / ".truenas-mcp" / "token.txt"
-            token_file.parent.mkdir(exist_ok=True, mode=0o700)
-
-            # Use os.open with proper permissions to avoid race condition
-            # File is created with 0o600 permissions atomically
-            fd = os.open(str(token_file), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
-            try:
-                with os.fdopen(fd, "w") as f:
-                    f.write(data.get("access_token"))
-            except (OSError, IOError):
-                os.close(fd)
-                raise
-
+            _save_token_securely(token_file, data.get("access_token"))
             console.print(f"[green]Token saved to: {token_file}[/green]")
 
         else:
@@ -235,18 +256,7 @@ def create_token(url: str, admin_token: str, username: str):
 
             # Save token to file with secure permissions
             token_file = Path.home() / ".truenas-mcp" / "token.txt"
-            token_file.parent.mkdir(exist_ok=True, mode=0o700)
-
-            # Use os.open with proper permissions to avoid race condition
-            # File is created with 0o600 permissions atomically
-            fd = os.open(str(token_file), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
-            try:
-                with os.fdopen(fd, "w") as f:
-                    f.write(data.get("access_token"))
-            except (OSError, IOError):
-                os.close(fd)
-                raise
-
+            _save_token_securely(token_file, data.get("access_token"))
             console.print(f"[green]Token saved to: {token_file}[/green]")
 
         else:

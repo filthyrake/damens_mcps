@@ -13,8 +13,6 @@ import stat
 import tempfile
 from pathlib import Path
 
-import pytest
-
 
 class TestHttpCliTokenFileSecurityPattern:
     """Test token file security pattern matching http_cli.py implementation."""
