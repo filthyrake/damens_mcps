@@ -42,14 +42,17 @@ def list(ctx):
 @click.argument('name')
 @click.argument('host')
 @click.argument('username')
-@click.argument('password')
 @click.option('--port', default=443, help='iDRAC port')
 @click.option('--protocol', default='https', help='Protocol (http/https)')
 @click.option('--ssl-verify/--no-ssl-verify', default=False, help='Verify SSL certificates')
 @click.pass_context
-def add(ctx, name, host, username, password, port, protocol, ssl_verify):
-    """Add a server to the fleet."""
+def add(ctx, name, host, username, port, protocol, ssl_verify):
+    """Add a server to the fleet (password will be prompted securely)."""
     manager = ctx.obj['manager']
+    
+    # Securely prompt for password
+    password = click.prompt("Enter iDRAC password", hide_input=True, confirmation_prompt=True)
+    
     manager.add_server(name, host, username, password, port, protocol, ssl_verify)
     click.echo(f"✅ Added server '{name}'")
 
