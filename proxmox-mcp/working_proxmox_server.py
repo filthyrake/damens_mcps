@@ -37,6 +37,7 @@ try:
         ProxmoxResourceNotFoundError
     )
     from src.proxmox_client import ProxmoxClient
+    from src.secure_config import SecureConfigManager
 except ImportError:
     # Fall back to sys.path modification for direct execution
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -53,6 +54,7 @@ except ImportError:
             ProxmoxResourceNotFoundError
         )
         from proxmox_client import ProxmoxClient
+        from secure_config import SecureConfigManager
     except ImportError as e:
         # Fail fast only if both import strategies fail
         print(f"CRITICAL ERROR: Failed to import required modules: {e}", file=sys.stderr)
@@ -66,7 +68,7 @@ def debug_print(message: str):
 
 
 def load_config() -> Dict[str, Any]:
-    """Load configuration from JSON file."""
+    """Load configuration from JSON file, supporting both plaintext and encrypted passwords."""
     # Try multiple possible config file locations
     possible_paths = [
         'config.json',  # Current directory
@@ -85,15 +87,45 @@ def load_config() -> Dict[str, Any]:
 
     debug_print(f"Using config file: {config_path}")
 
-    try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        debug_print(f"Configuration loaded successfully from: {config_path}")
-        return config
-    except json.JSONDecodeError as e:
-        raise ProxmoxConfigurationError(f"Invalid JSON in config file {config_path}: {e}")
-    except OSError as e:
-        raise ProxmoxConfigurationError(f"Failed to read config file {config_path}: {e}")
+    # Check if config uses encrypted password storage
+    from pathlib import Path
+    if SecureConfigManager.is_encrypted_config(Path(config_path)):
+        # Load encrypted config
+        debug_print("Detected encrypted configuration")
+        
+        # Get master password from environment variable
+        master_password = os.environ.get('PROXMOX_MASTER_PASSWORD')
+        if not master_password:
+            raise ProxmoxConfigurationError(
+                "Encrypted configuration detected but PROXMOX_MASTER_PASSWORD environment variable not set.\n"
+                "Please set the master password: export PROXMOX_MASTER_PASSWORD='your-password'"
+            )
+        
+        try:
+            manager = SecureConfigManager(config_file=config_path, master_password=master_password)
+            config = manager.load_config()
+            debug_print(f"Encrypted configuration loaded successfully from: {config_path}")
+            return config
+        except ValueError as e:
+            raise ProxmoxConfigurationError(f"Failed to decrypt configuration: {e}")
+    else:
+        # Load plaintext config (legacy format)
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            debug_print(f"Configuration loaded successfully from: {config_path}")
+            
+            # Show warning if using plaintext password
+            if 'password' in config:
+                debug_print("⚠️  WARNING: Configuration uses PLAINTEXT password storage!")
+                debug_print("⚠️  This is a SECURITY RISK. Please migrate to encrypted storage.")
+                debug_print("⚠️  Run: python migrate_config.py")
+            
+            return config
+        except json.JSONDecodeError as e:
+            raise ProxmoxConfigurationError(f"Invalid JSON in config file {config_path}: {e}")
+        except OSError as e:
+            raise ProxmoxConfigurationError(f"Failed to read config file {config_path}: {e}")
 
 
 def main():
