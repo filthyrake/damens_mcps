@@ -75,7 +75,7 @@ class TrueNASClient:
             )
         
         # Create retry decorator
-        self.retry_decorator = create_retry_decorator(
+        retry_decorator = create_retry_decorator(
             max_attempts=self.config.retry_max_attempts,
             min_wait=self.config.retry_min_wait,
             max_wait=self.config.retry_max_wait,
@@ -87,6 +87,8 @@ class TrueNASClient:
                 aiohttp.ClientConnectorError,
             )
         )
+        # Apply decorator once during initialization for efficiency
+        self._retried_execute_request = retry_decorator(self._execute_request)
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -259,8 +261,8 @@ class TrueNASClient:
         url = urljoin(self.config.base_url, endpoint)
         headers = self._get_headers()
         
-        # Apply retry decorator to the request execution
-        retried_request = self.retry_decorator(self._execute_request)
+        # Use pre-decorated request execution (applied once in __init__)
+        retried_request = self._retried_execute_request
         
         # Apply circuit breaker if enabled
         if self.config.circuit_breaker_enabled and self.circuit_breaker:

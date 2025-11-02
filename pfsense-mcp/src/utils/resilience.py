@@ -23,12 +23,10 @@ import pybreaker
 
 try:
     from .logging import get_logger
+    logger = get_logger(__name__)
 except ImportError:
     import logging
-    def get_logger(name):
-        return logging.getLogger(name)
-
-logger = get_logger(__name__)
+    logger = logging.getLogger(__name__)
 
 
 # Default retry configuration
@@ -128,6 +126,7 @@ def create_circuit_breaker(
     # Add listeners
     breaker.add_listener(on_open)
     breaker.add_listener(on_close)
+    breaker.add_listener(on_half_open)
     
     return breaker
 
@@ -157,10 +156,12 @@ async def _call_with_circuit_breaker_async(
         # Check if exception should be excluded
         excluded = breaker._excluded_exceptions
         if excluded:
-            # excluded might be a tuple or list of exception classes
-            if not isinstance(excluded, (tuple, list)):
+            # Convert to tuple if it's a list (pybreaker stores as list)
+            if isinstance(excluded, list):
+                excluded = tuple(excluded)
+            elif not isinstance(excluded, tuple):
                 excluded = (excluded,)
-            if isinstance(e, tuple(excluded)):
+            if isinstance(e, excluded):
                 raise
         # Failure - notify the breaker
         with breaker._lock:

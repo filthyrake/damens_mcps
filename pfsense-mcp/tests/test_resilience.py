@@ -1,8 +1,6 @@
 """Tests for resilience utilities (retry logic and circuit breaker)."""
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
 import aiohttp
 
 from src.utils.resilience import (
