@@ -149,12 +149,24 @@ nano .env
 ### 5. Install Pre-commit Hooks
 
 ```bash
-# Install pre-commit
-pip install pre-commit
+# Install pre-commit and detect-secrets
+pip install pre-commit detect-secrets
 
 # Install the hooks
 pre-commit install
+
+# Run hooks on all files to verify setup
+pre-commit run --all-files
 ```
+
+**Important Security Hooks:**
+- `detect-secrets` - Scans for API keys, passwords, and tokens
+- `detect-private-key` - Prevents SSH keys from being committed
+- `block-env-files` - Prevents .env files from being committed
+
+These hooks will **automatically block commits** that contain credentials or sensitive files.
+
+**Note**: The `.secrets.baseline` file contains known false positives (like example credentials in documentation). If `detect-secrets` flags a false positive, you can update the baseline with `detect-secrets scan --update .secrets.baseline`.
 
 ### 6. Verify Setup
 

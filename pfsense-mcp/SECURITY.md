@@ -54,6 +54,15 @@ chmod 600 .env
 chmod 600 config.json
 ```
 
+**⚠️ If You Accidentally Commit Credentials:**
+
+If you accidentally commit credentials to git, **immediately**:
+1. Rotate the exposed credentials on pfSense
+2. Follow the [Security Incident Response Guide](../SECURITY_INCIDENT_RESPONSE.md)
+3. Do NOT commit new credentials as a "fix"
+
+See the repository root [SECURITY_INCIDENT_RESPONSE.md](../SECURITY_INCIDENT_RESPONSE.md) for detailed remediation procedures including removing credentials from git history.
+
 ### SSL/TLS Configuration
 
 #### Production Requirements

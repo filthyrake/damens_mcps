@@ -1,34 +1,40 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 24.1.1
+  # Use local system tools to avoid network timeouts
+  - repo: local
     hooks:
       - id: black
-        language_version: python3.12
+        name: black
+        entry: black
+        language: system
+        types: [python]
         args: ['--line-length=120']
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
+      
       - id: isort
+        name: isort
+        entry: isort
+        language: system
+        types: [python]
         args: ['--profile', 'black', '--line-length', '120']
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
+      
       - id: flake8
+        name: flake8
+        entry: flake8
+        language: system
+        types: [python]
         args: ['--max-line-length=120', '--extend-ignore=E203,W503']
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
-    hooks:
+      
       - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
         args: ['--ignore-missing-imports', '--no-strict-optional']
-        additional_dependencies: []
-
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.6
-    hooks:
+      
       - id: bandit
+        name: bandit
+        entry: bandit
+        language: system
+        types: [python]
         args: ['-ll']
         exclude: ^tests/
 
@@ -36,10 +42,43 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
       - id: check-added-large-files
+        stages: [pre-commit]
       - id: check-json
+        stages: [pre-commit]
       - id: check-toml
+        stages: [pre-commit]
       - id: check-merge-conflict
+        stages: [pre-commit]
       - id: detect-private-key
+        stages: [pre-commit]
+      - id: forbid-new-submodules
+        stages: [pre-commit]
+      - id: no-commit-to-branch
+        args: ['--branch', 'main', '--branch', 'master']
+        stages: [pre-commit]
+
+  # Additional security checks
+  - repo: local
+    hooks:
+      # Detect secrets like API keys, passwords, and tokens
+      - id: detect-secrets
+        name: detect-secrets
+        entry: detect-secrets-hook
+        language: system
+        types: [text]
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package-lock.json
+      
+      # Prevent .env files from being committed
+      - id: block-env-files
+        name: Block .env files
+        entry: .env files should never be committed - use .env.example instead
+        language: fail
+        files: '^.*\.env$'
+        exclude: '^.*\.env\.example$|^.*env\.example$'
