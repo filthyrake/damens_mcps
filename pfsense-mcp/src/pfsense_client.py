@@ -15,6 +15,7 @@ try:
     from .auth import PfSenseAuth, PfSenseAuthError
     from .utils.logging import get_logger
     from .utils.validation import validate_config, validate_ip_address
+    from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
     from .exceptions import (
         PfSenseAPIError,
         PfSenseConnectionError,
@@ -26,6 +27,7 @@ except ImportError:
     from auth import PfSenseAuth, PfSenseAuthError
     from utils.logging import get_logger
     from utils.validation import validate_config, validate_ip_address
+    from utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
     from exceptions import (
         PfSenseAPIError,
         PfSenseConnectionError,
@@ -67,6 +69,44 @@ class HTTPPfSenseClient:
         # Can be overridden via config if pfSense uses different expiry
         self.jwt_token_lifetime = int(config.get("jwt_token_lifetime", DEFAULT_JWT_TOKEN_LIFETIME))
         self.jwt_token_refresh_buffer = int(config.get("jwt_token_refresh_buffer", DEFAULT_JWT_TOKEN_REFRESH_BUFFER))
+        
+        # Timeout configuration (seconds, accepts float for sub-second precision)
+        self.timeout = aiohttp.ClientTimeout(total=config.get("timeout", 30))
+        
+        # Connection pooling configuration
+        self.connector_limit = int(config.get("connector_limit", 100))
+        self.connector_limit_per_host = int(config.get("connector_limit_per_host", 30))
+        
+        # Retry configuration
+        self.retry_max_attempts = int(config.get("retry_max_attempts", 3))
+        self.retry_min_wait = float(config.get("retry_min_wait", 1.0))
+        self.retry_max_wait = float(config.get("retry_max_wait", 10.0))
+        
+        # Circuit breaker configuration
+        self.circuit_breaker_enabled = config.get("circuit_breaker_enabled", True)
+        self.circuit_breaker = None
+        if self.circuit_breaker_enabled:
+            self.circuit_breaker = create_circuit_breaker(
+                fail_max=int(config.get("circuit_breaker_fail_max", 5)),
+                timeout_duration=int(config.get("circuit_breaker_timeout", 60)),
+                name="pfsense_api"
+            )
+        
+        # Create retry decorator
+        retry_decorator = create_retry_decorator(
+            max_attempts=self.retry_max_attempts,
+            min_wait=self.retry_min_wait,
+            max_wait=self.retry_max_wait,
+            retry_exceptions=(
+                PfSenseConnectionError,
+                PfSenseTimeoutError,
+                aiohttp.ClientError,
+                aiohttp.ServerTimeoutError,
+                aiohttp.ClientConnectorError,
+            )
+        )
+        # Apply decorator once during initialization for efficiency
+        self._retried_execute_request = retry_decorator(self._execute_request)
     
     def _token_expired(self) -> bool:
         """
@@ -127,19 +167,24 @@ class HTTPPfSenseClient:
                 logger.warning(f"JWT token acquisition attempt {attempt + 1}/{max_retries} failed: {e}, retrying in {backoff_delay}s...")
                 await asyncio.sleep(backoff_delay)
     
-    async def _make_request(
+    async def _execute_request(
         self, 
         method: str, 
-        endpoint: str, 
+        url: str,
+        headers: Dict[str, str],
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Make an HTTP request to the pfSense API.
+        Execute the actual HTTP request (internal method with retry logic).
+        
+        This method is decorated with retry logic and should not be called directly.
+        Use _make_request instead.
         
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
-            endpoint: API endpoint path
+            url: Full URL
+            headers: Request headers
             data: Request body data
             params: Query parameters
             
@@ -148,21 +193,9 @@ class HTTPPfSenseClient:
             
         Raises:
             PfSenseAPIError: If the request fails
+            PfSenseConnectionError: If connection fails
+            PfSenseTimeoutError: If request times out
         """
-        if not self.session:
-            self.session = await self.auth.create_session()
-        
-        # Ensure we have a valid JWT token (if applicable)
-        await self._ensure_valid_token()
-        
-        url = urljoin(self.base_url, endpoint)
-        
-        # Use JWT headers if we have a token, otherwise use original auth
-        if self.jwt_token:
-            headers = self.auth.get_jwt_headers(self.jwt_token)
-        else:
-            headers = self.auth.get_auth_headers()
-        
         try:
             async with self.session.request(
                 method=method,
@@ -170,7 +203,8 @@ class HTTPPfSenseClient:
                 headers=headers,
                 json=data if data else None,
                 params=params,
-                allow_redirects=False
+                allow_redirects=False,
+                timeout=self.timeout
             ) as response:
                 response_text = await response.text()
                 
@@ -206,6 +240,76 @@ class HTTPPfSenseClient:
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}", exc_info=True)
             raise PfSenseAPIError(f"Invalid JSON response: {str(e)}") from e
+    
+    async def _make_request(
+        self, 
+        method: str, 
+        endpoint: str, 
+        data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Make an HTTP request to the pfSense API with retry logic and circuit breaker.
+        
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            endpoint: API endpoint path
+            data: Request body data
+            params: Query parameters
+            
+        Returns:
+            API response as dictionary
+            
+        Raises:
+            PfSenseAPIError: If the request fails
+            PfSenseConnectionError: If connection fails
+            PfSenseTimeoutError: If request times out
+        """
+        if not self.session:
+            # Create session with connection pooling and proper SSL configuration
+            # Use auth manager's SSL context for proper certificate handling
+            import ssl
+            ssl_context = None
+            if self.auth.protocol == "https":
+                ssl_context = ssl.create_default_context()
+                if not self.auth.ssl_verify:
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(
+                ssl=ssl_context,
+                limit=self.connector_limit,
+                limit_per_host=self.connector_limit_per_host,
+                ttl_dns_cache=300
+            )
+            self.session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=self.timeout
+            )
+        
+        # Ensure we have a valid JWT token (if applicable)
+        await self._ensure_valid_token()
+        
+        url = urljoin(self.base_url, endpoint)
+        
+        # Use JWT headers if we have a token, otherwise use original auth
+        if self.jwt_token:
+            headers = self.auth.get_jwt_headers(self.jwt_token)
+        else:
+            headers = self.auth.get_auth_headers()
+        
+        # Use pre-decorated request execution (applied once in __init__)
+        retried_request = self._retried_execute_request
+        
+        # Apply circuit breaker if enabled
+        if self.circuit_breaker_enabled and self.circuit_breaker:
+            result = await call_with_circuit_breaker_async(
+                self.circuit_breaker, retried_request, method, url, headers, data, params
+            )
+        else:
+            result = await retried_request(method, url, headers, data, params)
+        
+        return result
     
     async def get_system_info(self) -> Dict[str, Any]:
         """Get system information."""

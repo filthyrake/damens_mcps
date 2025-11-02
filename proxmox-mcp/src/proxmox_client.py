@@ -31,6 +31,7 @@ from .exceptions import (
     ProxmoxResourceNotFoundError,
     ProxmoxConfigurationError
 )
+from .utils.resilience import create_circuit_breaker, create_retry_decorator
 
 
 def debug_print(message: str):
@@ -112,6 +113,38 @@ class ProxmoxClient:
             'Accept': 'application/json',
             'User-Agent': 'Proxmox-MCP-Server/1.0'
         })
+        
+        # Timeout configuration (seconds)
+        self.timeout = 30
+        
+        # Retry configuration
+        self.retry_max_attempts = 3
+        self.retry_min_wait = 1.0
+        self.retry_max_wait = 10.0
+        
+        # Circuit breaker configuration
+        self.circuit_breaker_enabled = True
+        self.circuit_breaker = create_circuit_breaker(
+            fail_max=5,
+            timeout_duration=60,
+            name=f"proxmox_{host}"
+        )
+        
+        # Create retry decorator (for synchronous requests)
+        retry_decorator = create_retry_decorator(
+            max_attempts=self.retry_max_attempts,
+            min_wait=self.retry_min_wait,
+            max_wait=self.retry_max_wait,
+            retry_exceptions=(
+                ProxmoxConnectionError,
+                ProxmoxTimeoutError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.RequestException,
+            )
+        )
+        # Apply decorator once during initialization for efficiency
+        self._retried_execute_request = retry_decorator(self._execute_request)
 
         # Get authentication ticket
         self._authenticate()
@@ -177,11 +210,29 @@ class ProxmoxClient:
             debug_print(f"Missing expected field in authentication response: {e}")
             raise ProxmoxAPIError(f"Invalid authentication response format: {e}") from e
 
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
-        """Make a request with proper error handling and debugging."""
-        url = f"{self.base_url}{endpoint}"
-        debug_print(f"Making {method} request to: {endpoint}")
+    def _execute_request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """
+        Execute the actual HTTP request (internal method with retry logic).
         
+        This method is decorated with retry logic and should not be called directly.
+        Use _make_request instead.
+        
+        Args:
+            method: HTTP method
+            url: Full URL
+            **kwargs: Additional arguments to pass to requests
+            
+        Returns:
+            Response object
+            
+        Raises:
+            ProxmoxValidationError: If method is invalid
+            ProxmoxConnectionError: If connection fails
+            ProxmoxTimeoutError: If request times out
+            ProxmoxAuthenticationError: If authentication fails
+            ProxmoxResourceNotFoundError: If resource not found
+            ProxmoxAPIError: If API returns error
+        """
         # Method mapping for cleaner code
         method_handlers = {
             'GET': self.session.get,
@@ -195,32 +246,63 @@ class ProxmoxClient:
             if handler is None:
                 raise ProxmoxValidationError(f"Unsupported HTTP method: {method}")
             
+            # Add timeout if not specified
+            if 'timeout' not in kwargs:
+                kwargs['timeout'] = self.timeout
+            
             # Context-specific warning suppression - only suppress when SSL verification is disabled
             with suppress_insecure_request_warning(self.ssl_verify):
                 response = handler(url, **kwargs)
                 response.raise_for_status()
             return response
         except requests.exceptions.ConnectionError as e:
-            debug_print(f"Connection error for {method} {endpoint}: {e}")
+            debug_print(f"Connection error for {method} {url}: {e}")
             raise ProxmoxConnectionError(f"Failed to connect to Proxmox: {e}") from e
         except requests.exceptions.Timeout as e:
-            debug_print(f"Request timeout for {method} {endpoint}: {e}")
+            debug_print(f"Request timeout for {method} {url}: {e}")
             raise ProxmoxTimeoutError(f"Request timed out: {e}") from e
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                debug_print(f"Authentication error for {method} {endpoint}: {e}")
+                debug_print(f"Authentication error for {method} {url}: {e}")
                 raise ProxmoxAuthenticationError(f"Authentication required: {e}") from e
             elif e.response.status_code == 404:
-                debug_print(f"Resource not found for {method} {endpoint}: {e}")
+                debug_print(f"Resource not found for {method} {url}: {e}")
                 raise ProxmoxResourceNotFoundError(f"Resource not found: {e}") from e
             else:
-                debug_print(f"HTTP error for {method} {endpoint}: {e}")
+                debug_print(f"HTTP error for {method} {url}: {e}")
                 raise ProxmoxAPIError(f"HTTP error {e.response.status_code}: {e}") from e
         except requests.exceptions.RequestException as e:
-            debug_print(f"Request error for {method} {endpoint}: {e}")
+            debug_print(f"Request error for {method} {url}: {e}")
             raise ProxmoxConnectionError(f"Request error: {e}") from e
         except (ProxmoxValidationError, ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxResourceNotFoundError, ProxmoxAPIError):
             raise
+    
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """Make a request with retry logic and circuit breaker.
+        
+        Args:
+            method: HTTP method
+            endpoint: API endpoint
+            **kwargs: Additional arguments to pass to requests
+            
+        Returns:
+            Response object
+        """
+        url = f"{self.base_url}{endpoint}"
+        debug_print(f"Making {method} request to: {endpoint}")
+        
+        # Use pre-decorated request execution (applied once in __init__)
+        retried_request = self._retried_execute_request
+        
+        # Apply circuit breaker if enabled
+        if self.circuit_breaker_enabled and self.circuit_breaker:
+            result = self.circuit_breaker.call(
+                retried_request, method, url, **kwargs
+            )
+        else:
+            result = retried_request(method, url, **kwargs)
+        
+        return result
 
     def test_connection(self) -> Dict[str, Any]:
         """Test connection to Proxmox."""

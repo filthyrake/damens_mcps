@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from .auth import AuthManager
 from .utils.validation import validate_id, validate_dataset_name
+from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
 from .exceptions import (
     TrueNASError,
     TrueNASConnectionError,
@@ -32,6 +33,15 @@ class TrueNASConfig(BaseModel):
     username: Optional[str] = Field(None, description="Username for authentication")
     password: Optional[str] = Field(None, description="Password for authentication")
     verify_ssl: bool = Field(True, description="Whether to verify SSL certificates")
+    timeout: int = Field(30, description="Request timeout in seconds")
+    connector_limit: int = Field(100, description="Total connection pool size")
+    connector_limit_per_host: int = Field(30, description="Per-host connection limit")
+    retry_max_attempts: int = Field(3, description="Maximum retry attempts")
+    retry_min_wait: float = Field(1.0, description="Minimum wait between retries (seconds)")
+    retry_max_wait: float = Field(10.0, description="Maximum wait between retries (seconds)")
+    circuit_breaker_enabled: bool = Field(True, description="Enable circuit breaker")
+    circuit_breaker_fail_max: int = Field(5, description="Failures before opening circuit")
+    circuit_breaker_timeout: int = Field(60, description="Circuit breaker timeout (seconds)")
     
     @property
     def base_url(self) -> str:
@@ -54,6 +64,33 @@ class TrueNASClient:
         self.auth_manager = auth_manager
         self.session: Optional[aiohttp.ClientSession] = None
         self._auth_token: Optional[str] = None
+        
+        # Create circuit breaker if enabled
+        self.circuit_breaker = None
+        if self.config.circuit_breaker_enabled:
+            self.circuit_breaker = create_circuit_breaker(
+                fail_max=self.config.circuit_breaker_fail_max,
+                timeout_duration=self.config.circuit_breaker_timeout,
+                name="truenas_api"
+            )
+        
+        # Create retry decorator with TrueNAS-specific exceptions
+        # Explicitly specify custom exceptions including TrueNAS-specific error types
+        # for consistent exception handling across the client
+        retry_decorator = create_retry_decorator(
+            max_attempts=self.config.retry_max_attempts,
+            min_wait=self.config.retry_min_wait,
+            max_wait=self.config.retry_max_wait,
+            retry_exceptions=(
+                TrueNASConnectionError,
+                TrueNASTimeoutError,
+                aiohttp.ClientError,
+                aiohttp.ServerTimeoutError,
+                aiohttp.ClientConnectorError,
+            )
+        )
+        # Apply decorator once during initialization for efficiency
+        self._retried_execute_request = retry_decorator(self._execute_request)
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -67,8 +104,19 @@ class TrueNASClient:
     async def connect(self) -> None:
         """Establish connection to TrueNAS."""
         if self.session is None:
-            connector = aiohttp.TCPConnector(verify_ssl=self.config.verify_ssl)
-            self.session = aiohttp.ClientSession(connector=connector)
+            # Create connector with connection pooling
+            connector = aiohttp.TCPConnector(
+                verify_ssl=self.config.verify_ssl,
+                limit=self.config.connector_limit,
+                limit_per_host=self.config.connector_limit_per_host,
+                ttl_dns_cache=300
+            )
+            # Create session with timeout
+            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+            self.session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=timeout
+            )
             
             # Authenticate if needed
             if not self.config.api_key:
@@ -132,6 +180,65 @@ class TrueNASClient:
         
         return headers
     
+    async def _execute_request(
+        self, 
+        method: str, 
+        url: str,
+        headers: Dict[str, str],
+        data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute the actual HTTP request (internal method with retry logic).
+        
+        This method is decorated with retry logic and should not be called directly.
+        Use _make_request instead.
+        
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            url: Full URL
+            headers: Request headers
+            data: Request data for POST/PUT requests
+            params: Query parameters
+            
+        Returns:
+            API response data
+        """
+        try:
+            async with self.session.request(
+                method, url, json=data, params=params, headers=headers
+            ) as response:
+                if response.status >= 400:
+                    error_text = await response.text()
+                    if response.status == 401:
+                        logger.error(f"Authentication error for {method} {url}: {error_text}", exc_info=True)
+                        raise TrueNASAuthenticationError(f"Authentication failed: {error_text}")
+                    elif response.status == 404:
+                        logger.error(f"Resource not found for {method} {url}: {error_text}", exc_info=True)
+                        raise TrueNASAPIError(f"Resource not found: {error_text}")
+                    else:
+                        logger.error(f"API request failed for {method} {url}: {response.status} - {error_text}", exc_info=True)
+                        raise TrueNASAPIError(f"API request failed: {response.status} - {error_text}")
+                
+                return await response.json()
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"Connection error for {method} {url}: {e}", exc_info=True)
+            raise TrueNASConnectionError(f"Failed to connect to TrueNAS: {str(e)}") from e
+        except aiohttp.ServerTimeoutError as e:
+            logger.error(f"Request timeout for {method} {url}: {e}", exc_info=True)
+            raise TrueNASTimeoutError(f"Request timed out: {str(e)}") from e
+        except aiohttp.ClientError as e:
+            logger.error(f"Network error for {method} {url}: {e}", exc_info=True)
+            raise TrueNASConnectionError(f"Network error: {str(e)}") from e
+        except (TrueNASAuthenticationError, TrueNASAPIError, TrueNASConnectionError, TrueNASTimeoutError):
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response for {method} {url}: {e}", exc_info=True)
+            raise TrueNASAPIError(f"Invalid JSON response: {str(e)}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error for {method} {url}: {e}", exc_info=True)
+            raise TrueNASError(f"Unexpected request error: {str(e)}") from e
+    
     async def _make_request(
         self, 
         method: str, 
@@ -139,7 +246,7 @@ class TrueNASClient:
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Make a request to the TrueNAS API.
+        """Make a request to the TrueNAS API with retry logic and circuit breaker.
         
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
@@ -156,40 +263,18 @@ class TrueNASClient:
         url = urljoin(self.config.base_url, endpoint)
         headers = self._get_headers()
         
-        try:
-            async with self.session.request(
-                method, url, json=data, params=params, headers=headers
-            ) as response:
-                if response.status >= 400:
-                    error_text = await response.text()
-                    if response.status == 401:
-                        logger.error(f"Authentication error for {method} {endpoint}: {error_text}", exc_info=True)
-                        raise TrueNASAuthenticationError(f"Authentication failed: {error_text}")
-                    elif response.status == 404:
-                        logger.error(f"Resource not found for {method} {endpoint}: {error_text}", exc_info=True)
-                        raise TrueNASAPIError(f"Resource not found: {error_text}")
-                    else:
-                        logger.error(f"API request failed for {method} {endpoint}: {response.status} - {error_text}", exc_info=True)
-                        raise TrueNASAPIError(f"API request failed: {response.status} - {error_text}")
-                
-                return await response.json()
-        except aiohttp.ClientConnectorError as e:
-            logger.error(f"Connection error for {method} {endpoint}: {e}", exc_info=True)
-            raise TrueNASConnectionError(f"Failed to connect to TrueNAS: {str(e)}") from e
-        except aiohttp.ServerTimeoutError as e:
-            logger.error(f"Request timeout for {method} {endpoint}: {e}", exc_info=True)
-            raise TrueNASTimeoutError(f"Request timed out: {str(e)}") from e
-        except aiohttp.ClientError as e:
-            logger.error(f"Network error for {method} {endpoint}: {e}", exc_info=True)
-            raise TrueNASConnectionError(f"Network error: {str(e)}") from e
-        except (TrueNASAuthenticationError, TrueNASAPIError, TrueNASConnectionError, TrueNASTimeoutError):
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response for {method} {endpoint}: {e}", exc_info=True)
-            raise TrueNASAPIError(f"Invalid JSON response: {str(e)}") from e
-        except Exception as e:
-            logger.error(f"Unexpected error for {method} {endpoint}: {e}", exc_info=True)
-            raise TrueNASError(f"Unexpected request error: {str(e)}") from e
+        # Use pre-decorated request execution (applied once in __init__)
+        retried_request = self._retried_execute_request
+        
+        # Apply circuit breaker if enabled
+        if self.config.circuit_breaker_enabled and self.circuit_breaker:
+            result = await call_with_circuit_breaker_async(
+                self.circuit_breaker, retried_request, method, url, headers, data, params
+            )
+        else:
+            result = await retried_request(method, url, headers, data, params)
+        
+        return result
     
     # System Information Methods
     
