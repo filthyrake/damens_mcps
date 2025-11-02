@@ -57,6 +57,14 @@ except ImportError:
             )
             return func
         return decorator
+    
+    async def call_with_circuit_breaker_async(circuit_breaker, func, *args, **kwargs):
+        """Stub for async circuit breaker - resilience features disabled."""
+        logger.warning(
+            "call_with_circuit_breaker_async called, but resilience features are disabled. "
+            "Install tenacity and pybreaker for full functionality."
+        )
+        return await func(*args, **kwargs)
 
 # Initialize logger
 try:

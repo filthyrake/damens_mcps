@@ -75,7 +75,7 @@ class TrueNASClient:
             )
         
         # Create retry decorator with TrueNAS-specific exceptions
-        # Override default exceptions to include TrueNAS-specific error types
+        # Explicitly specify custom exceptions including TrueNAS-specific error types
         # for consistent exception handling across the client
         retry_decorator = create_retry_decorator(
             max_attempts=self.config.retry_max_attempts,

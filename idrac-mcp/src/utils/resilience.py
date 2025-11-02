@@ -81,6 +81,25 @@ def create_retry_decorator(
     )
 
 
+def _normalize_exception_types(exceptions):
+    """
+    Normalize exception types to a tuple for isinstance() checking.
+    
+    Args:
+        exceptions: Exception type(s) - can be None, single type, list, or tuple
+        
+    Returns:
+        Tuple of exception types, or None if input is None/empty
+    """
+    if not exceptions:
+        return None
+    if isinstance(exceptions, list):
+        return tuple(exceptions)
+    elif not isinstance(exceptions, tuple):
+        return (exceptions,)
+    return exceptions
+
+
 def create_circuit_breaker(
     fail_max: int = DEFAULT_CIRCUIT_BREAKER_FAILURES,
     timeout_duration: int = DEFAULT_CIRCUIT_BREAKER_TIMEOUT,
@@ -166,25 +185,25 @@ async def call_with_circuit_breaker_async(
         # NOTE: Direct access to _lock and _state is required due to pybreaker's
         # incomplete async support. The call_async method has compatibility issues
         # with modern asyncio. Tested with pybreaker>=1.0.0,<2.0.0.
-        with breaker._lock:
-            breaker._state.on_success()
+        try:
+            with breaker._lock:
+                breaker._state.on_success()
+        except AttributeError as attr_err:
+            logger.warning(f"pybreaker internal API changed: {attr_err}. Circuit breaker state update failed.")
         return result
     except Exception as e:
         # Check if exception should be excluded
-        excluded = breaker._excluded_exceptions
-        if excluded:
-            # Convert to tuple if it's a list (pybreaker stores as list)
-            if isinstance(excluded, list):
-                excluded = tuple(excluded)
-            elif not isinstance(excluded, tuple):
-                excluded = (excluded,)
-            if isinstance(e, excluded):
-                raise
+        excluded = _normalize_exception_types(breaker._excluded_exceptions)
+        if excluded and isinstance(e, excluded):
+            raise
         # Failure - notify the breaker
         # NOTE: Direct access to _lock and _state is required due to pybreaker's
         # incomplete async support. Tested with pybreaker>=1.0.0,<2.0.0.
-        with breaker._lock:
-            breaker._state.on_failure(e)
+        try:
+            with breaker._lock:
+                breaker._state.on_failure(e)
+        except AttributeError as attr_err:
+            logger.warning(f"pybreaker internal API changed: {attr_err}. Circuit breaker state update failed.")
         raise
 
 

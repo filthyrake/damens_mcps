@@ -181,9 +181,9 @@ client = ProxmoxClient(
 | `retry_min_wait` | float \| int | 1.0 | Minimum wait between retries (seconds) |
 | `retry_max_wait` | float \| int | 10.0 | Maximum wait between retries (seconds) |
 
-**Exponential Backoff Formula:** `wait = min(retry_max_wait, max(retry_min_wait, multiplier * 2^attempt))`
+**Exponential Backoff Formula:** `wait = min(retry_max_wait, max(retry_min_wait, multiplier * (2 ** attempt_number)))`
 
-where `multiplier` defaults to 1. The min/max constraints are applied after the exponential calculation.
+where `multiplier` defaults to 1. The calculation is: first raise 2 to the power of the attempt number, multiply by the multiplier, then clamp the result between min and max wait values.
 
 ### Circuit Breaker Parameters
 
