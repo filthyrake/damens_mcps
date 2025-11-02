@@ -183,7 +183,3 @@ class TestHttpCliTokenFileSecurityPattern:
             assert (
                 file_mode == 0o600
             ), f"File should have 0o600 permissions, got {oct(file_mode)}"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
