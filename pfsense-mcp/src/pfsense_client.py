@@ -266,8 +266,18 @@ class HTTPPfSenseClient:
             PfSenseTimeoutError: If request times out
         """
         if not self.session:
-            # Create session with connection pooling
+            # Create session with connection pooling and proper SSL configuration
+            # Use auth manager's SSL context for proper certificate handling
+            import ssl
+            ssl_context = None
+            if self.auth.protocol == "https":
+                ssl_context = ssl.create_default_context()
+                if not self.auth.ssl_verify:
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+            
             connector = aiohttp.TCPConnector(
+                ssl=ssl_context,
                 limit=self.connector_limit,
                 limit_per_host=self.connector_limit_per_host,
                 ttl_dns_cache=300

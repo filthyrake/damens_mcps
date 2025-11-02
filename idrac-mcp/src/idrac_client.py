@@ -19,6 +19,10 @@ except ImportError:
     # Fallback for direct execution
     import logging
     logger = logging.getLogger(__name__)
+    logger.warning(
+        "Resilience utilities not available - retry logic and circuit breaker disabled. "
+        "Install dependencies: pip install tenacity pybreaker"
+    )
     
     def validate_idrac_config(config):
         """Basic config validation."""
@@ -37,11 +41,11 @@ except ImportError:
         return config
     
     def create_circuit_breaker(**kwargs):
-        """Stub for circuit breaker."""
+        """Stub for circuit breaker - resilience features disabled."""
         return None
     
     def create_retry_decorator(**kwargs):
-        """Stub for retry decorator."""
+        """Stub for retry decorator - resilience features disabled."""
         def decorator(func):
             return func
         return decorator

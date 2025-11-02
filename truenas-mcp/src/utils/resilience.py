@@ -42,9 +42,9 @@ DEFAULT_CIRCUIT_BREAKER_TIMEOUT = 60  # seconds
 
 def create_retry_decorator(
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-    min_wait: int = DEFAULT_RETRY_MIN_WAIT,
-    max_wait: int = DEFAULT_RETRY_MAX_WAIT,
-    multiplier: int = DEFAULT_RETRY_MULTIPLIER,
+    min_wait: float = DEFAULT_RETRY_MIN_WAIT,
+    max_wait: float = DEFAULT_RETRY_MAX_WAIT,
+    multiplier: float = DEFAULT_RETRY_MULTIPLIER,
     retry_exceptions: Optional[Tuple[Type[Exception], ...]] = None
 ) -> Callable:
     """
@@ -149,6 +149,9 @@ async def _call_with_circuit_breaker_async(
     try:
         result = await func(*args, **kwargs)
         # Success - notify the breaker (it will close if in half-open state)
+        # NOTE: Direct access to _lock and _state is required due to pybreaker's
+        # incomplete async support. The call_async method has compatibility issues
+        # with modern asyncio. This is compatible with pybreaker>=1.0.0.
         with breaker._lock:
             breaker._state.on_success()
         return result
@@ -164,6 +167,8 @@ async def _call_with_circuit_breaker_async(
             if isinstance(e, excluded):
                 raise
         # Failure - notify the breaker
+        # NOTE: Direct access to _lock and _state is required due to pybreaker's
+        # incomplete async support. Compatible with pybreaker>=1.0.0.
         with breaker._lock:
             breaker._state.on_failure(e)
         raise
