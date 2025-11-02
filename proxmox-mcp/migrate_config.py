@@ -11,6 +11,7 @@ Usage:
 import argparse
 import getpass
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -140,10 +141,10 @@ def main():
         print()
         print("Next steps:")
         print("  1. Test the encrypted config:")
-        print(f"     PROXMOX_MASTER_PASSWORD='{master_password}' python working_proxmox_server.py")
+        print(f"     PROXMOX_MASTER_PASSWORD='<your-master-password>' python working_proxmox_server.py")
         print()
         print("  2. For production use, set the master password via environment variable:")
-        print("     export PROXMOX_MASTER_PASSWORD='your-master-password'")
+        print("     export PROXMOX_MASTER_PASSWORD='<your-master-password>'")
         print()
         
         if args.backup:
@@ -155,5 +156,4 @@ def main():
 
 
 if __name__ == '__main__':
-    import os  # Import here for --no-interactive mode
     main()

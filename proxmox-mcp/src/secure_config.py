@@ -159,7 +159,7 @@ class SecureConfigManager:
             raise ValueError("Master password required for encryption")
         
         # Generate new salt
-        self.salt = os.urandom(16)
+        self.salt = self.generate_salt()
         self.master_password = master_password
         self._initialize_encryption(self.salt)
         
