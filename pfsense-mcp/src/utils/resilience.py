@@ -131,7 +131,7 @@ def create_circuit_breaker(
     return breaker
 
 
-async def _call_with_circuit_breaker_async(
+async def call_with_circuit_breaker_async(
     breaker: pybreaker.CircuitBreaker,
     func: Callable,
     *args,
@@ -140,7 +140,21 @@ async def _call_with_circuit_breaker_async(
     """
     Call an async function with circuit breaker protection.
     
-    This is a wrapper since pybreaker's call_async has compatibility issues.
+    This is a public wrapper since pybreaker's call_async has compatibility issues.
+    Use this function to manually apply circuit breaker protection to async functions.
+    
+    Args:
+        breaker: CircuitBreaker instance
+        func: Async function to call
+        *args: Positional arguments to pass to func
+        **kwargs: Keyword arguments to pass to func
+        
+    Returns:
+        Result from the async function
+        
+    Raises:
+        CircuitBreakerError: If circuit is open
+        Exception: Any exception raised by func
     """
     if breaker.current_state == 'open':
         # Circuit is open, raise error immediately
@@ -235,7 +249,7 @@ def retry_with_circuit_breaker(
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):
-                return await _call_with_circuit_breaker_async(
+                return await call_with_circuit_breaker_async(
                     circuit_breaker, retried_func, *args, **kwargs
                 )
             return wrapper

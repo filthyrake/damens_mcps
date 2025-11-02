@@ -14,7 +14,7 @@ from requests.auth import HTTPBasicAuth
 try:
     from .utils.logging import get_logger
     from .utils.validation import validate_idrac_config, validate_power_operation, validate_user_config
-    from .utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
+    from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
 except ImportError:
     # Fallback for direct execution
     import logging
@@ -208,7 +208,7 @@ class IDracClient:
         
         # Apply circuit breaker if enabled
         if self.circuit_breaker_enabled and self.circuit_breaker:
-            result = await _call_with_circuit_breaker_async(
+            result = await call_with_circuit_breaker_async(
                 self.circuit_breaker, retried_request, method, url, data
             )
         else:

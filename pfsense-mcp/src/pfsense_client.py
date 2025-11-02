@@ -15,7 +15,7 @@ try:
     from .auth import PfSenseAuth, PfSenseAuthError
     from .utils.logging import get_logger
     from .utils.validation import validate_config, validate_ip_address
-    from .utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
+    from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
     from .exceptions import (
         PfSenseAPIError,
         PfSenseConnectionError,
@@ -27,7 +27,7 @@ except ImportError:
     from auth import PfSenseAuth, PfSenseAuthError
     from utils.logging import get_logger
     from utils.validation import validate_config, validate_ip_address
-    from utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
+    from utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
     from exceptions import (
         PfSenseAPIError,
         PfSenseConnectionError,
@@ -79,8 +79,8 @@ class HTTPPfSenseClient:
         
         # Retry configuration
         self.retry_max_attempts = int(config.get("retry_max_attempts", 3))
-        self.retry_min_wait = int(config.get("retry_min_wait", 1))
-        self.retry_max_wait = int(config.get("retry_max_wait", 10))
+        self.retry_min_wait = float(config.get("retry_min_wait", 1.0))
+        self.retry_max_wait = float(config.get("retry_max_wait", 10.0))
         
         # Circuit breaker configuration
         self.circuit_breaker_enabled = config.get("circuit_breaker_enabled", True)
@@ -303,7 +303,7 @@ class HTTPPfSenseClient:
         
         # Apply circuit breaker if enabled
         if self.circuit_breaker_enabled and self.circuit_breaker:
-            result = await _call_with_circuit_breaker_async(
+            result = await call_with_circuit_breaker_async(
                 self.circuit_breaker, retried_request, method, url, headers, data, params
             )
         else:

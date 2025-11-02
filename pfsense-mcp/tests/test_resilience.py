@@ -8,7 +8,7 @@ from src.utils.resilience import (
     create_circuit_breaker,
     retry_with_circuit_breaker,
     get_circuit_breaker_metrics,
-    _call_with_circuit_breaker_async,
+    call_with_circuit_breaker_async,
 )
 
 
@@ -116,7 +116,7 @@ class TestCircuitBreaker:
         # First 3 calls should fail and be counted
         for i in range(3):
             with pytest.raises(aiohttp.ClientError):
-                await _call_with_circuit_breaker_async(breaker, always_fails)
+                await call_with_circuit_breaker_async(breaker, always_fails)
         
         assert call_count == 3
         
@@ -125,7 +125,7 @@ class TestCircuitBreaker:
         import pybreaker
         call_count_before = call_count
         with pytest.raises(pybreaker.CircuitBreakerError):
-            await _call_with_circuit_breaker_async(breaker, always_fails)
+            await call_with_circuit_breaker_async(breaker, always_fails)
         
         # Function was not called during the 4th attempt
         assert call_count == call_count_before
@@ -149,7 +149,7 @@ class TestCircuitBreaker:
         
         # Successful calls should keep circuit closed
         for i in range(5):
-            result = await _call_with_circuit_breaker_async(breaker, succeeds)
+            result = await call_with_circuit_breaker_async(breaker, succeeds)
             assert result == {"success": True}
         
         assert call_count == 5
@@ -180,7 +180,7 @@ class TestCircuitBreaker:
         # Multiple ValueError failures should not open circuit
         for i in range(5):
             with pytest.raises(ValueError):
-                await _call_with_circuit_breaker_async(breaker, validation_fails)
+                await call_with_circuit_breaker_async(breaker, validation_fails)
         
         assert call_count == 5
         
@@ -252,19 +252,19 @@ class TestCombinedRetryAndCircuitBreaker:
         
         # First call: retries 3 times (call_count = 3)
         with pytest.raises(aiohttp.ClientError):
-            await _call_with_circuit_breaker_async(breaker, retried_function)
+            await call_with_circuit_breaker_async(breaker, retried_function)
         assert call_count == 3
         
         # Second call: retries 3 times (call_count = 6)
         with pytest.raises(aiohttp.ClientError):
-            await _call_with_circuit_breaker_async(breaker, retried_function)
+            await call_with_circuit_breaker_async(breaker, retried_function)
         assert call_count == 6
         
         # Circuit should now be open
         # Third call should fail immediately without calling function
         import pybreaker
         with pytest.raises(pybreaker.CircuitBreakerError):
-            await _call_with_circuit_breaker_async(breaker, retried_function)
+            await call_with_circuit_breaker_async(breaker, retried_function)
         
         # Function was not called (still 6)
         assert call_count == 6

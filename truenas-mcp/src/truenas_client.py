@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from .auth import AuthManager
 from .utils.validation import validate_id, validate_dataset_name
-from .utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
+from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
 from .exceptions import (
     TrueNASError,
     TrueNASConnectionError,
@@ -37,8 +37,8 @@ class TrueNASConfig(BaseModel):
     connector_limit: int = Field(100, description="Total connection pool size")
     connector_limit_per_host: int = Field(30, description="Per-host connection limit")
     retry_max_attempts: int = Field(3, description="Maximum retry attempts")
-    retry_min_wait: int = Field(1, description="Minimum wait between retries (seconds)")
-    retry_max_wait: int = Field(10, description="Maximum wait between retries (seconds)")
+    retry_min_wait: float = Field(1.0, description="Minimum wait between retries (seconds)")
+    retry_max_wait: float = Field(10.0, description="Maximum wait between retries (seconds)")
     circuit_breaker_enabled: bool = Field(True, description="Enable circuit breaker")
     circuit_breaker_fail_max: int = Field(5, description="Failures before opening circuit")
     circuit_breaker_timeout: int = Field(60, description="Circuit breaker timeout (seconds)")
@@ -268,7 +268,7 @@ class TrueNASClient:
         
         # Apply circuit breaker if enabled
         if self.config.circuit_breaker_enabled and self.circuit_breaker:
-            result = await _call_with_circuit_breaker_async(
+            result = await call_with_circuit_breaker_async(
                 self.circuit_breaker, retried_request, method, url, headers, data, params
             )
         else:

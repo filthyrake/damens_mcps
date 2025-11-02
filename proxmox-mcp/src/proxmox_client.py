@@ -119,8 +119,8 @@ class ProxmoxClient:
         
         # Retry configuration
         self.retry_max_attempts = 3
-        self.retry_min_wait = 1
-        self.retry_max_wait = 10
+        self.retry_min_wait = 1.0
+        self.retry_max_wait = 10.0
         
         # Circuit breaker configuration
         self.circuit_breaker_enabled = True
