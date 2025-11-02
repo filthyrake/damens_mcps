@@ -1,4 +1,15 @@
-"""Unit tests for PfSenseAuth context manager behavior."""
+"""Unit tests for PfSenseAuth context manager behavior.
+
+This test suite verifies that:
+1. PfSenseAuth properly implements async context manager (__aenter__/__aexit__)
+2. PfSenseAuth does NOT support sync context manager (__enter__/__exit__)
+3. Session resources are properly created and cleaned up
+4. Cleanup occurs even when exceptions are raised
+
+The sync context manager was removed because it cannot properly handle
+async resource cleanup (aiohttp.ClientSession), which would cause resource
+leaks and runtime warnings.
+"""
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -78,8 +89,8 @@ class TestPfSenseAuthContextManager:
         auth = PfSenseAuth(auth_config)
         
         # Check that __enter__ and __exit__ do not exist
-        assert not hasattr(auth, '__enter__') or not callable(getattr(auth, '__enter__', None))
-        assert not hasattr(auth, '__exit__') or not callable(getattr(auth, '__exit__', None))
+        assert not hasattr(auth, '__enter__')
+        assert not hasattr(auth, '__exit__')
     
     @pytest.mark.asyncio
     async def test_async_context_manager_methods_exist(self, auth_config):
