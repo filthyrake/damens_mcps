@@ -4,7 +4,6 @@ import json
 import os
 import pytest
 import sys
-from pathlib import Path
 import tempfile
 
 # Add src directory to path
