@@ -32,28 +32,40 @@ run_checks() {
     # Install dependencies
     echo "Installing dependencies..."
     pip install -q -r requirements.txt 2>/dev/null || true
-    pip install -q flake8 black isort mypy bandit safety interrogate 2>/dev/null || true
+    # Pin versions to match pre-commit config
+    pip install -q 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0' 2>/dev/null || true
+    
+    # Check which directories exist
+    DIRS=""
+    [ -d "src" ] && DIRS="$DIRS src/"
+    [ -d "tests" ] && DIRS="$DIRS tests/"
+    
+    if [ -z "$DIRS" ]; then
+        echo "  ⚠ No src/ or tests/ directories found, skipping checks"
+        cd ..
+        return
+    fi
     
     # Run checks
     echo ""
     echo "1. Format check with black..."
-    black --check src/ tests/ --line-length=120 || echo "  ⚠ Black found formatting issues"
+    black --check $DIRS --line-length=120 || echo "  ⚠ Black found formatting issues"
     
     echo ""
     echo "2. Import sort check with isort..."
-    isort --check-only src/ tests/ --profile black --line-length=120 || echo "  ⚠ Isort found import issues"
+    isort --check-only $DIRS --profile black --line-length=120 || echo "  ⚠ Isort found import issues"
     
     echo ""
     echo "3. Lint with flake8..."
-    flake8 src/ tests/ --max-line-length=120 --extend-ignore=E203,W503 --statistics || echo "  ⚠ Flake8 found linting issues"
+    flake8 $DIRS --max-line-length=120 --extend-ignore=E203,W503 --statistics || echo "  ⚠ Flake8 found linting issues"
     
     echo ""
     echo "4. Type check with mypy..."
-    mypy src/ --ignore-missing-imports --no-strict-optional || echo "  ⚠ Mypy found type issues"
+    [ -d "src" ] && mypy src/ --ignore-missing-imports --no-strict-optional || echo "  ⚠ Mypy found type issues or src/ not found"
     
     echo ""
     echo "5. Security scan with bandit..."
-    bandit -r src/ -ll -f txt || echo "  ⚠ Bandit found security issues"
+    [ -d "src" ] && bandit -r src/ -ll -f txt || echo "  ⚠ Bandit found security issues or src/ not found"
     
     echo ""
     echo "6. Dependency vulnerability scan with safety..."
@@ -61,7 +73,7 @@ run_checks() {
     
     echo ""
     echo "7. Documentation coverage with interrogate..."
-    interrogate src/ -vv --fail-under=40 || echo "  ⚠ Interrogate found documentation issues"
+    [ -d "src" ] && interrogate src/ -vv --fail-under=40 || echo "  ⚠ Interrogate found documentation issues or src/ not found"
     
     # Deactivate virtual environment
     deactivate
