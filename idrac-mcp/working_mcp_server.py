@@ -158,6 +158,23 @@ class IDracClient:
         debug_print(f"Session headers: {safe_headers}")
         debug_print(f"Auth type: {type(self.auth).__name__}")
     
+    def _execute_http_request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """
+        Execute HTTP request with context-specific warning suppression.
+        
+        Helper method to eliminate duplication in _make_request.
+        """
+        with warnings.catch_warnings():
+            if not self.ssl_verify:
+                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            
+            if method.upper() == 'GET':
+                return self.session.get(url, timeout=10, **kwargs)
+            elif method.upper() == 'POST':
+                return self.session.post(url, timeout=10, **kwargs)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+    
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make a request with proper error handling and debugging."""
         url = f"{self.base_url}{endpoint}"
@@ -167,18 +184,8 @@ class IDracClient:
         safe_headers = redact_sensitive_headers(dict(self.session.headers))
         debug_print(f"Session headers: {safe_headers}")
         
-        # Context-specific warning suppression - only suppress when SSL verification is disabled
         try:
-            with warnings.catch_warnings():
-                if not self.ssl_verify:
-                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                
-                if method.upper() == 'GET':
-                    response = self.session.get(url, timeout=10, **kwargs)
-                elif method.upper() == 'POST':
-                    response = self.session.post(url, timeout=10, **kwargs)
-                else:
-                    raise ValueError(f"Unsupported method: {method}")
+            response = self._execute_http_request(method, url, **kwargs)
             
             debug_print(f"Response status: {response.status_code}")
             safe_response_headers = redact_sensitive_headers(dict(response.headers))
@@ -193,15 +200,8 @@ class IDracClient:
                 debug_print(f"Re-authenticated with auth type: {type(self.auth).__name__}")
                 debug_print(f"Cleared cookies, session now has: {len(self.session.cookies)} cookies")
                 
-                # Retry the request with same warning suppression
-                with warnings.catch_warnings():
-                    if not self.ssl_verify:
-                        warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                    
-                    if method.upper() == 'GET':
-                        response = self.session.get(url, timeout=10, **kwargs)
-                    elif method.upper() == 'POST':
-                        response = self.session.post(url, timeout=10, **kwargs)
+                # Retry the request
+                response = self._execute_http_request(method, url, **kwargs)
                 
                 debug_print(f"Retry response status: {response.status_code}")
                 debug_print(f"Retry response has cookies: {len(response.cookies)} cookies")

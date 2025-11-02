@@ -38,6 +38,30 @@ def debug_print(message: str):
     print(f"DEBUG: {message}", file=sys.stderr)
 
 
+def suppress_insecure_request_warning(ssl_verify: bool):
+    """
+    Context manager to suppress InsecureRequestWarning when SSL verification is disabled.
+    
+    This is a helper to eliminate code duplication and ensure consistent warning handling.
+    """
+    class WarningSuppressionContext:
+        def __init__(self, should_suppress: bool):
+            self.should_suppress = should_suppress
+            self.context = None
+            
+        def __enter__(self):
+            self.context = warnings.catch_warnings()
+            self.context.__enter__()
+            if self.should_suppress:
+                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            return self
+            
+        def __exit__(self, *args):
+            return self.context.__exit__(*args)
+    
+    return WarningSuppressionContext(not ssl_verify)
+
+
 class ProxmoxClient:
     """Client for interacting with Proxmox VE API."""
 
@@ -119,10 +143,7 @@ class ProxmoxClient:
             }
             
             # Context-specific warning suppression - only suppress when SSL verification is disabled
-            with warnings.catch_warnings():
-                if not self.ssl_verify:
-                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                
+            with suppress_insecure_request_warning(self.ssl_verify):
                 response = self.session.post(self.auth_url, data=auth_data, headers=headers)
                 response.raise_for_status()
             auth_result = response.json()
@@ -175,10 +196,7 @@ class ProxmoxClient:
                 raise ProxmoxValidationError(f"Unsupported HTTP method: {method}")
             
             # Context-specific warning suppression - only suppress when SSL verification is disabled
-            with warnings.catch_warnings():
-                if not self.ssl_verify:
-                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                
+            with suppress_insecure_request_warning(self.ssl_verify):
                 response = handler(url, **kwargs)
                 response.raise_for_status()
             return response
