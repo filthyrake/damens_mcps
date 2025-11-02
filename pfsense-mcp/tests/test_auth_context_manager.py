@@ -12,10 +12,9 @@ leaks and runtime warnings.
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 import aiohttp
 
-from src.auth import PfSenseAuth, PfSenseAuthError
+from src.auth import PfSenseAuth
 
 
 class TestPfSenseAuthContextManager:
