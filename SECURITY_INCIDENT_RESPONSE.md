@@ -38,9 +38,9 @@ When API keys, passwords, or other credentials are accidentally committed to git
    # macOS: brew install bfg
    # Linux: Download from https://rtyley.github.io/bfg-repo-cleaner/
    
-   # Clone a fresh copy
-   git clone --mirror https://github.com/filthyrake/damens_mcps.git
-   cd damens_mcps.git
+   # Clone a fresh copy of your repository
+   git clone --mirror https://github.com/YOUR_ORG/YOUR_REPO.git
+   cd YOUR_REPO.git
    
    # Remove .env files from history
    bfg --delete-files .env
@@ -58,9 +58,9 @@ When API keys, passwords, or other credentials are accidentally committed to git
    # Install git-filter-repo
    pip install git-filter-repo
    
-   # Clone a fresh copy
-   git clone https://github.com/filthyrake/damens_mcps.git
-   cd damens_mcps
+   # Clone a fresh copy of your repository
+   git clone https://github.com/YOUR_ORG/YOUR_REPO.git
+   cd YOUR_REPO
    
    # Remove .env files from all history
    git filter-repo --invert-paths --path pfsense-mcp/.env
@@ -72,9 +72,9 @@ When API keys, passwords, or other credentials are accidentally committed to git
 
    **Option C: Using git filter-branch (Fallback)**
    ```bash
-   # Clone a fresh copy
-   git clone https://github.com/filthyrake/damens_mcps.git
-   cd damens_mcps
+   # Clone a fresh copy of your repository
+   git clone https://github.com/YOUR_ORG/YOUR_REPO.git
+   cd YOUR_REPO
    
    # Remove .env from history
    git filter-branch --force --index-filter \
@@ -259,13 +259,13 @@ Within 1 week after incident resolution:
 ## Contact Information
 
 ### Security Team
-- **Primary Contact**: [Repository Maintainers]
-- **Email**: [See GitHub repository]
-- **Slack/Discord**: [Team channel]
+- **Primary Contact**: Repository Maintainers (see SECURITY.md)
+- **Email**: Contact information available in repository SECURITY.md
+- **Slack/Discord**: Internal team communication channels
 
 ### Emergency Contacts
-- **After Hours**: [On-call rotation]
-- **Escalation**: [Management contact]
+- **After Hours**: Follow organization's on-call procedures
+- **Escalation**: Contact repository owner or organization security team
 
 ## Additional Resources
 
@@ -277,7 +277,7 @@ Within 1 week after incident resolution:
 
 ## Version History
 
-- **v1.0.0** (2025-11-02): Initial incident response guide created following credential exposure in pfsense-mcp/.env
+- **v1.0.0** (2025-11-02): Initial incident response guide created following security review and hardening
 
 ---
 

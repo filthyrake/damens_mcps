@@ -81,4 +81,4 @@ repos:
         entry: .env files should never be committed - use .env.example instead
         language: fail
         files: '^.*\.env$'
-        exclude: '\.env\.example$|env\.example$'
+        exclude: '^.*\.env\.example$|^.*env\.example$'
