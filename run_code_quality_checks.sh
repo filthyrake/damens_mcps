@@ -26,14 +26,26 @@ run_checks() {
         python3 -m venv .venv
     fi
     
-    # Activate virtual environment
-    source .venv/bin/activate
+    # Activate virtual environment (platform-specific)
+    if [ -f ".venv/bin/activate" ]; then
+        source .venv/bin/activate
+    elif [ -f ".venv/Scripts/activate" ]; then
+        source .venv/Scripts/activate
+    else
+        echo "  ⚠ Failed to find virtual environment activation script"
+        cd ..
+        return
+    fi
     
     # Install dependencies
     echo "Installing dependencies..."
-    pip install -q -r requirements.txt 2>/dev/null || true
+    if [ -f "requirements.txt" ]; then
+        pip install -q -r requirements.txt 2>/dev/null || echo "  ⚠ Warning: Some dependencies from requirements.txt failed to install"
+    fi
     # Pin versions to match pre-commit config
-    pip install -q 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0' 2>/dev/null || true
+    if ! pip install -q 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0' 2>/dev/null; then
+        echo "  ⚠ Warning: Some quality tools failed to install, checks may not run properly"
+    fi
     
     # Check which directories exist
     DIRS=""
@@ -49,15 +61,15 @@ run_checks() {
     # Run checks
     echo ""
     echo "1. Format check with black..."
-    black --check $DIRS --line-length=120 || echo "  ⚠ Black found formatting issues"
+    black --check "$DIRS" --line-length=120 || echo "  ⚠ Black found formatting issues"
     
     echo ""
     echo "2. Import sort check with isort..."
-    isort --check-only $DIRS --profile black --line-length=120 || echo "  ⚠ Isort found import issues"
+    isort --check-only "$DIRS" --profile black --line-length=120 || echo "  ⚠ Isort found import issues"
     
     echo ""
     echo "3. Lint with flake8..."
-    flake8 $DIRS --max-line-length=120 --extend-ignore=E203,W503 --statistics || echo "  ⚠ Flake8 found linting issues"
+    flake8 "$DIRS" --max-line-length=120 --extend-ignore=E203,W503 --statistics || echo "  ⚠ Flake8 found linting issues"
     
     echo ""
     echo "4. Type check with mypy..."

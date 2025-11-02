@@ -187,7 +187,7 @@ We use automated code quality tools (enforced via pre-commit hooks and CI/CD):
 
 ```bash
 # Install quality tools
-pip install flake8 black isort mypy bandit safety pylint interrogate
+pip install flake8 black isort mypy bandit safety interrogate
 
 # Format code
 black src/ tests/ --line-length=120

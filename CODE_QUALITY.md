@@ -193,7 +193,7 @@ Each project runs:
 cd pfsense-mcp  # or truenas-mcp, idrac-mcp, proxmox-mcp
 
 # Install quality tools
-pip install flake8 black isort mypy bandit safety pylint interrogate
+pip install flake8 black isort mypy bandit safety interrogate
 
 # Run all checks
 black --check src/ tests/ --line-length=120

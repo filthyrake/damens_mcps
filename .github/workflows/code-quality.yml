@@ -26,7 +26,7 @@ jobs:
       run: |
         cd pfsense-mcp
         pip install -r requirements.txt
-        pip install flake8 black isort mypy bandit safety pylint interrogate
+        pip install 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0'
     
     - name: Format check with black
       run: |
@@ -61,7 +61,7 @@ jobs:
     - name: Dependency vulnerability scan with safety
       run: |
         cd pfsense-mcp
-        safety check --json || true
+        safety check --json
       continue-on-error: true
     
     - name: Documentation coverage with interrogate
@@ -86,7 +86,7 @@ jobs:
       run: |
         cd truenas-mcp
         pip install -r requirements.txt
-        pip install flake8 black isort mypy bandit safety pylint interrogate
+        pip install 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0'
     
     - name: Format check with black
       run: |
@@ -121,7 +121,7 @@ jobs:
     - name: Dependency vulnerability scan with safety
       run: |
         cd truenas-mcp
-        safety check --json || true
+        safety check --json
       continue-on-error: true
     
     - name: Documentation coverage with interrogate
@@ -146,7 +146,7 @@ jobs:
       run: |
         cd idrac-mcp
         pip install -r requirements.txt
-        pip install flake8 black isort mypy bandit safety pylint interrogate
+        pip install 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0'
     
     - name: Format check with black
       run: |
@@ -181,7 +181,7 @@ jobs:
     - name: Dependency vulnerability scan with safety
       run: |
         cd idrac-mcp
-        safety check --json || true
+        safety check --json
       continue-on-error: true
     
     - name: Documentation coverage with interrogate
@@ -206,7 +206,7 @@ jobs:
       run: |
         cd proxmox-mcp
         pip install -r requirements.txt
-        pip install flake8 black isort mypy bandit safety pylint interrogate
+        pip install 'black>=24.1.0' 'isort>=5.13.0' 'flake8>=7.0.0' 'mypy>=1.8.0' 'bandit>=1.7.6' 'safety>=3.0.0' 'interrogate>=1.5.0'
     
     - name: Format check with black
       run: |
@@ -241,7 +241,7 @@ jobs:
     - name: Dependency vulnerability scan with safety
       run: |
         cd proxmox-mcp
-        safety check --json || true
+        safety check --json
       continue-on-error: true
     
     - name: Documentation coverage with interrogate
