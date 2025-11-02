@@ -31,9 +31,9 @@ except ImportError:
 
 # Default retry configuration
 DEFAULT_MAX_ATTEMPTS = 3
-DEFAULT_RETRY_MIN_WAIT = 1  # seconds
-DEFAULT_RETRY_MAX_WAIT = 10  # seconds
-DEFAULT_RETRY_MULTIPLIER = 1  # exponential backoff multiplier
+DEFAULT_RETRY_MIN_WAIT = 1.0  # seconds
+DEFAULT_RETRY_MAX_WAIT = 10.0  # seconds
+DEFAULT_RETRY_MULTIPLIER = 1.0  # exponential backoff multiplier
 
 # Default circuit breaker configuration
 DEFAULT_CIRCUIT_BREAKER_FAILURES = 5
@@ -151,7 +151,7 @@ async def _call_with_circuit_breaker_async(
         # Success - notify the breaker (it will close if in half-open state)
         # NOTE: Direct access to _lock and _state is required due to pybreaker's
         # incomplete async support. The call_async method has compatibility issues
-        # with modern asyncio. This is compatible with pybreaker>=1.0.0.
+        # with modern asyncio. Tested with pybreaker>=1.0.0,<2.0.0.
         with breaker._lock:
             breaker._state.on_success()
         return result
@@ -168,7 +168,7 @@ async def _call_with_circuit_breaker_async(
                 raise
         # Failure - notify the breaker
         # NOTE: Direct access to _lock and _state is required due to pybreaker's
-        # incomplete async support. Compatible with pybreaker>=1.0.0.
+        # incomplete async support. Tested with pybreaker>=1.0.0,<2.0.0.
         with breaker._lock:
             breaker._state.on_failure(e)
         raise
@@ -176,9 +176,9 @@ async def _call_with_circuit_breaker_async(
 
 def retry_with_circuit_breaker(
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-    min_wait: int = DEFAULT_RETRY_MIN_WAIT,
-    max_wait: int = DEFAULT_RETRY_MAX_WAIT,
-    multiplier: int = DEFAULT_RETRY_MULTIPLIER,
+    min_wait: float = DEFAULT_RETRY_MIN_WAIT,
+    max_wait: float = DEFAULT_RETRY_MAX_WAIT,
+    multiplier: float = DEFAULT_RETRY_MULTIPLIER,
     retry_exceptions: Optional[Tuple[Type[Exception], ...]] = None,
     circuit_breaker: Optional[pybreaker.CircuitBreaker] = None,
     circuit_fail_max: int = DEFAULT_CIRCUIT_BREAKER_FAILURES,

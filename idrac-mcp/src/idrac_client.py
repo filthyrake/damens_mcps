@@ -42,11 +42,19 @@ except ImportError:
     
     def create_circuit_breaker(**kwargs):
         """Stub for circuit breaker - resilience features disabled."""
+        logger.warning(
+            "create_circuit_breaker called, but resilience features are disabled. "
+            "Install tenacity and pybreaker for full functionality."
+        )
         return None
     
     def create_retry_decorator(**kwargs):
         """Stub for retry decorator - resilience features disabled."""
         def decorator(func):
+            logger.warning(
+                "create_retry_decorator called, but resilience features are disabled. "
+                "Install tenacity and pybreaker for full functionality."
+            )
             return func
         return decorator
 

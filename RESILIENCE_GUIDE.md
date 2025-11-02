@@ -178,8 +178,8 @@ client = ProxmoxClient(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `retry_max_attempts` | int | 3 | Maximum number of retry attempts |
-| `retry_min_wait` | int | 1 | Minimum wait between retries (seconds) |
-| `retry_max_wait` | int | 10 | Maximum wait between retries (seconds) |
+| `retry_min_wait` | float \| int | 1.0 | Minimum wait between retries (seconds) |
+| `retry_max_wait` | float \| int | 10.0 | Maximum wait between retries (seconds) |
 
 **Exponential Backoff Formula:** `wait = min(retry_max_wait, max(retry_min_wait, multiplier * 2^attempt))`
 

@@ -70,8 +70,8 @@ class HTTPPfSenseClient:
         self.jwt_token_lifetime = int(config.get("jwt_token_lifetime", DEFAULT_JWT_TOKEN_LIFETIME))
         self.jwt_token_refresh_buffer = int(config.get("jwt_token_refresh_buffer", DEFAULT_JWT_TOKEN_REFRESH_BUFFER))
         
-        # Timeout configuration (seconds)
-        self.timeout = aiohttp.ClientTimeout(total=int(config.get("timeout", 30)))
+        # Timeout configuration (seconds, accepts float for sub-second precision)
+        self.timeout = aiohttp.ClientTimeout(total=config.get("timeout", 30))
         
         # Connection pooling configuration
         self.connector_limit = int(config.get("connector_limit", 100))

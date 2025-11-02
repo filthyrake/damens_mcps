@@ -123,11 +123,12 @@ class TestCircuitBreaker:
         # Circuit should now be open, 4th call should fail immediately
         # without calling the function
         import pybreaker
+        call_count_before = call_count
         with pytest.raises(pybreaker.CircuitBreakerError):
             await _call_with_circuit_breaker_async(breaker, always_fails)
         
-        # Function was not called (still 3)
-        assert call_count == 3
+        # Function was not called during the 4th attempt
+        assert call_count == call_count_before
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_closes_on_success(self):
