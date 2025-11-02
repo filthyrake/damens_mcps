@@ -123,7 +123,7 @@ def serve(host: str, port: int, reload: bool):
                 f"Host: {host}\n"
                 f"Port: {port}\n"
                 f"TrueNAS: {settings.truenas_host}:{settings.truenas_port}\n"
-                f"SSL Verification: {settings.truenas_verify_ssl}\n"
+                f"SSL Verification: {'Enabled' if settings.truenas_verify_ssl else 'Disabled'}\n"
                 f"Debug: {settings.debug}\n"
                 f"Auto-reload: {reload}",
                 title="Server Configuration",
