@@ -15,7 +15,7 @@ try:
     from .auth import PfSenseAuth, PfSenseAuthError
     from .utils.logging import get_logger
     from .utils.validation import validate_config, validate_ip_address
-    from .utils.resilience import create_circuit_breaker, create_retry_decorator
+    from .utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
     from .exceptions import (
         PfSenseAPIError,
         PfSenseConnectionError,
@@ -27,7 +27,7 @@ except ImportError:
     from auth import PfSenseAuth, PfSenseAuthError
     from utils.logging import get_logger
     from utils.validation import validate_config, validate_ip_address
-    from utils.resilience import create_circuit_breaker, create_retry_decorator
+    from utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
     from exceptions import (
         PfSenseAPIError,
         PfSenseConnectionError,
@@ -291,8 +291,8 @@ class HTTPPfSenseClient:
         
         # Apply circuit breaker if enabled
         if self.circuit_breaker_enabled and self.circuit_breaker:
-            result = await self.circuit_breaker.call_async(
-                retried_request, method, url, headers, data, params
+            result = await _call_with_circuit_breaker_async(
+                self.circuit_breaker, retried_request, method, url, headers, data, params
             )
         else:
             result = await retried_request(method, url, headers, data, params)

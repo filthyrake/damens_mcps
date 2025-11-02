@@ -8,7 +8,6 @@ failures and prevent cascading failures.
 
 import asyncio
 import functools
-import logging
 from typing import Any, Callable, Optional, Type, Tuple
 
 from tenacity import (
@@ -22,7 +21,14 @@ from tenacity import (
 )
 import pybreaker
 
-logger = logging.getLogger(__name__)
+try:
+    from .logging import get_logger
+except ImportError:
+    import logging
+    def get_logger(name):
+        return logging.getLogger(name)
+
+logger = get_logger(__name__)
 
 
 # Default retry configuration
@@ -114,7 +120,7 @@ def create_circuit_breaker(
     
     breaker = pybreaker.CircuitBreaker(
         fail_max=fail_max,
-        timeout_duration=timeout_duration,
+        reset_timeout=timeout_duration,
         exclude=exclude,
         name=name or "default"
     )
@@ -124,6 +130,42 @@ def create_circuit_breaker(
     breaker.add_listener(on_close)
     
     return breaker
+
+
+async def _call_with_circuit_breaker_async(
+    breaker: pybreaker.CircuitBreaker,
+    func: Callable,
+    *args,
+    **kwargs
+) -> Any:
+    """
+    Call an async function with circuit breaker protection.
+    
+    This is a wrapper since pybreaker's call_async has compatibility issues.
+    """
+    if breaker.current_state == 'open':
+        # Circuit is open, raise error immediately
+        raise pybreaker.CircuitBreakerError(breaker)
+    
+    try:
+        result = await func(*args, **kwargs)
+        # Success - notify the breaker (it will close if in half-open state)
+        with breaker._lock:
+            breaker._state.on_success()
+        return result
+    except Exception as e:
+        # Check if exception should be excluded
+        excluded = breaker._excluded_exceptions
+        if excluded:
+            # excluded might be a tuple or list of exception classes
+            if not isinstance(excluded, (tuple, list)):
+                excluded = (excluded,)
+            if isinstance(e, tuple(excluded)):
+                raise
+        # Failure - notify the breaker
+        with breaker._lock:
+            breaker._state.on_failure(e)
+        raise
 
 
 def retry_with_circuit_breaker(
@@ -187,7 +229,9 @@ def retry_with_circuit_breaker(
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):
-                return await circuit_breaker.call_async(retried_func, *args, **kwargs)
+                return await _call_with_circuit_breaker_async(
+                    circuit_breaker, retried_func, *args, **kwargs
+                )
             return wrapper
         else:
             @functools.wraps(func)

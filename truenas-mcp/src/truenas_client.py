@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from .auth import AuthManager
 from .utils.validation import validate_id, validate_dataset_name
-from .utils.resilience import create_circuit_breaker, create_retry_decorator
+from .utils.resilience import create_circuit_breaker, create_retry_decorator, _call_with_circuit_breaker_async
 from .exceptions import (
     TrueNASError,
     TrueNASConnectionError,
@@ -264,8 +264,8 @@ class TrueNASClient:
         
         # Apply circuit breaker if enabled
         if self.config.circuit_breaker_enabled and self.circuit_breaker:
-            result = await self.circuit_breaker.call_async(
-                retried_request, method, url, headers, data, params
+            result = await _call_with_circuit_breaker_async(
+                self.circuit_breaker, retried_request, method, url, headers, data, params
             )
         else:
             result = await retried_request(method, url, headers, data, params)
