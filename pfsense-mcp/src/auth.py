@@ -27,6 +27,15 @@ class PfSenseAuthError(Exception):
 class PfSenseAuth:
     """
     Handles authentication for pfSense API requests.
+    
+    This class supports async context manager usage only (use 'async with').
+    The synchronous context manager is not supported as it cannot properly
+    clean up async resources like aiohttp.ClientSession.
+    
+    Example:
+        async with PfSenseAuth(config) as auth:
+            # Use auth object
+            pass
     """
     
     def __init__(self, config: Dict[str, str]):
@@ -204,14 +213,6 @@ class PfSenseAuth:
         if self.session:
             await self.session.close()
             self.session = None
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # Note: This won't work with async context, but provides sync compatibility
-        # Sync context manager cannot handle async cleanup
-        pass
     
     async def __aenter__(self):
         await self.create_session()
