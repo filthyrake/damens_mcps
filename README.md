@@ -1,5 +1,9 @@
 # Damen's MCP Servers Collection 🚀
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Issues](https://img.shields.io/github/issues/filthyrake/damens_mcps)](https://github.com/filthyrake/damens_mcps/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/filthyrake/damens_mcps)](https://github.com/filthyrake/damens_mcps/stargazers)
+
 > **Note:** These MCP servers were generated using [Cursor](https://cursor.sh/) AI tools. While functional, they may benefit from human review and refinement for production use.
 
 A comprehensive collection of Model Context Protocol (MCP) servers for managing various infrastructure components. These servers enable AI assistants to directly interact with and manage your infrastructure through standardized MCP interfaces.
@@ -198,6 +202,7 @@ python examples/basic_usage.py
 Each project has detailed documentation:
 
 - **Individual READMEs** in each project directory
+- **[CLAUDE.md](CLAUDE.md)** - Development guidelines and architecture overview for AI assistant integration
 - **API Documentation** in `docs/` folders
 - **Example scripts** in `examples/` directories
 - **Deployment guides** for Docker and Kubernetes
