@@ -12,9 +12,6 @@ pydantic-settings>=2.0.0,<3.0.0
 passlib[bcrypt]>=1.7.4,<2.0.0
 python-jose[cryptography]>=3.3.0,<4.0.0
 
-# Proxmox API client
-proxmoxer>=2.0.0,<3.0.0
-
 # HTTP server and client
 fastapi>=0.104.0,<0.121.0
 uvicorn[standard]>=0.24.0,<0.39.0
