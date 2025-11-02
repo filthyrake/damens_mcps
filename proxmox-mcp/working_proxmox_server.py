@@ -101,11 +101,11 @@ def main():
     # Load configuration
     config = load_config()
 
-    # Only suppress SSL warnings when explicitly configured to not verify SSL
-    # This is safer than globally disabling all warnings
+    # Note: SSL warnings are now suppressed only in the context of specific requests
+    # where SSL verification is disabled, rather than globally. This allows legitimate
+    # SSL issues to be visible during development and troubleshooting.
     if not config.get('ssl_verify', True):
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        debug_print("SSL warnings disabled due to ssl_verify=False configuration")
+        debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
 
     debug_print("Server starting...")
 

@@ -16,9 +16,11 @@ Example usage:
 
 import json
 import sys
+import warnings
 from typing import Any, Dict, List
 
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 
 from .exceptions import (
     ProxmoxConnectionError,
@@ -91,6 +93,8 @@ class ProxmoxClient:
         self._authenticate()
 
         debug_print("Created Proxmox client (connection details redacted)")
+        if not ssl_verify:
+            debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
         debug_print(f"SSL Verify: {ssl_verify}")
         debug_print(f"Session headers: {dict(self.session.headers)}")
 
@@ -114,8 +118,13 @@ class ProxmoxClient:
                 'Accept': 'application/json'
             }
             
-            response = self.session.post(self.auth_url, data=auth_data, headers=headers)
-            response.raise_for_status()
+            # Context-specific warning suppression - only suppress when SSL verification is disabled
+            with warnings.catch_warnings():
+                if not self.ssl_verify:
+                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+                
+                response = self.session.post(self.auth_url, data=auth_data, headers=headers)
+                response.raise_for_status()
             auth_result = response.json()
             if auth_result['data']:
                 self.session.cookies.set('PVEAuthCookie', auth_result['data']['ticket'])
@@ -165,8 +174,13 @@ class ProxmoxClient:
             if handler is None:
                 raise ProxmoxValidationError(f"Unsupported HTTP method: {method}")
             
-            response = handler(url, **kwargs)
-            response.raise_for_status()
+            # Context-specific warning suppression - only suppress when SSL verification is disabled
+            with warnings.catch_warnings():
+                if not self.ssl_verify:
+                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+                
+                response = handler(url, **kwargs)
+                response.raise_for_status()
             return response
         except requests.exceptions.ConnectionError as e:
             debug_print(f"Connection error for {method} {endpoint}: {e}")

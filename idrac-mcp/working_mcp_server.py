@@ -10,6 +10,7 @@ Use this file for all iDRAC MCP server operations.
 import json
 import os
 import sys
+import warnings
 import requests
 from typing import Any, Dict
 from urllib3.exceptions import InsecureRequestWarning
@@ -112,10 +113,9 @@ def load_config() -> Dict[str, Any]:
     except Exception as e:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}")
 
-# Suppress SSL warnings only for self-signed certificates when explicitly configured
-# This is more targeted than global suppression
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Note: SSL warnings are now suppressed only in the context of specific requests
+# where SSL verification is disabled, rather than globally. This allows legitimate
+# SSL issues to be visible during development and troubleshooting.
 
 # Completely suppress all output
 import logging
@@ -151,6 +151,8 @@ class IDracClient:
         
         # Debug: Print session info (redacted to avoid sensitive details)
         debug_print("Created iDRAC client (connection details redacted)")
+        if not ssl_verify:
+            debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
         debug_print(f"SSL Verify: {ssl_verify}")
         safe_headers = redact_sensitive_headers(dict(self.session.headers))
         debug_print(f"Session headers: {safe_headers}")
@@ -165,13 +167,18 @@ class IDracClient:
         safe_headers = redact_sensitive_headers(dict(self.session.headers))
         debug_print(f"Session headers: {safe_headers}")
         
+        # Context-specific warning suppression - only suppress when SSL verification is disabled
         try:
-            if method.upper() == 'GET':
-                response = self.session.get(url, timeout=10, **kwargs)
-            elif method.upper() == 'POST':
-                response = self.session.post(url, timeout=10, **kwargs)
-            else:
-                raise ValueError(f"Unsupported method: {method}")
+            with warnings.catch_warnings():
+                if not self.ssl_verify:
+                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+                
+                if method.upper() == 'GET':
+                    response = self.session.get(url, timeout=10, **kwargs)
+                elif method.upper() == 'POST':
+                    response = self.session.post(url, timeout=10, **kwargs)
+                else:
+                    raise ValueError(f"Unsupported method: {method}")
             
             debug_print(f"Response status: {response.status_code}")
             safe_response_headers = redact_sensitive_headers(dict(response.headers))
@@ -186,11 +193,15 @@ class IDracClient:
                 debug_print(f"Re-authenticated with auth type: {type(self.auth).__name__}")
                 debug_print(f"Cleared cookies, session now has: {len(self.session.cookies)} cookies")
                 
-                # Retry the request
-                if method.upper() == 'GET':
-                    response = self.session.get(url, timeout=10, **kwargs)
-                elif method.upper() == 'POST':
-                    response = self.session.post(url, timeout=10, **kwargs)
+                # Retry the request with same warning suppression
+                with warnings.catch_warnings():
+                    if not self.ssl_verify:
+                        warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+                    
+                    if method.upper() == 'GET':
+                        response = self.session.get(url, timeout=10, **kwargs)
+                    elif method.upper() == 'POST':
+                        response = self.session.post(url, timeout=10, **kwargs)
                 
                 debug_print(f"Retry response status: {response.status_code}")
                 debug_print(f"Retry response has cookies: {len(response.cookies)} cookies")
