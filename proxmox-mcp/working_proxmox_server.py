@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import Any, Dict, List
 
 import urllib3
@@ -88,7 +89,6 @@ def load_config() -> Dict[str, Any]:
     debug_print(f"Using config file: {config_path}")
 
     # Check if config uses encrypted password storage
-    from pathlib import Path
     if SecureConfigManager.is_encrypted_config(Path(config_path)):
         # Load encrypted config
         debug_print("Detected encrypted configuration")
