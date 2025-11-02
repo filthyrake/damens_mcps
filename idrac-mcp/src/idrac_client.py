@@ -14,6 +14,7 @@ from requests.auth import HTTPBasicAuth
 try:
     from .utils.logging import get_logger
     from .utils.validation import validate_idrac_config, validate_power_operation, validate_user_config
+    from .utils.resilience import create_circuit_breaker, create_retry_decorator
 except ImportError:
     # Fallback for direct execution
     import logging
@@ -34,6 +35,16 @@ except ImportError:
     def validate_user_config(config):
         """Basic user config validation."""
         return config
+    
+    def create_circuit_breaker(**kwargs):
+        """Stub for circuit breaker."""
+        return None
+    
+    def create_retry_decorator(**kwargs):
+        """Stub for retry decorator."""
+        def decorator(func):
+            return func
+        return decorator
 
 # Initialize logger
 try:
@@ -59,6 +70,42 @@ class IDracClient:
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
+        
+        # Timeout configuration (seconds)
+        self.timeout = aiohttp.ClientTimeout(total=config.get('timeout', 30))
+        
+        # Connection pooling configuration
+        self.connector_limit = config.get('connector_limit', 100)
+        self.connector_limit_per_host = config.get('connector_limit_per_host', 30)
+        
+        # Retry configuration
+        self.retry_max_attempts = config.get('retry_max_attempts', 3)
+        self.retry_min_wait = config.get('retry_min_wait', 1)
+        self.retry_max_wait = config.get('retry_max_wait', 10)
+        
+        # Circuit breaker configuration
+        self.circuit_breaker_enabled = config.get('circuit_breaker_enabled', True)
+        self.circuit_breaker = None
+        if self.circuit_breaker_enabled:
+            self.circuit_breaker = create_circuit_breaker(
+                fail_max=config.get('circuit_breaker_fail_max', 5),
+                timeout_duration=config.get('circuit_breaker_timeout', 60),
+                name=f"idrac_{self.config['host']}"
+            )
+        
+        # Create retry decorator
+        self.retry_decorator = create_retry_decorator(
+            max_attempts=self.retry_max_attempts,
+            min_wait=self.retry_min_wait,
+            max_wait=self.retry_max_wait,
+            retry_exceptions=(
+                ConnectionError,
+                TimeoutError,
+                aiohttp.ClientError,
+                aiohttp.ServerTimeoutError,
+                aiohttp.ClientConnectorError,
+            )
+        )
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -72,11 +119,18 @@ class IDracClient:
     async def connect(self):
         """Establish connection to iDRAC."""
         try:
-            connector = aiohttp.TCPConnector(ssl=self.config['ssl_verify'])
+            # Create connector with connection pooling
+            connector = aiohttp.TCPConnector(
+                ssl=self.config['ssl_verify'],
+                limit=self.connector_limit,
+                limit_per_host=self.connector_limit_per_host,
+                ttl_dns_cache=300
+            )
             self.session = aiohttp.ClientSession(
                 connector=connector,
                 auth=aiohttp.BasicAuth(self.config['username'], self.config['password']),
-                headers=self._headers
+                headers=self._headers,
+                timeout=self.timeout
             )
             logger.info(f"Connected to iDRAC at {self.base_url}")
         except Exception as e:
@@ -90,8 +144,34 @@ class IDracClient:
             self.session = None
             logger.info("Disconnected from iDRAC")
     
+    async def _execute_request(self, method: str, url: str, data: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        Execute the actual HTTP request (internal method with retry logic).
+        
+        This method is decorated with retry logic and should not be called directly.
+        Use _make_request instead.
+        
+        Args:
+            method: HTTP method
+            url: Full URL
+            data: Request data
+            
+        Returns:
+            Response data
+            
+        Raises:
+            Exception: If request fails
+        """
+        try:
+            async with self.session.request(method, url, json=data) as response:
+                response.raise_for_status()
+                return await response.json()
+        except aiohttp.ClientError as e:
+            logger.error(f"iDRAC API request failed: {e}")
+            raise Exception(f"API request failed: {e}")
+    
     async def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
-        """Make HTTP request to iDRAC API.
+        """Make HTTP request to iDRAC API with retry logic and circuit breaker.
         
         Args:
             method: HTTP method
@@ -109,13 +189,18 @@ class IDracClient:
         
         url = urljoin(self.base_url, endpoint)
         
-        try:
-            async with self.session.request(method, url, json=data) as response:
-                response.raise_for_status()
-                return await response.json()
-        except aiohttp.ClientError as e:
-            logger.error(f"iDRAC API request failed: {e}")
-            raise Exception(f"API request failed: {e}")
+        # Apply retry decorator to the request execution
+        retried_request = self.retry_decorator(self._execute_request)
+        
+        # Apply circuit breaker if enabled
+        if self.circuit_breaker_enabled and self.circuit_breaker:
+            result = await self.circuit_breaker.call_async(
+                retried_request, method, url, data
+            )
+        else:
+            result = await retried_request(method, url, data)
+        
+        return result
     
     async def get_system_info(self) -> Dict[str, Any]:
         """Get system information.
