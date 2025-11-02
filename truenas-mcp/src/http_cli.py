@@ -102,12 +102,28 @@ def serve(host: str, port: int, reload: bool):
             log_file=settings.log_file,
         )
 
+        # Emit SSL warning if verification is disabled
+        if not settings.truenas_verify_ssl:
+            console.print(
+                Panel.fit(
+                    "[bold yellow]⚠️  WARNING: SSL VERIFICATION DISABLED ⚠️[/bold yellow]\n\n"
+                    "SSL certificate verification is currently DISABLED.\n"
+                    "This makes your connection vulnerable to man-in-the-middle attacks.\n\n"
+                    "[bold red]DO NOT use this configuration in production![/bold red]\n\n"
+                    "To enable SSL verification, set TRUENAS_VERIFY_SSL=true in your .env file.\n"
+                    "See SECURITY.md for information on proper SSL certificate setup.",
+                    title="Security Warning",
+                    border_style="yellow",
+                )
+            )
+
         console.print(
             Panel.fit(
                 f"[bold green]TrueNAS MCP HTTP Server[/bold green]\n"
                 f"Host: {host}\n"
                 f"Port: {port}\n"
                 f"TrueNAS: {settings.truenas_host}:{settings.truenas_port}\n"
+                f"SSL Verification: {settings.truenas_verify_ssl}\n"
                 f"Debug: {settings.debug}\n"
                 f"Auto-reload: {reload}",
                 title="Server Configuration",

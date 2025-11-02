@@ -131,6 +131,7 @@ kubectl create secret generic truenas-mcp-secrets \
 | `TRUENAS_API_KEY` | API key for authentication | - | Yes* |
 | `TRUENAS_USERNAME` | Username for authentication | - | Yes* |
 | `TRUENAS_PASSWORD` | Password for authentication | - | Yes* |
+| `TRUENAS_VERIFY_SSL` | Enable SSL certificate verification | true | No |
 | `SECRET_KEY` | JWT secret key | - | Yes |
 | `ADMIN_USERNAME` | MCP admin username for JWT auth | - | Yes** |
 | `ADMIN_PASSWORD` | MCP admin password for JWT auth | - | Yes** |
@@ -139,6 +140,19 @@ kubectl create secret generic truenas-mcp-secrets \
 
 *Either API key or username/password is required for TrueNAS authentication.
 **Required for JWT authentication. Used to create the MCP admin user.
+
+### ⚠️ SSL/TLS Security
+
+**IMPORTANT:** Always use `TRUENAS_VERIFY_SSL=true` in production environments!
+
+SSL certificate verification is **enabled by default** to protect against man-in-the-middle attacks. Only disable it for:
+- Development environments with self-signed certificates
+- Testing purposes in isolated networks
+
+When SSL verification is disabled, the server will emit a prominent warning on startup. For production deployments:
+1. Use properly signed SSL certificates (Let's Encrypt, commercial CA, or internal CA)
+2. Keep `TRUENAS_VERIFY_SSL=true` (the default)
+3. See [SECURITY.md](SECURITY.md) for detailed SSL configuration guidance
 
 ### Using the CLI
 

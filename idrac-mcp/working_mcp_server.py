@@ -52,6 +52,7 @@ def redact_sensitive_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
 def create_example_config(config_path: str = 'config.json') -> None:
     """Create an example configuration file."""
     example_config = {
+        "_comment": "IMPORTANT: Always use ssl_verify=true in production to prevent MITM attacks! Only set to false for development/testing with self-signed certificates. See SECURITY.md for proper certificate setup.",
         "idrac_servers": {
             "server1": {
                 "name": "Production Server 1",
@@ -60,7 +61,7 @@ def create_example_config(config_path: str = 'config.json') -> None:
                 "protocol": "https",
                 "username": "root",
                 "password": "your_password_here",
-                "ssl_verify": False
+                "ssl_verify": True
             },
             "server2": {
                 "name": "Production Server 2",
@@ -69,7 +70,7 @@ def create_example_config(config_path: str = 'config.json') -> None:
                 "protocol": "https",
                 "username": "root",
                 "password": "your_password_here",
-                "ssl_verify": False
+                "ssl_verify": True
             }
         },
         "default_server": "server1",
@@ -492,6 +493,25 @@ class WorkingIDracMCPServer:
         # Set default server
         self.default_server = default_server or list(self.servers.keys())[0]
         debug_print(f"Default server: {self.default_server}")
+        
+        # Check for SSL verification issues and emit warning
+        ssl_disabled_servers = [
+            server_id for server_id, config in self.servers.items()
+            if not config.get("ssl_verify", False)
+        ]
+        if ssl_disabled_servers:
+            print("\n" + "="*80, file=sys.stderr)
+            print("⚠️  WARNING: SSL VERIFICATION DISABLED ⚠️", file=sys.stderr)
+            print("="*80, file=sys.stderr)
+            print("\nSSL certificate verification is DISABLED for the following servers:", file=sys.stderr)
+            for server_id in ssl_disabled_servers:
+                print(f"  - {server_id} ({self.servers[server_id]['name']})", file=sys.stderr)
+            print("\nThis makes your connections vulnerable to man-in-the-middle attacks.", file=sys.stderr)
+            print("DO NOT use this configuration in production!", file=sys.stderr)
+            print("\nTo enable SSL verification, set 'ssl_verify': true in config.json", file=sys.stderr)
+            print("or IDRAC_SSL_VERIFY=true in .env file.", file=sys.stderr)
+            print("See SECURITY.md for information on proper SSL certificate setup.", file=sys.stderr)
+            print("="*80 + "\n", file=sys.stderr)
         
         # Initialize iDRAC clients for all servers
         self.idrac_clients = {}

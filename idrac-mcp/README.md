@@ -24,7 +24,7 @@ Create a `config.json` file in the same directory as the server:
       "protocol": "https",
       "username": "root",
       "password": "your_password_here",
-      "ssl_verify": false
+      "ssl_verify": true
     },
     "backup": {
       "name": "Backup Server",
@@ -33,7 +33,7 @@ Create a `config.json` file in the same directory as the server:
       "protocol": "https",
       "username": "root",
       "password": "your_password_here",
-      "ssl_verify": false
+      "ssl_verify": true
     }
   },
   "default_server": "production",
@@ -53,9 +53,24 @@ Create a `config.json` file in the same directory as the server:
   - **`protocol`**: Protocol to use (http or https)
   - **`username`**: iDRAC username (usually "root")
   - **`password`**: iDRAC password
-  - **`ssl_verify`**: Whether to verify SSL certificates (set to false for self-signed)
+  - **`ssl_verify`**: Whether to verify SSL certificates (default: true, recommended for production)
 - **`default_server`**: ID of the server to use when no server_id is specified
 - **`server`**: MCP server configuration
+
+### ⚠️ SSL/TLS Security
+
+**IMPORTANT:** Always use `"ssl_verify": true` in production environments!
+
+SSL certificate verification is **enabled by default** in all example configurations to protect against man-in-the-middle attacks. Only disable it (`"ssl_verify": false`) for:
+- Development environments with self-signed certificates
+- Testing purposes in isolated networks
+- Temporary troubleshooting (re-enable immediately after)
+
+When SSL verification is disabled for any server, the server will emit a prominent warning on startup listing all affected servers. For production deployments:
+1. Use properly signed SSL certificates (Let's Encrypt, commercial CA, or internal CA)
+2. Keep `"ssl_verify": true` in your config.json (the default)
+3. Alternatively, set `IDRAC_SSL_VERIFY=true` in your .env file
+4. See [SECURITY.md](SECURITY.md) for detailed SSL configuration guidance
 
 ## Available Tools
 

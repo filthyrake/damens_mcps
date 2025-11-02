@@ -61,23 +61,83 @@ chmod 600 config.json
 **Always use SSL verification in production:**
 
 ```bash
-TRUENAS_SSL_VERIFY=true
+TRUENAS_VERIFY_SSL=true  # This is the default
 ```
 
+**⚠️ CRITICAL SECURITY NOTICE:**
+- SSL verification is **enabled by default** in all example configurations
+- The server will emit a visible warning on startup if SSL verification is disabled
+- Disabling SSL verification exposes your system to **man-in-the-middle attacks**
+- An attacker could intercept credentials and API calls between the MCP server and TrueNAS
+
 **Valid Certificate Options:**
-1. **Let's Encrypt** (free, automated)
-2. **Commercial CA certificates** (DigiCert, etc.)
+1. **Let's Encrypt** (free, automated, recommended)
+   - Free SSL certificates with automatic renewal
+   - Widely trusted by all major browsers and systems
+   - Easy to set up with most web servers
+2. **Commercial CA certificates** (DigiCert, GlobalSign, etc.)
+   - Best for enterprise environments requiring specific compliance
+   - Provides extended validation options
 3. **Internal CA** (for enterprise environments)
+   - Allows centralized certificate management
+   - Requires distribution of CA certificate to all clients
+   - Good for isolated networks without internet access
 
 #### Development/Testing
 
-Self-signed certificates can be used for testing:
+Self-signed certificates should **only** be used for testing in isolated environments:
 
 ```bash
-TRUENAS_SSL_VERIFY=false  # Development only!
+TRUENAS_VERIFY_SSL=false  # ⚠️ Development/testing only!
 ```
 
-**⚠️ Warning:** Disabling SSL verification makes you vulnerable to man-in-the-middle attacks.
+**When to disable SSL verification:**
+- Local development with self-signed certificates
+- Testing in isolated lab environments
+- Temporary troubleshooting (re-enable immediately after)
+
+**Never disable SSL verification when:**
+- Deploying to production
+- Connecting over untrusted networks
+- Handling sensitive data
+- Accessing the system remotely
+
+#### Setting Up Proper SSL Certificates
+
+**Option 1: Let's Encrypt (Recommended)**
+```bash
+# Install certbot on TrueNAS
+pkg install py39-certbot
+
+# Generate certificate
+certbot certonly --standalone -d truenas.yourdomain.com
+
+# Configure TrueNAS to use the certificate via the web UI:
+# System -> Certificates -> Import Certificate
+```
+
+**Option 2: Import Commercial Certificate**
+1. Purchase certificate from a CA
+2. Generate CSR in TrueNAS (System -> Certificates)
+3. Submit CSR to CA
+4. Import signed certificate back into TrueNAS
+
+**Option 3: Internal CA for Enterprise**
+```bash
+# On your CA server, generate certificate for TrueNAS
+openssl req -new -key truenas.key -out truenas.csr
+
+# Sign with your internal CA
+openssl x509 -req -in truenas.csr -CA ca.crt -CAkey ca.key -out truenas.crt
+
+# Import into TrueNAS via System -> Certificates
+```
+
+**After installing a valid certificate:**
+1. Verify the certificate is active in TrueNAS web UI
+2. Set `TRUENAS_VERIFY_SSL=true` in your .env file
+3. Restart the MCP server
+4. Confirm no SSL warnings appear
 
 #### Certificate Best Practices
 
