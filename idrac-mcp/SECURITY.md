@@ -176,6 +176,133 @@ export IDRAC_PASSWORD="$(cat /secure/vault/idrac_password)"
 
 ---
 
+## 🔐 SSL/TLS Configuration
+
+### Production Requirements
+
+**Always use SSL verification in production:**
+
+```json
+{
+  "idrac_servers": {
+    "server1": {
+      "ssl_verify": true  // This is now the default
+    }
+  }
+}
+```
+
+Or with environment variables:
+```bash
+IDRAC_SSL_VERIFY=true  # This is the default
+```
+
+**⚠️ CRITICAL SECURITY NOTICE:**
+- SSL verification is **enabled by default** in all example configurations
+- The server will emit a visible warning on startup listing any servers with SSL verification disabled
+- Disabling SSL verification exposes your system to **man-in-the-middle attacks**
+- An attacker could intercept credentials and API calls between the MCP server and iDRAC
+
+**Valid Certificate Options:**
+1. **iDRAC Default Certificate** (Dell-signed)
+   - Pre-installed on all iDRAC systems
+   - May show browser warnings (self-signed)
+   - Replace with proper certificate for production
+2. **Commercial CA certificates** (DigiCert, GlobalSign, etc.)
+   - Best for enterprise environments requiring specific compliance
+   - Trusted by all systems without additional configuration
+3. **Internal CA** (for enterprise environments)
+   - Allows centralized certificate management
+   - Requires distribution of CA certificate to all clients
+   - Good for isolated networks without internet access
+
+### Development/Testing
+
+Self-signed certificates should **only** be used for testing in isolated environments:
+
+```json
+{
+  "ssl_verify": false  // ⚠️ Development/testing only!
+}
+```
+
+**When to disable SSL verification:**
+- Local development with default iDRAC self-signed certificates
+- Testing in isolated lab environments
+- Temporary troubleshooting (re-enable immediately after)
+
+**Never disable SSL verification when:**
+- Deploying to production
+- Connecting over untrusted networks
+- Managing production servers
+- Accessing the system remotely over the internet
+
+### Setting Up Proper SSL Certificates on iDRAC
+
+**Option 1: Generate CSR and Import Certificate**
+1. Log into iDRAC web interface
+2. Navigate to: **iDRAC Settings → Network → SSL**
+3. Click **Generate New Certificate (CSR)**
+4. Fill in certificate details (Common Name = iDRAC hostname/IP)
+5. Download the CSR file
+6. Submit CSR to your CA (internal or commercial)
+7. Upload the signed certificate back to iDRAC
+8. Restart iDRAC web server
+
+**Option 2: Import Existing Certificate**
+1. Navigate to: **iDRAC Settings → Network → SSL**
+2. Click **Upload Server Certificate**
+3. Upload your certificate file (.pem or .crt)
+4. Upload your private key file (.key)
+5. Optionally upload intermediate CA certificates
+6. Restart iDRAC web server
+
+**Option 3: Using OpenSSL (Internal CA)**
+```bash
+# Generate private key
+openssl genrsa -out idrac.key 2048
+
+# Generate CSR
+openssl req -new -key idrac.key -out idrac.csr \
+  -subj "/CN=idrac.example.com/O=YourOrg"
+
+# Sign with your internal CA
+openssl x509 -req -in idrac.csr -CA ca.crt -CAkey ca.key \
+  -out idrac.crt -days 365 -CAcreateserial
+
+# Upload idrac.crt and idrac.key to iDRAC via web interface
+```
+
+**After installing a valid certificate:**
+1. Verify the certificate in iDRAC web UI (check expiration date)
+2. Set `"ssl_verify": true` in your config.json
+3. Or set `IDRAC_SSL_VERIFY=true` in your .env file
+4. Restart the MCP server
+5. Confirm no SSL warnings appear on startup
+
+**Certificate Verification with Custom CA:**
+
+If using an internal CA, you may need to trust the CA certificate:
+```bash
+# On the system running the MCP server:
+
+# For system-wide trust (Linux):
+sudo cp your-internal-ca.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+
+# For Python requests library (alternative):
+export REQUESTS_CA_BUNDLE=/path/to/your-ca-bundle.crt
+```
+
+Or specify the CA certificate path in configuration:
+```json
+{
+  "ssl_verify": "/path/to/ca-bundle.crt"
+}
+```
+
+---
+
 ## 🔒 General Security Recommendations
 
 ### File Permissions
