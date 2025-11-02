@@ -3,7 +3,7 @@ repos:
     rev: 24.1.1
     hooks:
       - id: black
-        language_version: python3.12
+        language_version: python3
         args: ['--line-length=120']
 
   - repo: https://github.com/pycqa/isort
@@ -11,6 +11,7 @@ repos:
     hooks:
       - id: isort
         args: ['--profile', 'black', '--line-length', '120']
+        stages: [commit]
 
   - repo: https://github.com/pycqa/flake8
     rev: 7.0.0
@@ -36,10 +37,41 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        stages: [commit]
       - id: end-of-file-fixer
+        stages: [commit]
       - id: check-yaml
+        stages: [commit]
       - id: check-added-large-files
+        stages: [commit]
       - id: check-json
+        stages: [commit]
       - id: check-toml
+        stages: [commit]
       - id: check-merge-conflict
+        stages: [commit]
       - id: detect-private-key
+        stages: [commit]
+      - id: forbid-new-submodules
+        stages: [commit]
+      - id: no-commit-to-branch
+        args: ['--branch', 'main', '--branch', 'master']
+        stages: [commit]
+
+  # Detect secrets like API keys, passwords, and tokens
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package.lock.json
+
+  # Additional security checks - prevent .env files from being committed
+  - repo: local
+    hooks:
+      - id: block-env-files
+        name: Block .env files
+        entry: .env files should never be committed - use .env.example instead
+        language: fail
+        files: '^.*\.env$'
+        exclude: '\.env\.example$|env\.example$'

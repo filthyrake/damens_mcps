@@ -85,6 +85,17 @@ We are committed to addressing security issues promptly:
 5. **Credit** in security advisory (if desired)
 6. **CVE assignment** for significant issues
 
+## Security Incident Response
+
+**If you accidentally commit credentials to the repository:**
+
+1. **IMMEDIATELY** rotate the exposed credentials on the target system
+2. Follow the [Security Incident Response Guide](SECURITY_INCIDENT_RESPONSE.md)
+3. Notify repository maintainers
+4. Do NOT commit new credentials as a "fix"
+
+See [SECURITY_INCIDENT_RESPONSE.md](SECURITY_INCIDENT_RESPONSE.md) for detailed remediation procedures.
+
 ## Security Best Practices
 
 ### For Contributors
@@ -98,6 +109,7 @@ When contributing code:
 - **Sanitize error messages** to avoid information leakage
 - **Follow least privilege principle** in all designs
 - **Review project-specific SECURITY.md** files
+- **Install and use pre-commit hooks** to prevent credential commits
 
 ### For Users/Deployers
 
