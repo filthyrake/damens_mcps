@@ -32,6 +32,22 @@ def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
     print(f"DEBUG: {message}", file=sys.stderr)
 
+def redact_sensitive_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
+    """Redact sensitive header values for safe logging."""
+    if not isinstance(headers, dict):
+        return headers
+    
+    sensitive_keys = ['authorization', 'cookie', 'x-auth-token', 'set-cookie']
+    redacted = {}
+    
+    for key, value in headers.items():
+        if key.lower() in sensitive_keys:
+            redacted[key] = "REDACTED"
+        else:
+            redacted[key] = value
+    
+    return redacted
+
 def create_example_config(config_path: str = 'config.json') -> None:
     """Create an example configuration file."""
     example_config = {
@@ -136,16 +152,18 @@ class IDracClient:
         # Debug: Print session info (redacted to avoid sensitive details)
         debug_print("Created iDRAC client (connection details redacted)")
         debug_print(f"SSL Verify: {ssl_verify}")
-        debug_print(f"Session headers: {dict(self.session.headers)}")
-        debug_print(f"Auth type: {type(self.auth)}")
+        safe_headers = redact_sensitive_headers(dict(self.session.headers))
+        debug_print(f"Session headers: {safe_headers}")
+        debug_print(f"Auth type: {type(self.auth).__name__}")
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make a request with proper error handling and debugging."""
         url = f"{self.base_url}{endpoint}"
         debug_print(f"Making {method} request to: {url}")
-        debug_print(f"Session auth: {self.session.auth}")
-        debug_print(f"Session cookies: {dict(self.session.cookies)}")
-        debug_print(f"Session headers: {dict(self.session.headers)}")
+        debug_print(f"Session auth configured: {self.session.auth is not None}")
+        debug_print(f"Session has cookies: {len(self.session.cookies)} cookies")
+        safe_headers = redact_sensitive_headers(dict(self.session.headers))
+        debug_print(f"Session headers: {safe_headers}")
         
         try:
             if method.upper() == 'GET':
@@ -156,16 +174,17 @@ class IDracClient:
                 raise ValueError(f"Unsupported method: {method}")
             
             debug_print(f"Response status: {response.status_code}")
-            debug_print(f"Response headers: {dict(response.headers)}")
-            debug_print(f"Response cookies: {dict(response.cookies)}")
+            safe_response_headers = redact_sensitive_headers(dict(response.headers))
+            debug_print(f"Response headers: {safe_response_headers}")
+            debug_print(f"Response has cookies: {len(response.cookies)} cookies")
             
             if response.status_code == 401:
                 debug_print("401 Unauthorized - attempting to re-authenticate")
                 # Clear any existing cookies and re-authenticate
                 self.session.cookies.clear()
                 self.session.auth = self.auth
-                debug_print(f"Re-authenticated with: {self.session.auth}")
-                debug_print(f"Cleared cookies, new cookies: {dict(self.session.cookies)}")
+                debug_print(f"Re-authenticated with auth type: {type(self.auth).__name__}")
+                debug_print(f"Cleared cookies, session now has: {len(self.session.cookies)} cookies")
                 
                 # Retry the request
                 if method.upper() == 'GET':
@@ -174,7 +193,7 @@ class IDracClient:
                     response = self.session.post(url, timeout=10, **kwargs)
                 
                 debug_print(f"Retry response status: {response.status_code}")
-                debug_print(f"Retry response cookies: {dict(response.cookies)}")
+                debug_print(f"Retry response has cookies: {len(response.cookies)} cookies")
             
             return response
             
