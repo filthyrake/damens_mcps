@@ -44,9 +44,6 @@ class SecureConfigManager:
         if not self.master_password:
             raise ValueError("Master password required for encrypted configuration")
         
-        if self.master_password == "":
-            raise ValueError("Master password cannot be empty")
-        
         self.salt = salt
         
         # Derive key from password using PBKDF2 (OWASP 2023 recommendation: 480,000 iterations)
