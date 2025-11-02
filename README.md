@@ -3,6 +3,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Issues](https://img.shields.io/github/issues/filthyrake/damens_mcps)](https://github.com/filthyrake/damens_mcps/issues)
 [![GitHub Stars](https://img.shields.io/github/stars/filthyrake/damens_mcps)](https://github.com/filthyrake/damens_mcps/stargazers)
+[![Test Status](https://github.com/filthyrake/damens_mcps/workflows/Test%20MCP%20Servers/badge.svg)](https://github.com/filthyrake/damens_mcps/actions/workflows/test.yml)
+[![Code Quality](https://github.com/filthyrake/damens_mcps/workflows/Code%20Quality%20Checks/badge.svg)](https://github.com/filthyrake/damens_mcps/actions/workflows/code-quality.yml)
+[![codecov](https://codecov.io/gh/filthyrake/damens_mcps/branch/main/graph/badge.svg)](https://codecov.io/gh/filthyrake/damens_mcps)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+[![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
 > **Note:** These MCP servers were generated using [Cursor](https://cursor.sh/) AI tools. While functional, they may benefit from human review and refinement for production use.
 
@@ -203,6 +210,7 @@ Each project has detailed documentation:
 
 - **Individual READMEs** in each project directory
 - **[CLAUDE.md](CLAUDE.md)** - Development guidelines and architecture overview for AI assistant integration
+- **[CODE_QUALITY.md](CODE_QUALITY.md)** - Code quality standards and tools documentation
 - **API Documentation** in `docs/` folders
 - **Example scripts** in `examples/` directories
 - **Deployment guides** for Docker and Kubernetes

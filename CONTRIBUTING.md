@@ -146,7 +146,17 @@ cp env.example .env  # or config.example.json to config.json
 nano .env
 ```
 
-### 5. Verify Setup
+### 5. Install Pre-commit Hooks
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install the hooks
+pre-commit install
+```
+
+### 6. Verify Setup
 
 ```bash
 # Run tests to verify setup
@@ -158,11 +168,11 @@ python -m src.server  # Command varies by project
 
 ## Coding Standards
 
-All projects follow these standards:
+All projects follow these standards. For comprehensive details, see [CODE_QUALITY.md](CODE_QUALITY.md).
 
 ### Python Style
 
-- **PEP 8** compliance with 100-character line length
+- **PEP 8** compliance with 120-character line length
 - **Type hints** required for all function signatures
 - **Docstrings** required for all public APIs (Google-style)
 - **Naming conventions**:
@@ -173,17 +183,30 @@ All projects follow these standards:
 
 ### Code Quality Tools
 
+We use automated code quality tools (enforced via pre-commit hooks and CI/CD):
+
 ```bash
-# Format code (if you have these installed)
-black src/ --line-length 100
-isort src/
+# Install quality tools
+pip install flake8 black isort mypy bandit safety pylint interrogate
+
+# Format code
+black src/ tests/ --line-length=120
+isort src/ tests/ --profile black --line-length=120
 
 # Check style
-flake8 src/ --max-line-length=100
+flake8 src/ tests/ --max-line-length=120 --extend-ignore=E203,W503
 
 # Type checking
-mypy src/
+mypy src/ --ignore-missing-imports --no-strict-optional
+
+# Security scan
+bandit -r src/ -ll
+
+# Check dependencies
+safety check
 ```
+
+See [CODE_QUALITY.md](CODE_QUALITY.md) for complete documentation.
 
 ### Security Requirements
 
