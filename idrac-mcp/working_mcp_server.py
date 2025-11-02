@@ -16,17 +16,17 @@ from urllib3.exceptions import InsecureRequestWarning
 from requests.auth import HTTPBasicAuth
 
 # Import validation utilities
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'utils'))
+_validation_path = os.path.join(os.path.dirname(__file__), 'src', 'utils')
+sys.path.insert(0, _validation_path)
 try:
     from validation import validate_server_id
-except ImportError:
-    # Fallback if validation module not available
-    def validate_server_id(server_id: str) -> bool:
-        """Fallback validation for server ID."""
-        import re
-        if not server_id or not isinstance(server_id, str):
-            return False
-        return bool(re.match(r'^[a-zA-Z0-9_-]+$', server_id)) and len(server_id) <= 128
+except ImportError as e:
+    # Fail immediately - this indicates a deployment problem that must be fixed
+    print(f"CRITICAL: Failed to import validation module: {e}", file=sys.stderr)
+    print("This indicates a deployment or configuration issue.", file=sys.stderr)
+    print(f"Expected validation module at: {os.path.join(_validation_path, 'validation.py')}", file=sys.stderr)
+    print("Ensure the file exists and all dependencies are installed.", file=sys.stderr)
+    sys.exit(1)
 
 def debug_print(message: str):
     """Print debug messages to stderr to avoid interfering with MCP protocol."""
