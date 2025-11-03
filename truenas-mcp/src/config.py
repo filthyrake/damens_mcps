@@ -3,6 +3,7 @@
 import os
 import secrets
 import string
+from collections import Counter
 from typing import Optional
 from pathlib import Path
 
@@ -39,7 +40,8 @@ def validate_secret_key_strength(key: str) -> bool:
         return False
 
     # Check for repeating patterns (no character should appear more than half the time)
-    if any(key.count(c) > len(key) // 2 for c in set(key)):
+    char_counts = Counter(key)
+    if any(count > len(key) // 2 for count in char_counts.values()):
         return False
 
     return True
