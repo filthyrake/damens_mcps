@@ -269,8 +269,6 @@ def validate_configuration(settings: Settings) -> None:
 
 def generate_secret_key() -> str:
     """Generate a secure secret key."""
-    import secrets
-
     return secrets.token_urlsafe(32)
 
 
