@@ -72,22 +72,27 @@ A **portable, HTTP-based** Model Context Protocol (MCP) server that provides an 
    python -m src.http_cli init
    ```
 
-3. **Update configuration**:
+3. **Generate a secure secret key**:
+   ```bash
+   python -c 'import secrets; print(secrets.token_urlsafe(32))'
+   ```
+   
+4. **Update configuration**:
    Edit `.env` file with your TrueNAS details:
    ```env
    TRUENAS_HOST=your-truenas-host.example.com
    TRUENAS_API_KEY=your-api-key-here
-   SECRET_KEY=your-generated-secret-key
+   SECRET_KEY=<paste-generated-key-here>
    ADMIN_USERNAME=your-admin-username
    ADMIN_PASSWORD=your-secure-admin-password
    ```
 
-4. **Start server**:
+5. **Start server**:
    ```bash
    python -m src.http_cli serve
    ```
 
-5. **Test connection**:
+6. **Test connection**:
    ```bash
    python -m src.http_cli health
    ```
@@ -153,6 +158,44 @@ When SSL verification is disabled, the server will emit a prominent warning on s
 1. Use properly signed SSL certificates (Let's Encrypt, commercial CA, or internal CA)
 2. Keep `TRUENAS_VERIFY_SSL=true` (the default)
 3. See [SECURITY.md](SECURITY.md) for detailed SSL configuration guidance
+
+### 🔐 Secret Key Generation
+
+**IMPORTANT:** The `SECRET_KEY` is used to sign JWT tokens and must be cryptographically secure!
+
+The server enforces strong secret key requirements:
+- **Minimum 32 characters**
+- **At least 3 of 4 character types:** lowercase, uppercase, digits, special characters
+- **No excessive repetition:** no single character can appear more than half the time
+
+#### Generating a Secure Secret Key
+
+**Recommended method** (Python secrets module):
+```bash
+python -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+**Alternative methods:**
+```bash
+# Using OpenSSL
+openssl rand -base64 32
+
+# Using /dev/urandom (Linux/macOS)
+head -c 32 /dev/urandom | base64
+```
+
+**❌ DO NOT USE weak keys like:**
+- `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"` (all same character)
+- `"00000000000000000000000000000000"` (all zeros)
+- `"password123password123password123"` (predictable patterns)
+- Short keys under 32 characters
+
+**Why this matters:**
+- Weak keys make JWT tokens easy to forge
+- Attackers could gain unauthorized access to your TrueNAS system
+- Compromise of JWT tokens = full API access with user's permissions
+
+See [SECURITY.md](SECURITY.md) for more details on JWT token security.
 
 ### Using the CLI
 
