@@ -147,6 +147,103 @@ openssl x509 -req -in truenas.csr -CA ca.crt -CAkey ca.key -out truenas.crt
 - **Use strong key sizes** (2048-bit RSA minimum, 256-bit ECC)
 - **Disable weak ciphers** (RC4, 3DES, MD5)
 
+### JWT Token Security
+
+#### Secret Key Requirements
+
+**CRITICAL:** The `SECRET_KEY` environment variable is used to sign JWT authentication tokens. A weak key compromises the entire authentication system.
+
+**The server enforces strong secret key requirements:**
+- **Minimum 32 characters long**
+- **At least 3 of 4 character types:** lowercase letters, uppercase letters, digits, special characters
+- **No excessive repetition:** no single character can appear more than half the time
+
+#### Generating Secure Secret Keys
+
+**Recommended method** (Python secrets module):
+```bash
+python -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+**Alternative methods:**
+```bash
+# Using OpenSSL
+openssl rand -base64 32
+
+# Using /dev/urandom (Linux/macOS)
+head -c 32 /dev/urandom | base64
+```
+
+**❌ Examples of WEAK keys that will be REJECTED:**
+```bash
+SECRET_KEY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # All same character
+SECRET_KEY=00000000000000000000000000000000  # All zeros  
+SECRET_KEY=abcdefghijklmnopqrstuvwxyzabcdef  # Only lowercase, no diversity
+SECRET_KEY=password123password123password123 # Predictable pattern
+SECRET_KEY=short                             # Too short
+```
+
+**✅ Examples of STRONG keys that will be ACCEPTED:**
+```bash
+SECRET_KEY=MyS3cureP@ssw0rd!WithMixedChars123  # Mixed character types
+SECRET_KEY=Abcd1234!@#$efgh5678%^&*IJKL9876   # High entropy
+SECRET_KEY=K7mN_p2QrS-tU3vWx4Yz!A5bC6dE7fG8  # Random generation
+```
+
+#### Why JWT Token Security Matters
+
+JWT tokens provide authentication for the MCP server HTTP API. If the secret key is compromised:
+
+**Attack Scenarios:**
+1. **Token Forgery:** Attacker creates valid JWT tokens with any username/permissions
+2. **Privilege Escalation:** Attacker gains admin access to TrueNAS through forged tokens
+3. **Data Breach:** Full read/write access to all TrueNAS data and configurations
+4. **System Compromise:** Ability to execute any API call with admin privileges
+
+**Impact:**
+- Complete bypass of authentication system
+- Unauthorized access to storage systems
+- Potential data loss or corruption
+- Breach of multi-tenant boundaries
+- Compliance violations (HIPAA, SOC2, etc.)
+
+#### JWT Token Best Practices
+
+**Secret Key Management:**
+- Generate keys using cryptographically secure random number generators
+- Store keys in environment variables, never in code or git
+- Rotate keys periodically (recommended: every 90 days)
+- Use different keys for development, staging, and production
+- Treat secret keys with same sensitivity as root passwords
+
+**Token Configuration:**
+```bash
+# Strong secret key (required)
+SECRET_KEY=<generated-secure-key>
+
+# Token expiration (default: 30 minutes)
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# JWT algorithm (default: HS256)
+JWT_ALGORITHM=HS256
+```
+
+**Token Handling:**
+- Use HTTPS/TLS for all API calls to prevent token interception
+- Set appropriate token expiration times (30 minutes recommended)
+- Implement token refresh mechanisms for long-running sessions
+- Revoke tokens on logout or password change
+- Monitor for unusual token usage patterns
+
+**Validation on Startup:**
+The server validates secret key strength on startup. If validation fails:
+```
+ValidationError: SECRET_KEY must be at least 32 characters with sufficient entropy.
+Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+This prevents the server from starting with weak keys, protecting against configuration errors.
+
 ### Network Security
 
 #### Network Segmentation
