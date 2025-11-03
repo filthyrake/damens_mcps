@@ -7,7 +7,7 @@ import os
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from config import TrueNASConfig, ServerConfig, AuthConfig
+from config import TrueNASConfig, ServerConfig, AuthConfig, validate_secret_key_strength
 from pydantic import ValidationError
 
 
@@ -95,9 +95,10 @@ class TestServerConfigValidators:
 class TestAuthConfigValidators:
     """Test authentication configuration validators."""
     
-    def test_valid_auth_config(self):
-        """Test valid auth configuration."""
-        secret = "a" * 32  # 32 characters minimum
+    def test_valid_auth_config_with_strong_key(self):
+        """Test valid auth configuration with strong key."""
+        # Strong key with mixed characters (at least 32 chars)
+        secret = "MyS3cureP@ssw0rd!WithMixedChars123"
         config = AuthConfig(secret_key=secret)
         assert config.secret_key == secret
         assert config.algorithm == "HS256"
@@ -107,19 +108,115 @@ class TestAuthConfigValidators:
         with pytest.raises(ValidationError) as exc_info:
             AuthConfig(secret_key="tooshort")
         
-        assert "Secret key must be at least 32 characters long" in str(exc_info.value)
+        assert "sufficient entropy" in str(exc_info.value)
     
-    def test_secret_key_exactly_32_chars(self):
-        """Test that exactly 32 character secret key is accepted."""
-        secret = "a" * 32
-        config = AuthConfig(secret_key=secret)
-        assert len(config.secret_key) == 32
+    def test_secret_key_weak_all_lowercase(self):
+        """Test that weak key with only lowercase is rejected."""
+        weak_key = "a" * 32  # Only lowercase letters, no diversity
+        with pytest.raises(ValidationError) as exc_info:
+            AuthConfig(secret_key=weak_key)
+        
+        assert "sufficient entropy" in str(exc_info.value)
+        assert "Generate with:" in str(exc_info.value)
     
-    def test_secret_key_longer_than_32_chars(self):
-        """Test that longer secret key is accepted."""
-        secret = "a" * 64
-        config = AuthConfig(secret_key=secret)
-        assert len(config.secret_key) == 64
+    def test_secret_key_weak_all_zeros(self):
+        """Test that weak key with all zeros is rejected."""
+        weak_key = "0" * 32
+        with pytest.raises(ValidationError) as exc_info:
+            AuthConfig(secret_key=weak_key)
+        
+        assert "sufficient entropy" in str(exc_info.value)
+    
+    def test_secret_key_weak_repetitive(self):
+        """Test that repetitive weak key is rejected."""
+        weak_key = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # 32 'a' characters
+        with pytest.raises(ValidationError) as exc_info:
+            AuthConfig(secret_key=weak_key)
+        
+        assert "sufficient entropy" in str(exc_info.value)
+
+
+class TestSecretKeyEntropyValidation:
+    """Test secret key entropy validation function."""
+    
+    def test_validate_secret_key_strength_function(self):
+        """Test the validate_secret_key_strength helper function directly."""
+        # Strong keys should pass (at least 32 characters)
+        assert validate_secret_key_strength("MyS3cureP@ssw0rd!WithMixedChars123") is True
+        assert validate_secret_key_strength("Abcd1234!@#$efgh5678%^&*IJKL9876") is True
+        
+        # Weak keys should fail
+        assert validate_secret_key_strength("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") is False
+        assert validate_secret_key_strength("00000000000000000000000000000000") is False
+        assert validate_secret_key_strength("short") is False
+    
+    def test_weak_key_insufficient_diversity(self):
+        """Test that keys with insufficient character diversity are rejected."""
+        # Only lowercase and uppercase (2 types)
+        weak_key = "abcdefghijklmnopqrstuvwxyzABCDE"
+        assert validate_secret_key_strength(weak_key) is False
+        
+        # Only lowercase and digits (2 types)
+        weak_key = "abcdefghijklmnopqrstuvw1234567"
+        assert validate_secret_key_strength(weak_key) is False
+    
+    def test_weak_key_too_repetitive(self):
+        """Test that keys with too much repetition are rejected."""
+        # More than half the characters are the same
+        weak_key = "aaaaaaaaaaaaaaaaaaBBBccccDDDD12!"
+        assert validate_secret_key_strength(weak_key) is False
+    
+    def test_strong_key_with_three_types(self):
+        """Test that keys with 3 character types are accepted."""
+        # Lowercase, uppercase, and digits (3 types, at least 32 chars)
+        strong_key = "AbCdEfGh1234567890IjKlMnOpQrStUv"
+        assert validate_secret_key_strength(strong_key) is True
+        
+        # Lowercase, uppercase, and special (3 types, at least 32 chars)
+        strong_key = "AbCdEfGh!@#$%^&*()IjKlMnOpQrStUv"
+        assert validate_secret_key_strength(strong_key) is True
+        
+        # Lowercase, digits, and special (3 types, at least 32 chars)
+        strong_key = "abcdefgh1234567890!@#$%^&*()xyzw"
+        assert validate_secret_key_strength(strong_key) is True
+    
+    def test_strong_key_with_four_types(self):
+        """Test that keys with all 4 character types are accepted."""
+        strong_key = "Abc123!@#DefGhi456$%^JklMno789Xyz"
+        assert validate_secret_key_strength(strong_key) is True
+    
+    def test_strong_key_generated_by_secrets(self):
+        """Test that keys generated by secrets module pass validation."""
+        import secrets
+        generated_key = secrets.token_urlsafe(32)
+        assert validate_secret_key_strength(generated_key) is True
+    
+    def test_config_with_strong_keys_accepted(self):
+        """Test that AuthConfig accepts strong keys."""
+        strong_keys = [
+            "MyS3cureP@ssw0rd!WithMixedChars123",
+            "Abcd1234!@#$efgh5678%^&*IJKL9876",
+            "P@ssw0rd123!SecureKeyHere$456Extra",
+        ]
+        
+        for key in strong_keys:
+            config = AuthConfig(secret_key=key)
+            assert config.secret_key == key
+    
+    def test_config_with_weak_keys_rejected(self):
+        """Test that AuthConfig rejects weak keys."""
+        weak_keys = [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",  # All same character
+            "00000000000000000000000000000000",  # All zeros
+            "abcdefghijklmnopqrstuvwxyzabcde",  # Only lowercase
+            "12345678901234567890123456789012",  # Only digits
+            "abcdefghijklmnopqrstuvwx12345678",  # Only 2 types
+        ]
+        
+        for key in weak_keys:
+            with pytest.raises(ValidationError) as exc_info:
+                AuthConfig(secret_key=key)
+            assert "sufficient entropy" in str(exc_info.value)
 
 
 class TestPydanticV2Migration:
@@ -138,7 +235,7 @@ class TestPydanticV2Migration:
         with pytest.raises(ValidationError):
             TrueNASConfig(host="test.com", port=0, api_key="test")
         
-        # Test secret key validation
+        # Test secret key validation (should fail due to insufficient entropy)
         with pytest.raises(ValidationError):
             AuthConfig(secret_key="short")
     
@@ -153,6 +250,11 @@ class TestPydanticV2Migration:
         
         with pytest.raises(ValidationError):
             TrueNASConfig(host="", api_key="test")
+        
+        # Test that strong secret keys work (at least 32 chars)
+        strong_key = "MyS3cureP@ssw0rd!WithMixedChars123"
+        config = AuthConfig(secret_key=strong_key)
+        assert config.secret_key == strong_key
 
 
 if __name__ == "__main__":

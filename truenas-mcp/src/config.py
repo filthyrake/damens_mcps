@@ -1,11 +1,48 @@
 """Configuration management for TrueNAS MCP Server."""
 
 import os
+import secrets
+import string
 from typing import Optional
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
+
+
+def validate_secret_key_strength(key: str) -> bool:
+    """Validate secret key has sufficient entropy.
+    
+    Args:
+        key: The secret key to validate
+        
+    Returns:
+        True if the key has sufficient entropy, False otherwise
+        
+    Requirements:
+        - At least 32 characters long
+        - At least 3 of 4 character types (lowercase, uppercase, digits, special)
+        - No single character repeated more than half the key length
+    """
+    if len(key) < 32:
+        return False
+    
+    # Check for character diversity
+    has_lower = any(c in string.ascii_lowercase for c in key)
+    has_upper = any(c in string.ascii_uppercase for c in key)
+    has_digit = any(c in string.digits for c in key)
+    has_special = any(c in string.punctuation for c in key)
+    
+    # Require at least 3 of 4 character types
+    diversity_count = sum([has_lower, has_upper, has_digit, has_special])
+    if diversity_count < 3:
+        return False
+    
+    # Check for repeating patterns (no character should appear more than half the time)
+    if any(key.count(c) > len(key) // 2 for c in set(key)):
+        return False
+    
+    return True
 
 
 class TrueNASConfig(BaseModel):
@@ -57,8 +94,11 @@ class AuthConfig(BaseModel):
     @field_validator('secret_key')
     @classmethod
     def validate_secret_key(cls, v):
-        if len(v) < 32:
-            raise ValueError("Secret key must be at least 32 characters long")
+        if not validate_secret_key_strength(v):
+            raise ValueError(
+                "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+                "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
         return v
 
 
@@ -126,8 +166,11 @@ class Settings(BaseSettings):
     @field_validator('secret_key')
     @classmethod
     def validate_secret_key(cls, v):
-        if len(v) < 32:
-            raise ValueError("SECRET_KEY must be at least 32 characters long")
+        if not validate_secret_key_strength(v):
+            raise ValueError(
+                "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+                "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
         return v
     
     @field_validator('truenas_port', 'server_port')
@@ -196,8 +239,11 @@ def validate_configuration(settings: Settings) -> None:
         raise ValueError("Either TRUENAS_API_KEY or TRUENAS_USERNAME/TRUENAS_PASSWORD must be set")
     
     # Validate authentication
-    if len(settings.secret_key) < 32:
-        raise ValueError("SECRET_KEY must be at least 32 characters long")
+    if not validate_secret_key_strength(settings.secret_key):
+        raise ValueError(
+            "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+            "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
     
     # Validate ports
     if not 1 <= settings.truenas_port <= 65535:
