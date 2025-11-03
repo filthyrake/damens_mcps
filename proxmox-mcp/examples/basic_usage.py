@@ -63,7 +63,11 @@ def test_proxmox_client():
         # Get version info
         print("  📊 Getting Proxmox version...")
         version_info = client.get_version()
-        print(f"  ✅ Version info: {version_info.get('status', 'unknown')}")
+        if version_info.get('status') == 'success':
+            version = version_info.get('version', {}).get('version', 'unknown')
+            print(f"  ✅ Proxmox version: {version}")
+        else:
+            print(f"  ⚠️  API call status: {version_info.get('status', 'unknown')}")
         
         # List nodes
         print("  🖥️  Listing nodes...")
