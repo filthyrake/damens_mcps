@@ -42,6 +42,40 @@ class TestProxmoxClient(unittest.TestCase):
         self.assertTrue(hasattr(self.client, 'host'))
         self.assertTrue(hasattr(self.client, 'username'))
     
+    def test_client_initialization_from_config_dict(self):
+        """Test that the client can be initialized from a config dictionary (as in basic_usage.py)."""
+        config = {
+            'host': '192.168.1.100',
+            'port': 8006,
+            'protocol': 'https',
+            'username': 'root',
+            'password': 'testpassword',
+            'realm': 'pam',
+            'ssl_verify': False
+        }
+        
+        # Mock the authentication to avoid actual API calls
+        with patch.object(ProxmoxClient, '_authenticate'):
+            # This pattern should match what's in basic_usage.py
+            client = ProxmoxClient(
+                host=config['host'],
+                port=config['port'],
+                protocol=config['protocol'],
+                username=config['username'],
+                password=config['password'],
+                realm=config.get('realm', 'pve'),
+                ssl_verify=config.get('ssl_verify', False)
+            )
+            
+            # Verify the client was initialized correctly
+            self.assertIsNotNone(client)
+            self.assertEqual(client.host, '192.168.1.100')
+            self.assertEqual(client.port, 8006)
+            self.assertEqual(client.protocol, 'https')
+            self.assertEqual(client.username, 'root')
+            self.assertEqual(client.realm, 'pam')
+            self.assertEqual(client.ssl_verify, False)
+    
     @patch('src.proxmox_client.ProxmoxClient._make_request')
     def test_test_connection(self, mock_make_request):
         """Test the test_connection method."""

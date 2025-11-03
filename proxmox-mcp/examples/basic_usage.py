@@ -45,22 +45,33 @@ def test_proxmox_client():
         
         # Create client instance
         print("  📡 Creating Proxmox client...")
-        client = ProxmoxClient(config)
+        client = ProxmoxClient(
+            host=config['host'],
+            port=config['port'],
+            protocol=config['protocol'],
+            username=config['username'],
+            password=config['password'],
+            realm=config.get('realm', 'pve'),
+            ssl_verify=config.get('ssl_verify', False)
+        )
         
         # Test connection
         print("  🔌 Testing connection...")
-        import asyncio
-        result = asyncio.run(client.test_connection())
+        result = client.test_connection()
         print(f"  ✅ Connection result: {result}")
         
-        # Get cluster status
-        print("  📊 Getting cluster status...")
-        status = asyncio.run(client.get_cluster_status())
-        print(f"  ✅ Cluster status: {status}")
+        # Get version info
+        print("  📊 Getting Proxmox version...")
+        version_info = client.get_version()
+        if version_info.get('status') == 'success':
+            version = version_info.get('version', {}).get('version', 'unknown')
+            print(f"  ✅ Proxmox version: {version}")
+        else:
+            print(f"  ⚠️  API call status: {version_info.get('status', 'unknown')}")
         
         # List nodes
         print("  🖥️  Listing nodes...")
-        nodes = asyncio.run(client.list_nodes())
+        nodes = client.list_nodes()
         print(f"  ✅ Nodes found: {len(nodes) if isinstance(nodes, list) else 'N/A'}")
         
         if isinstance(nodes, list):
@@ -94,17 +105,24 @@ def test_vm_operations():
     
     try:
         from src.proxmox_client import ProxmoxClient
-        import asyncio
         
         # Load configuration
         config = load_config()
         
         # Create client
-        client = ProxmoxClient(config)
+        client = ProxmoxClient(
+            host=config['host'],
+            port=config['port'],
+            protocol=config['protocol'],
+            username=config['username'],
+            password=config['password'],
+            realm=config.get('realm', 'pve'),
+            ssl_verify=config.get('ssl_verify', False)
+        )
         
         # List VMs
         print("  📋 Listing all VMs...")
-        vms = asyncio.run(client.list_vms())
+        vms = client.list_vms()
         print(f"  ✅ Total VMs: {len(vms) if isinstance(vms, list) else 'N/A'}")
         
         if isinstance(vms, list) and vms:
@@ -132,17 +150,24 @@ def test_storage_operations():
     
     try:
         from src.proxmox_client import ProxmoxClient
-        import asyncio
         
         # Load configuration
         config = load_config()
         
         # Create client
-        client = ProxmoxClient(config)
+        client = ProxmoxClient(
+            host=config['host'],
+            port=config['port'],
+            protocol=config['protocol'],
+            username=config['username'],
+            password=config['password'],
+            realm=config.get('realm', 'pve'),
+            ssl_verify=config.get('ssl_verify', False)
+        )
         
         # List storage
         print("  📋 Listing storage...")
-        storage = asyncio.run(client.list_storage())
+        storage = client.list_storage()
         print(f"  ✅ Storage pools: {len(storage) if isinstance(storage, list) else 'N/A'}")
         
         if isinstance(storage, list) and storage:
