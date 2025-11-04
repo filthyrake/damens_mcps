@@ -19,7 +19,12 @@ import pytest
 
 
 class TestMCPProtocolDirect:
-    """Test MCP protocol compliance by validating response structures."""
+    """Test MCP protocol compliance by validating response structures.
+    
+    These tests use a direct testing approach that validates protocol
+    structures without subprocess execution. This ensures reliable,
+    fast tests that work in all environments and CI/CD pipelines.
+    """
     
     def test_initialize_response_structure(self):
         """Test that initialize response has correct structure."""

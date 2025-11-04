@@ -46,7 +46,7 @@ class TestProxmoxE2EStructure:
         assert isinstance(response["result"]["content"], list)
         assert len(response["result"]["content"]) > 0
         assert "isError" in response["result"]
-        assert response["result"]["isError"] == False
+        assert response["result"]["isError"] is False
     
     def test_tool_call_error_structure(self):
         """Test that tool/call error responses have correct structure."""
@@ -66,7 +66,7 @@ class TestProxmoxE2EStructure:
         
         assert error_response.get("jsonrpc") == "2.0"
         assert "result" in error_response
-        assert error_response["result"]["isError"] == True
+        assert error_response["result"]["isError"] is True
     
     def test_validation_error_messages(self):
         """Test that validation errors return helpful messages."""

@@ -44,8 +44,12 @@ class TestMCPProtocolDirect:
         return str(config_file)
     
     def test_initialize_response_structure(self):
-        """Test that initialize response has correct structure."""
-        # This tests the response structure without needing actual server
+        """Test that initialize response has correct structure.
+        
+        Note: This uses a direct testing approach, validating the structure
+        of protocol responses without subprocess execution. This ensures
+        reliable, fast tests that work in all environments.
+        """
         response = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -149,15 +153,16 @@ class TestMCPProtocolDirect:
             assert len(message) > 0
 
 
-@pytest.mark.skip(reason="Subprocess tests require fixing server imports - use direct tests instead")
+@pytest.mark.skip(reason="Subprocess tests require fixing server imports. Issue: working_proxmox_server.py uses relative imports in src/__init__.py and src/utils/__init__.py that fail when run as a script. Tracked for future resolution.")
 class TestMCPProtocol:
     """Test MCP protocol compliance with subprocess (requires working server).
     
-    Note: These tests are currently skipped due to import issues with running
-    the server as a subprocess. The server uses relative imports in __init__.py
-    files which don't work when running the script directly. 
+    Note: These tests are currently skipped because the server uses relative
+    imports (e.g., 'from .proxmox_client import ProxmoxClient' in src/__init__.py)
+    which don't work when running the script directly as a subprocess.
     
-    Use TestMCPProtocolDirect for protocol compliance testing instead.
+    Workaround: Use TestMCPProtocolDirect for protocol compliance testing.
+    Future: Refactor server imports to support both module and script execution.
     """
     
     @pytest.fixture
