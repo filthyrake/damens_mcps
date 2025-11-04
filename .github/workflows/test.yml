@@ -88,7 +88,7 @@ jobs:
     - name: Run unit tests
       run: |
         cd idrac-mcp
-        pytest tests/ -v --ignore=tests/integration --cov=src --cov-report=xml --cov-report=term
+        pytest tests/ -v -m "not integration" --cov=src --cov-report=xml --cov-report=term
     
     - name: Run integration tests
       run: |

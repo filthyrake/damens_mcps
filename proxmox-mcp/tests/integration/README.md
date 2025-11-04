@@ -69,7 +69,7 @@ These tests are currently skipped due to import issues with the server:
 - ⏭️ Unknown method errors
 
 **Why Skipped?**  
-The `working_proxmox_server.py` uses relative imports in `__init__.py` files (`from .module import ...`) which don't work when running the script directly as a subprocess. This is a known limitation that doesn't affect normal usage but prevents subprocess-based testing.
+The `working_proxmox_server.py` uses try-except blocks to handle both module-style imports and direct execution for its validation and exception modules. This nuanced import logic can cause issues when running the server as a subprocess, leading to import errors that prevent subprocess-based testing. This is a known limitation of the current import structure and does not affect normal usage, but it does block subprocess-based integration tests.
 
 ## Integration with CI/CD
 

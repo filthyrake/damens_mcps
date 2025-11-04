@@ -123,8 +123,10 @@ Integration tests run automatically in GitHub Actions on every push and pull req
 - name: Run integration tests
   run: |
     cd proxmox-mcp
-    pytest tests/integration/ -v --cov=src --cov-append
+    pytest tests/integration/ -v --cov=src --cov-report=term
 ```
+
+**Note:** When combining coverage from unit and integration tests, use `--cov-append` in the integration test step to append to existing coverage data.
 
 ### Test Status
 

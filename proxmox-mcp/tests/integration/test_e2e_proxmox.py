@@ -16,7 +16,6 @@ import subprocess
 import sys
 import time
 from typing import Any, Dict, Optional
-from unittest.mock import Mock, patch
 import pytest
 import responses
 
