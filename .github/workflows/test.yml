@@ -85,10 +85,15 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-asyncio pytest-mock
     
-    - name: Run tests
+    - name: Run unit tests
       run: |
         cd idrac-mcp
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+        pytest tests/ -v --ignore=tests/integration --cov=src --cov-report=xml --cov-report=term
+    
+    - name: Run integration tests
+      run: |
+        cd idrac-mcp
+        pytest tests/integration/ -v --cov=src --cov-append --cov-report=xml --cov-report=term
     
     - name: Upload coverage
       uses: codecov/codecov-action@v5
@@ -115,10 +120,15 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-asyncio pytest-mock
     
-    - name: Run tests
+    - name: Run unit tests
       run: |
         cd proxmox-mcp
         pytest tests/test_unit.py tests/test_validation_security.py -v --cov=src --cov-report=xml --cov-report=term
+    
+    - name: Run integration tests
+      run: |
+        cd proxmox-mcp
+        pytest tests/integration/ -v --cov=src --cov-append --cov-report=xml --cov-report=term
     
     - name: Upload coverage
       uses: codecov/codecov-action@v5
