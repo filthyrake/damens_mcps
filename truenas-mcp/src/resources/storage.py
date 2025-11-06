@@ -68,7 +68,7 @@ class StorageResource(BaseResource):
             ),
             Tool(
                 name="truenas_storage_delete_pool",
-                description="Delete a storage pool",
+                description="Delete a storage pool. DESTRUCTIVE OPERATION - requires explicit confirmation via 'confirm' parameter set to true.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -76,9 +76,9 @@ class StorageResource(BaseResource):
                             "type": "string",
                             "description": "Storage pool ID"
                         },
-                        "force": {
+                        "confirm": {
                             "type": "boolean",
-                            "description": "Force deletion even if pool is in use"
+                            "description": "Must be set to true to confirm this destructive operation"
                         }
                     },
                     "required": ["pool_id"]
@@ -131,7 +131,7 @@ class StorageResource(BaseResource):
             ),
             Tool(
                 name="truenas_storage_delete_dataset",
-                description="Delete a dataset",
+                description="Delete a dataset. DESTRUCTIVE OPERATION - requires explicit confirmation via 'confirm' parameter set to true.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -139,9 +139,9 @@ class StorageResource(BaseResource):
                             "type": "string",
                             "description": "Dataset ID"
                         },
-                        "recursive": {
+                        "confirm": {
                             "type": "boolean",
-                            "description": "Recursively delete child datasets"
+                            "description": "Must be set to true to confirm this destructive operation"
                         }
                     },
                     "required": ["dataset_id"]
@@ -185,7 +185,7 @@ class StorageResource(BaseResource):
             ),
             Tool(
                 name="truenas_storage_delete_snapshot",
-                description="Delete a snapshot",
+                description="Delete a snapshot. DESTRUCTIVE OPERATION - requires explicit confirmation via 'confirm' parameter set to true.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -193,9 +193,9 @@ class StorageResource(BaseResource):
                             "type": "string",
                             "description": "Snapshot ID"
                         },
-                        "recursive": {
+                        "confirm": {
                             "type": "boolean",
-                            "description": "Recursively delete child snapshots"
+                            "description": "Must be set to true to confirm this destructive operation"
                         }
                     },
                     "required": ["snapshot_id"]
@@ -321,16 +321,24 @@ class StorageResource(BaseResource):
         try:
             self._validate_required_params(params, ["pool_id"])
             pool_id = params["pool_id"]
+            confirm = self._safe_get_param(params, "confirm", False)
             
-            # Note: This would require additional validation and safety checks
-            # For now, we'll return a placeholder response
-            result = {
-                "status": "deletion_scheduled",
-                "pool_id": pool_id,
-                "force": self._safe_get_param(params, "force", False),
-                "message": "Pool deletion has been scheduled"
-            }
+            # Require explicit confirmation for destructive operation
+            if not confirm:
+                return self._create_error_result(
+                    "Pool deletion requires explicit confirmation. "
+                    "Set 'confirm' parameter to true to proceed. "
+                    "WARNING: This is a destructive operation that cannot be undone."
+                )
             
+            # Validate pool exists before attempting deletion
+            try:
+                await self.client.get_pool(pool_id)
+            except Exception as e:
+                return self._create_error_result(f"Pool '{pool_id}' not found or inaccessible: {e}")
+            
+            # Execute the actual deletion via API
+            result = await self.client.delete_pool(pool_id)
             return self._create_success_result(result)
         except Exception as e:
             return self._create_error_result(f"Failed to delete pool: {e}")
@@ -371,16 +379,18 @@ class StorageResource(BaseResource):
         try:
             self._validate_required_params(params, ["dataset_id"])
             dataset_id = params["dataset_id"]
+            confirm = self._safe_get_param(params, "confirm", False)
             
-            # Note: This would require additional validation and safety checks
-            # For now, we'll return a placeholder response
-            result = {
-                "status": "deletion_scheduled",
-                "dataset_id": dataset_id,
-                "recursive": self._safe_get_param(params, "recursive", False),
-                "message": "Dataset deletion has been scheduled"
-            }
+            # Require explicit confirmation for destructive operation
+            if not confirm:
+                return self._create_error_result(
+                    "Dataset deletion requires explicit confirmation. "
+                    "Set 'confirm' parameter to true to proceed. "
+                    "WARNING: This is a destructive operation that cannot be undone."
+                )
             
+            # Execute the actual deletion via API
+            result = await self.client.delete_dataset(dataset_id)
             return self._create_success_result(result)
         except Exception as e:
             return self._create_error_result(f"Failed to delete dataset: {e}")
@@ -417,16 +427,18 @@ class StorageResource(BaseResource):
         try:
             self._validate_required_params(params, ["snapshot_id"])
             snapshot_id = params["snapshot_id"]
+            confirm = self._safe_get_param(params, "confirm", False)
             
-            # Note: This would require additional validation and safety checks
-            # For now, we'll return a placeholder response
-            result = {
-                "status": "deletion_scheduled",
-                "snapshot_id": snapshot_id,
-                "recursive": self._safe_get_param(params, "recursive", False),
-                "message": "Snapshot deletion has been scheduled"
-            }
+            # Require explicit confirmation for destructive operation
+            if not confirm:
+                return self._create_error_result(
+                    "Snapshot deletion requires explicit confirmation. "
+                    "Set 'confirm' parameter to true to proceed. "
+                    "WARNING: This is a destructive operation that cannot be undone."
+                )
             
+            # Execute the actual deletion via API
+            result = await self.client.delete_snapshot(snapshot_id)
             return self._create_success_result(result)
         except Exception as e:
             return self._create_error_result(f"Failed to delete snapshot: {e}")

@@ -90,13 +90,17 @@ class SystemResource(BaseResource):
             ),
             Tool(
                 name="truenas_system_reboot",
-                description="Reboot the TrueNAS system",
+                description="Reboot the TrueNAS system. DESTRUCTIVE OPERATION - requires explicit confirmation via 'confirm' parameter set to true.",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "delay": {
                             "type": "integer",
-                            "description": "Delay in seconds before reboot"
+                            "description": "Delay in seconds before reboot (default: 0)"
+                        },
+                        "confirm": {
+                            "type": "boolean",
+                            "description": "Must be set to true to confirm this destructive operation"
                         }
                     },
                     "required": []
@@ -104,13 +108,17 @@ class SystemResource(BaseResource):
             ),
             Tool(
                 name="truenas_system_shutdown",
-                description="Shutdown the TrueNAS system",
+                description="Shutdown the TrueNAS system. DESTRUCTIVE OPERATION - requires explicit confirmation via 'confirm' parameter set to true.",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "delay": {
                             "type": "integer",
-                            "description": "Delay in seconds before shutdown"
+                            "description": "Delay in seconds before shutdown (default: 0)"
+                        },
+                        "confirm": {
+                            "type": "boolean",
+                            "description": "Must be set to true to confirm this destructive operation"
                         }
                     },
                     "required": []
@@ -221,17 +229,20 @@ class SystemResource(BaseResource):
     async def _reboot_system(self, params: Dict[str, Any]) -> CallToolResult:
         """Reboot the system."""
         try:
-            # Note: This would require additional API endpoint implementation
-            # For now, we'll return a placeholder response
+            confirm = self._safe_get_param(params, "confirm", False)
+            
+            # Require explicit confirmation for destructive operation
+            if not confirm:
+                return self._create_error_result(
+                    "System reboot requires explicit confirmation. "
+                    "Set 'confirm' parameter to true to proceed. "
+                    "WARNING: This will reboot the TrueNAS system and interrupt all services."
+                )
+            
             delay = self._safe_get_param(params, "delay", 0)
             
-            # This is a placeholder - actual implementation would call the reboot API
-            result = {
-                "status": "reboot_scheduled",
-                "delay_seconds": delay,
-                "message": "System reboot has been scheduled"
-            }
-            
+            # Execute the actual reboot via API
+            result = await self.client.reboot_system(delay)
             return self._create_success_result(result)
         except Exception as e:
             return self._create_error_result(f"Failed to reboot system: {e}")
@@ -239,17 +250,20 @@ class SystemResource(BaseResource):
     async def _shutdown_system(self, params: Dict[str, Any]) -> CallToolResult:
         """Shutdown the system."""
         try:
-            # Note: This would require additional API endpoint implementation
-            # For now, we'll return a placeholder response
+            confirm = self._safe_get_param(params, "confirm", False)
+            
+            # Require explicit confirmation for destructive operation
+            if not confirm:
+                return self._create_error_result(
+                    "System shutdown requires explicit confirmation. "
+                    "Set 'confirm' parameter to true to proceed. "
+                    "WARNING: This will shutdown the TrueNAS system and interrupt all services."
+                )
+            
             delay = self._safe_get_param(params, "delay", 0)
             
-            # This is a placeholder - actual implementation would call the shutdown API
-            result = {
-                "status": "shutdown_scheduled",
-                "delay_seconds": delay,
-                "message": "System shutdown has been scheduled"
-            }
-            
+            # Execute the actual shutdown via API
+            result = await self.client.shutdown_system(delay)
             return self._create_success_result(result)
         except Exception as e:
             return self._create_error_result(f"Failed to shutdown system: {e}")
