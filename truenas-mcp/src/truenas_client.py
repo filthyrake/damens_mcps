@@ -298,24 +298,24 @@ class TrueNASClient:
         """Reboot the TrueNAS system.
         
         Args:
-            delay: Delay in seconds before reboot (default: 0)
+            delay: Delay in seconds before reboot (default: 0 for immediate reboot)
             
         Returns:
             API response confirming reboot initiation
         """
-        data = {"delay": delay} if delay > 0 else {}
+        data = {"delay": delay} if delay else {}
         return await self._make_request("POST", "system/reboot", data=data)
     
     async def shutdown_system(self, delay: int = 0) -> Dict[str, Any]:
         """Shutdown the TrueNAS system.
         
         Args:
-            delay: Delay in seconds before shutdown (default: 0)
+            delay: Delay in seconds before shutdown (default: 0 for immediate shutdown)
             
         Returns:
             API response confirming shutdown initiation
         """
-        data = {"delay": delay} if delay > 0 else {}
+        data = {"delay": delay} if delay else {}
         return await self._make_request("POST", "system/shutdown", data=data)
     
     # Storage Methods

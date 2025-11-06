@@ -85,7 +85,7 @@ class TestDeletePoolConfirmation:
         
         result = await storage_resource.handle_tool(request)
         
-        assert result.isError is not True
+        assert not result.isError
         mock_client.get_pool.assert_called_once_with("test-pool")
         mock_client.delete_pool.assert_called_once_with("test-pool")
 
@@ -112,7 +112,7 @@ class TestDeleteDatasetConfirmation:
         
         result = await storage_resource.handle_tool(request)
         
-        assert result.isError is not True
+        assert not result.isError
         mock_client.delete_dataset.assert_called_once_with("pool/dataset")
 
 
@@ -138,7 +138,7 @@ class TestDeleteSnapshotConfirmation:
         
         result = await storage_resource.handle_tool(request)
         
-        assert result.isError is not True
+        assert not result.isError
         mock_client.delete_snapshot.assert_called_once_with("pool/dataset@snap1")
 
 
@@ -164,7 +164,7 @@ class TestRebootSystemConfirmation:
         
         result = await system_resource.handle_tool(request)
         
-        assert result.isError is not True
+        assert not result.isError
         mock_client.reboot_system.assert_called_once_with(0)
     
     @pytest.mark.asyncio
@@ -176,7 +176,7 @@ class TestRebootSystemConfirmation:
         
         result = await system_resource.handle_tool(request)
         
-        assert result.isError is not True
+        assert not result.isError
         mock_client.reboot_system.assert_called_once_with(60)
 
 
@@ -202,7 +202,7 @@ class TestShutdownSystemConfirmation:
         
         result = await system_resource.handle_tool(request)
         
-        assert result.isError is not True
+        assert not result.isError
         mock_client.shutdown_system.assert_called_once_with(0)
 
 
