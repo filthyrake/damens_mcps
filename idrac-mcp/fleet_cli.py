@@ -12,8 +12,10 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from multi_server_manager import MultiServerManager
+from version import __version__
 
 @click.group()
+@click.version_option(version=__version__, prog_name="iDRAC Fleet CLI")
 @click.option('--config', '-c', default='fleet_servers.json', help='Fleet configuration file')
 @click.pass_context
 def cli(ctx, config):

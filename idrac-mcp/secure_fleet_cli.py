@@ -12,8 +12,10 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from secure_multi_server_manager import SecureMultiServerManager
+from version import __version__
 
 @click.group()
+@click.version_option(version=__version__, prog_name="Secure iDRAC Fleet CLI")
 @click.option('--config', '-c', default='fleet_servers.json', help='Fleet configuration file')
 @click.option('--key-file', '-k', default='.fleet_key', help='Encryption key file (legacy)')
 @click.option('--password', '-p', envvar='IDRAC_FLEET_PASSWORD', help='Master password (or set IDRAC_FLEET_PASSWORD env var)')
