@@ -294,6 +294,30 @@ class TrueNASClient:
         """Get system uptime information."""
         return await self._make_request("GET", "system/uptime")
     
+    async def reboot_system(self, delay: int = 0) -> Dict[str, Any]:
+        """Reboot the TrueNAS system.
+        
+        Args:
+            delay: Delay in seconds before reboot (default: 0 for immediate reboot)
+            
+        Returns:
+            API response confirming reboot initiation
+        """
+        data = {"delay": delay}
+        return await self._make_request("POST", "system/reboot", data=data)
+    
+    async def shutdown_system(self, delay: int = 0) -> Dict[str, Any]:
+        """Shutdown the TrueNAS system.
+        
+        Args:
+            delay: Delay in seconds before shutdown (default: 0 for immediate shutdown)
+            
+        Returns:
+            API response confirming shutdown initiation
+        """
+        data = {"delay": delay}
+        return await self._make_request("POST", "system/shutdown", data=data)
+    
     # Storage Methods
     
     async def get_pools(self) -> List[Dict[str, Any]]:
