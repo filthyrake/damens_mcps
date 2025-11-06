@@ -303,7 +303,7 @@ class TrueNASClient:
         Returns:
             API response confirming reboot initiation
         """
-        data = {"delay": delay} if delay else {}
+        data = {"delay": delay}
         return await self._make_request("POST", "system/reboot", data=data)
     
     async def shutdown_system(self, delay: int = 0) -> Dict[str, Any]:
@@ -315,7 +315,7 @@ class TrueNASClient:
         Returns:
             API response confirming shutdown initiation
         """
-        data = {"delay": delay} if delay else {}
+        data = {"delay": delay}
         return await self._make_request("POST", "system/shutdown", data=data)
     
     # Storage Methods

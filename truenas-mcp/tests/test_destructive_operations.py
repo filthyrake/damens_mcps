@@ -1,7 +1,7 @@
 """Tests for destructive operations with confirmation flow."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from src.resources.storage import StorageResource
 from src.resources.system import SystemResource

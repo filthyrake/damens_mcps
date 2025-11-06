@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from mcp.types import CallToolRequest, CallToolResult, Tool
 
 from .base import BaseResource
+from ..exceptions import TrueNASAPIError, TrueNASError
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +335,7 @@ class StorageResource(BaseResource):
             # Validate pool exists before attempting deletion
             try:
                 await self.client.get_pool(pool_id)
-            except Exception as e:
+            except (TrueNASAPIError, TrueNASError) as e:
                 return self._create_error_result(f"Pool '{pool_id}' not found or inaccessible: {e}")
             
             # Execute the actual deletion via API
