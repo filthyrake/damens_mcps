@@ -938,8 +938,20 @@ class WorkingIDracMCPServer:
 
 def main():
     """Main entry point."""
+    # Check for --version flag
+    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+        # Import version info
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+        try:
+            from version import __version__, __description__
+            print(f"iDRAC MCP Server version {__version__}")
+            print(__description__)
+        except ImportError:
+            print("iDRAC MCP Server version 1.0.0")
+        sys.exit(0)
+
     debug_print("Starting main...")
-    
+
     try:
         config = load_config()
     except FileNotFoundError as e:

@@ -36,6 +36,7 @@ try:
         validate_backup_name,
         validate_id
     )
+    from .version import __version__, __description__
 except ImportError:
     # Fallback for direct execution
     from pfsense_client import HTTPPfSenseClient, PfSenseAPIError
@@ -47,6 +48,7 @@ except ImportError:
         validate_backup_name,
         validate_id
     )
+    from version import __version__, __description__
 
 
 # Create a completely silent stdout that only allows JSON
@@ -720,7 +722,7 @@ async def main():
                             "capabilities": {},
                             "serverInfo": {
                                 "name": "pfsense-mcp",
-                                "version": "1.0.0"
+                                "version": __version__
                             }
                         }
                     }
@@ -742,4 +744,13 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Check for --version flag before setting up silent stdout/stderr
+    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+        # Restore original stdout temporarily
+        if hasattr(sys.stdout, 'original_stdout'):
+            sys.stdout = sys.stdout.original_stdout
+        print(f"pfSense MCP Server version {__version__}")
+        print(__description__)
+        sys.exit(0)
+
     asyncio.run(main())

@@ -1028,6 +1028,17 @@ class WorkingProxmoxMCPServer:
 
 def main():
     """Main entry point."""
+    # Check for --version flag
+    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+        # Import version info
+        try:
+            from src.version import __version__, __description__
+            print(f"Proxmox MCP Server version {__version__}")
+            print(__description__)
+        except ImportError:
+            print("Proxmox MCP Server version 1.0.0")
+        sys.exit(0)
+
     try:
         server = WorkingProxmoxMCPServer()
         server.run()

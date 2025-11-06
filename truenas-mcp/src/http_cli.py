@@ -24,6 +24,7 @@ from .config import (
 )
 from .http_server import create_app
 from .utils.logging import setup_logging
+from .version import __version__
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ def _save_token_securely(token_file: Path, token: str) -> None:
 
 
 @click.group()
+@click.version_option(version=__version__, prog_name="TrueNAS MCP CLI")
 @click.option("--debug", is_flag=True, help="Enable debug mode")
 @click.option("--config", type=click.Path(exists=True), help="Configuration file path")
 def cli(debug: bool, config: Optional[str]):
