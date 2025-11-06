@@ -16,6 +16,18 @@ from typing import Any, Dict, List, Optional, TypedDict, Literal
 from urllib3.exceptions import InsecureRequestWarning
 from requests.auth import HTTPBasicAuth
 
+# Check for --version flag before any other imports that might fail
+if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+    # Add src directory to path for version import
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+    try:
+        from version import __version__, __description__
+        print(f"iDRAC MCP Server version {__version__}")
+        print(__description__)
+    except ImportError:
+        print("iDRAC MCP Server version 1.0.0")
+    sys.exit(0)
+
 # Nested types for create_example_config
 class ServerConfig(TypedDict):
     name: str
@@ -938,18 +950,6 @@ class WorkingIDracMCPServer:
 
 def main():
     """Main entry point."""
-    # Check for --version flag
-    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
-        # Import version info
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-        try:
-            from version import __version__, __description__
-            print(f"iDRAC MCP Server version {__version__}")
-            print(__description__)
-        except ImportError:
-            print("iDRAC MCP Server version 1.0.0")
-        sys.exit(0)
-
     debug_print("Starting main...")
 
     try:
