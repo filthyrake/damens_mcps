@@ -22,10 +22,10 @@ if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
     try:
         from version import __version__, __description__
-        print(f"iDRAC MCP Server version {__version__}")
-        print(__description__)
+        print(f"iDRAC MCP Server version {__version__}", file=sys.stderr)
+        print(__description__, file=sys.stderr)
     except ImportError:
-        print("iDRAC MCP Server version 1.0.0")
+        print("iDRAC MCP Server version 1.0.0", file=sys.stderr)
     sys.exit(0)
 
 # Nested types for create_example_config
