@@ -308,11 +308,11 @@ kubectl logs -f deployment/truenas-mcp
 
 ## Related Documentation
 
-- [TrueNAS MCP README](../truenas-mcp/README.md)
-- [TrueNAS MCP SECURITY](../truenas-mcp/SECURITY.md)
+- [TrueNAS MCP README](../../truenas-mcp/README.md)
+- [TrueNAS MCP SECURITY](../../truenas-mcp/SECURITY.md)
 - [TrueNAS Documentation](https://www.truenas.com/docs/)
 - [TrueNAS API Documentation](https://www.truenas.com/docs/api/)
-- [Main Repository README](../README.md)
+- [Main Repository README](../../README.md)
 
 ## Notes
 

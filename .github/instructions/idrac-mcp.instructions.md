@@ -382,11 +382,11 @@ system_info = {
 
 ## Related Documentation
 
-- [iDRAC MCP README](../idrac-mcp/README.md)
-- [iDRAC MCP SECURITY](../idrac-mcp/SECURITY.md)
+- [iDRAC MCP README](../../idrac-mcp/README.md)
+- [iDRAC MCP SECURITY](../../idrac-mcp/SECURITY.md)
 - [Dell iDRAC Documentation](https://www.dell.com/support/kbdoc/en-us/000177080/idrac)
 - [Redfish API Specification](https://www.dmtf.org/standards/redfish)
-- [Main Repository README](../README.md)
+- [Main Repository README](../../README.md)
 
 ## Notes
 

@@ -435,11 +435,11 @@ def check_resources(node: str, memory: int, cores: int) -> bool:
 
 ## Related Documentation
 
-- [Proxmox MCP README](../proxmox-mcp/README.md)
-- [Proxmox MCP SECURITY](../proxmox-mcp/SECURITY.md)
+- [Proxmox MCP README](../../proxmox-mcp/README.md)
+- [Proxmox MCP SECURITY](../../proxmox-mcp/SECURITY.md)
 - [Proxmox VE Documentation](https://pve.proxmox.com/wiki/)
 - [Proxmox API Documentation](https://pve.proxmox.com/pve-docs/api-viewer/)
-- [Main Repository README](../README.md)
+- [Main Repository README](../../README.md)
 
 ## Notes
 

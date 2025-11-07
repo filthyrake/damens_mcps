@@ -216,10 +216,10 @@ When modifying firewall rule handling:
 
 ## Related Documentation
 
-- [pfSense MCP README](../pfsense-mcp/README.md)
-- [pfSense MCP SECURITY](../pfsense-mcp/SECURITY.md)
+- [pfSense MCP README](../../pfsense-mcp/README.md)
+- [pfSense MCP SECURITY](../../pfsense-mcp/SECURITY.md)
 - [pfSense Documentation](https://docs.netgate.com/)
-- [Main Repository README](../README.md)
+- [Main Repository README](../../README.md)
 
 ## Notes
 
