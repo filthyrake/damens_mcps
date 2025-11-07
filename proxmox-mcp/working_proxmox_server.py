@@ -1018,12 +1018,6 @@ class WorkingProxmoxMCPServer:
 
         except KeyboardInterrupt:
             debug_print("Server interrupted by user")
-        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-            debug_print(f"Server error: {e}")
-            import traceback
-            debug_print(f"Server traceback: {traceback.format_exc()}")
-            # Don't exit, just log the error and continue
-            debug_print("Server continuing despite error...")
 
 
 def main():
