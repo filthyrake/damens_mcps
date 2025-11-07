@@ -1018,6 +1018,13 @@ class WorkingProxmoxMCPServer:
 
         except KeyboardInterrupt:
             debug_print("Server interrupted by user")
+        except Exception as e:
+            # Catch-all for unexpected fatal errors outside of request processing
+            debug_print(f"Fatal server error: {e}")
+            import traceback
+            debug_print(f"Traceback: {traceback.format_exc()}")
+            # Log but don't exit - let the server attempt to continue
+            debug_print("Server continuing despite error...")
 
 
 def main():
