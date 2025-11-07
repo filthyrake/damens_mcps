@@ -1023,8 +1023,7 @@ class WorkingProxmoxMCPServer:
             debug_print(f"Fatal server error: {e}")
             import traceback
             debug_print(f"Traceback: {traceback.format_exc()}")
-            # Log but don't exit - let the server attempt to continue
-            debug_print("Server continuing despite error...")
+            debug_print("Server exiting due to fatal error")
 
 
 def main():
