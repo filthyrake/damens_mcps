@@ -13,6 +13,14 @@ MAX_SERVICE_NAME_LENGTH = 128  # System service name limit
 MAX_BACKUP_NAME_LENGTH = 255  # Backup name maximum length
 MAX_ID_LENGTH = 128  # Maximum length for generic IDs (rules, VLANs, etc.)
 
+# Network port limits
+MIN_PORT = 1  # Minimum valid TCP/UDP port
+MAX_PORT = 65535  # Maximum valid TCP/UDP port
+
+# VLAN ID limits
+MIN_VLAN_ID = 1  # Minimum valid VLAN ID
+MAX_VLAN_ID = 4094  # Maximum valid VLAN ID (802.1Q standard)
+
 
 def validate_ip_address(ip: str) -> bool:
     """
@@ -73,7 +81,7 @@ def validate_port(port: Union[int, str]) -> bool:
     """
     try:
         port_num = int(port)
-        return 1 <= port_num <= 65535
+        return MIN_PORT <= port_num <= MAX_PORT
     except (ValueError, TypeError):
         return False
 
@@ -105,7 +113,7 @@ def validate_port_range(port_range: str) -> bool:
         end_port = int(parts[1].strip())
         
         # Validate both ports are in valid range
-        if not (1 <= start_port <= 65535 and 1 <= end_port <= 65535):
+        if not (MIN_PORT <= start_port <= MAX_PORT and MIN_PORT <= end_port <= MAX_PORT):
             return False
         
         # Start port should be less than or equal to end port
@@ -168,7 +176,7 @@ def validate_vlan_id(vlan_id: Union[int, str]) -> bool:
     """
     try:
         vlan_num = int(vlan_id)
-        return 1 <= vlan_num <= 4094
+        return MIN_VLAN_ID <= vlan_num <= MAX_VLAN_ID
     except (ValueError, TypeError):
         return False
 
@@ -217,7 +225,7 @@ def validate_firewall_rule_params(params: Dict[str, Any]) -> bool:
     if 'port' in params and params['port']:
         port_value = str(params['port'])
         if not validate_port_range(port_value):
-            errors.append("Invalid port. Must be a valid port number (1-65535) or port range (e.g., 8000-9000)")
+            errors.append(f"Invalid port. Must be a valid port number ({MIN_PORT}-{MAX_PORT}) or port range (e.g., 8000-9000)")
     
     return len(errors) == 0
 
@@ -238,7 +246,7 @@ def validate_vlan_params(params: Dict[str, Any]) -> bool:
     if 'vlan_id' not in params:
         errors.append("Missing required field: vlan_id")
     elif not validate_vlan_id(params['vlan_id']):
-        errors.append("Invalid VLAN ID. Must be between 1 and 4094")
+        errors.append(f"Invalid VLAN ID. Must be between {MIN_VLAN_ID} and {MAX_VLAN_ID}")
     
     if 'interface' not in params or not params['interface']:
         errors.append("Missing required field: interface")

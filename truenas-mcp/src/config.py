@@ -13,6 +13,10 @@ from pydantic_settings import BaseSettings
 # Cryptographic constants
 MIN_SECRET_KEY_LENGTH = 32  # Cryptographic best practice - 256 bits minimum
 
+# Network port limits
+MIN_PORT = 1  # Minimum valid TCP/UDP port
+MAX_PORT = 65535  # Maximum valid TCP/UDP port
+
 
 def validate_secret_key_strength(key: str) -> bool:
     """Validate secret key has sufficient entropy.
@@ -70,8 +74,8 @@ class TrueNASConfig(BaseModel):
     @field_validator("port")
     @classmethod
     def validate_port(cls, v):
-        if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if not MIN_PORT <= v <= MAX_PORT:
+            raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
 
 
@@ -86,8 +90,8 @@ class ServerConfig(BaseModel):
     @field_validator("port")
     @classmethod
     def validate_port(cls, v):
-        if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if not MIN_PORT <= v <= MAX_PORT:
+            raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
 
 
@@ -191,8 +195,8 @@ class Settings(BaseSettings):
     @field_validator("truenas_port", "server_port")
     @classmethod
     def validate_ports(cls, v):
-        if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if not MIN_PORT <= v <= MAX_PORT:
+            raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
 
 
@@ -265,11 +269,11 @@ def validate_configuration(settings: Settings) -> None:
         )
 
     # Validate ports
-    if not 1 <= settings.truenas_port <= 65535:
-        raise ValueError("TRUENAS_PORT must be between 1 and 65535")
+    if not MIN_PORT <= settings.truenas_port <= MAX_PORT:
+        raise ValueError(f"TRUENAS_PORT must be between {MIN_PORT} and {MAX_PORT}")
 
-    if not 1 <= settings.server_port <= 65535:
-        raise ValueError("SERVER_PORT must be between 1 and 65535")
+    if not MIN_PORT <= settings.server_port <= MAX_PORT:
+        raise ValueError(f"SERVER_PORT must be between {MIN_PORT} and {MAX_PORT}")
 
 
 def generate_secret_key() -> str:
