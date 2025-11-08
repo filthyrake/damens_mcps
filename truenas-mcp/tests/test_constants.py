@@ -1,6 +1,5 @@
 """Tests for configuration constants in TrueNAS MCP Server."""
 
-import pytest
 from src.config import (
     MIN_SECRET_KEY_LENGTH,
     MIN_PORT,

@@ -1,6 +1,5 @@
 """Tests for constants in iDRAC MCP Server."""
 
-import pytest
 import sys
 import os
 

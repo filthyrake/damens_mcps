@@ -1,6 +1,5 @@
 """Tests for validation constants in Proxmox MCP Server."""
 
-import pytest
 from src.utils.validation import (
     MIN_VMID,
     MAX_VMID,

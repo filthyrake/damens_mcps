@@ -1,6 +1,5 @@
 """Tests for validation constants in pfSense MCP Server."""
 
-import pytest
 from src.utils.validation import (
     MAX_PACKAGE_NAME_LENGTH,
     MAX_SERVICE_NAME_LENGTH,
