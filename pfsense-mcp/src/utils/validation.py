@@ -7,6 +7,12 @@ import ipaddress
 import re
 from typing import Any, Dict, List, Union
 
+# Name length limits
+MAX_PACKAGE_NAME_LENGTH = 255  # pfSense API limitation
+MAX_SERVICE_NAME_LENGTH = 128  # System service name limit
+MAX_BACKUP_NAME_LENGTH = 255  # Backup name maximum length
+MAX_ID_LENGTH = 128  # Maximum length for generic IDs (rules, VLANs, etc.)
+
 
 def validate_ip_address(ip: str) -> bool:
     """
@@ -291,7 +297,7 @@ def validate_package_name(name: str) -> bool:
     # Only allow alphanumeric, hyphens, underscores, and dots
     # This is safe for pfSense package manager
     pattern = r'^[a-zA-Z0-9._-]+$'
-    return bool(re.match(pattern, name)) and len(name) <= 255
+    return bool(re.match(pattern, name)) and len(name) <= MAX_PACKAGE_NAME_LENGTH
 
 
 def validate_service_name(name: str) -> bool:
@@ -313,7 +319,7 @@ def validate_service_name(name: str) -> bool:
     # Only allow alphanumeric, hyphens, and underscores
     # Common service names: openvpn, ipsec, wireguard, etc.
     pattern = r'^[a-zA-Z0-9_-]+$'
-    return bool(re.match(pattern, name)) and len(name) <= 128
+    return bool(re.match(pattern, name)) and len(name) <= MAX_SERVICE_NAME_LENGTH
 
 
 def validate_backup_name(name: str) -> bool:
@@ -333,7 +339,7 @@ def validate_backup_name(name: str) -> bool:
     
     # Only allow alphanumeric, hyphens, underscores, and dots
     pattern = r'^[a-zA-Z0-9._-]+$'
-    return bool(re.match(pattern, name)) and len(name) <= 255
+    return bool(re.match(pattern, name)) and len(name) <= MAX_BACKUP_NAME_LENGTH
 
 
 def validate_id(id_value: str) -> bool:
@@ -353,7 +359,7 @@ def validate_id(id_value: str) -> bool:
     
     # Only allow alphanumeric, hyphens, and underscores
     pattern = r'^[a-zA-Z0-9_-]+$'
-    return bool(re.match(pattern, id_value)) and len(id_value) <= 128
+    return bool(re.match(pattern, id_value)) and len(id_value) <= MAX_ID_LENGTH
 
 
 def validate_config(config: Dict[str, Any]) -> bool:

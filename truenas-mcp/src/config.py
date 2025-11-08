@@ -10,6 +10,9 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
+# Cryptographic constants
+MIN_SECRET_KEY_LENGTH = 32  # Cryptographic best practice - 256 bits minimum
+
 
 def validate_secret_key_strength(key: str) -> bool:
     """Validate secret key has sufficient entropy.
@@ -25,7 +28,7 @@ def validate_secret_key_strength(key: str) -> bool:
         - At least 3 of 4 character types (lowercase, uppercase, digits, special)
         - No single character repeated more than half the key length
     """
-    if len(key) < 32:
+    if len(key) < MIN_SECRET_KEY_LENGTH:
         return False
 
     # Check for character diversity
@@ -103,7 +106,7 @@ class AuthConfig(BaseModel):
     def validate_secret_key(cls, v):
         if not validate_secret_key_strength(v):
             raise ValueError(
-                "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters with sufficient entropy. "
                 "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
         return v
@@ -180,7 +183,7 @@ class Settings(BaseSettings):
     def validate_secret_key(cls, v):
         if not validate_secret_key_strength(v):
             raise ValueError(
-                "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters with sufficient entropy. "
                 "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
         return v
@@ -257,7 +260,7 @@ def validate_configuration(settings: Settings) -> None:
     # Validate authentication
     if not validate_secret_key_strength(settings.secret_key):
         raise ValueError(
-            "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+            f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters with sufficient entropy. "
             "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
 

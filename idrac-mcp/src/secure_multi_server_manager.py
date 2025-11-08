@@ -11,6 +11,10 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import getpass
 
+# Cryptographic constants
+# OWASP 2023 recommendation for PBKDF2-HMAC-SHA256
+PBKDF2_ITERATIONS = 480000
+
 # Try relative import first, fall back to absolute
 try:
     from .idrac_client import IDracClient
@@ -102,12 +106,12 @@ class SecureMultiServerManager:
             self.salt = os.urandom(16)
             print("🔑 Generated new salt for key derivation")
         
-        # Derive key from password using PBKDF2 (OWASP 2023 recommendation: 480,000 iterations)
+        # Derive key from password using PBKDF2
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=self.salt,
-            iterations=480000,  # OWASP 2023 recommendation for PBKDF2-SHA256
+            iterations=PBKDF2_ITERATIONS,
         )
         key = base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
         self.fernet = Fernet(key)
