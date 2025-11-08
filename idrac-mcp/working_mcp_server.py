@@ -16,6 +16,10 @@ from typing import Any, Dict, List, Optional, TypedDict, Literal
 from urllib3.exceptions import InsecureRequestWarning
 from requests.auth import HTTPBasicAuth
 
+# Request timeout configuration
+# Balance between responsiveness and reliability for iDRAC API calls
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
+
 # Check for --version flag before any other imports that might fail
 if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
     # Add src directory to path for version import
@@ -202,9 +206,9 @@ class IDracClient:
                 warnings.filterwarnings('ignore', category=InsecureRequestWarning)
             
             if method.upper() == 'GET':
-                return self.session.get(url, timeout=10, **kwargs)
+                return self.session.get(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
             elif method.upper() == 'POST':
-                return self.session.post(url, timeout=10, **kwargs)
+                return self.session.post(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
             else:
                 raise ValueError(f"Unsupported method: {method}")
     

@@ -10,6 +10,13 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
+# Cryptographic constants
+MIN_SECRET_KEY_LENGTH = 32  # Cryptographic best practice - 256 bits minimum
+
+# Network port limits
+MIN_PORT = 1  # Minimum valid TCP/UDP port
+MAX_PORT = 65535  # Maximum valid TCP/UDP port
+
 
 def validate_secret_key_strength(key: str) -> bool:
     """Validate secret key has sufficient entropy.
@@ -25,7 +32,7 @@ def validate_secret_key_strength(key: str) -> bool:
         - At least 3 of 4 character types (lowercase, uppercase, digits, special)
         - No single character repeated more than half the key length
     """
-    if len(key) < 32:
+    if len(key) < MIN_SECRET_KEY_LENGTH:
         return False
 
     # Check for character diversity
@@ -67,8 +74,8 @@ class TrueNASConfig(BaseModel):
     @field_validator("port")
     @classmethod
     def validate_port(cls, v):
-        if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if not MIN_PORT <= v <= MAX_PORT:
+            raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
 
 
@@ -83,8 +90,8 @@ class ServerConfig(BaseModel):
     @field_validator("port")
     @classmethod
     def validate_port(cls, v):
-        if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if not MIN_PORT <= v <= MAX_PORT:
+            raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
 
 
@@ -103,7 +110,7 @@ class AuthConfig(BaseModel):
     def validate_secret_key(cls, v):
         if not validate_secret_key_strength(v):
             raise ValueError(
-                "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters with sufficient entropy. "
                 "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
         return v
@@ -180,7 +187,7 @@ class Settings(BaseSettings):
     def validate_secret_key(cls, v):
         if not validate_secret_key_strength(v):
             raise ValueError(
-                "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters with sufficient entropy. "
                 "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
         return v
@@ -188,8 +195,8 @@ class Settings(BaseSettings):
     @field_validator("truenas_port", "server_port")
     @classmethod
     def validate_ports(cls, v):
-        if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if not MIN_PORT <= v <= MAX_PORT:
+            raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
 
 
@@ -257,16 +264,16 @@ def validate_configuration(settings: Settings) -> None:
     # Validate authentication
     if not validate_secret_key_strength(settings.secret_key):
         raise ValueError(
-            "SECRET_KEY must be at least 32 characters with sufficient entropy. "
+            f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters with sufficient entropy. "
             "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
 
     # Validate ports
-    if not 1 <= settings.truenas_port <= 65535:
-        raise ValueError("TRUENAS_PORT must be between 1 and 65535")
+    if not MIN_PORT <= settings.truenas_port <= MAX_PORT:
+        raise ValueError(f"TRUENAS_PORT must be between {MIN_PORT} and {MAX_PORT}")
 
-    if not 1 <= settings.server_port <= 65535:
-        raise ValueError("SERVER_PORT must be between 1 and 65535")
+    if not MIN_PORT <= settings.server_port <= MAX_PORT:
+        raise ValueError(f"SERVER_PORT must be between {MIN_PORT} and {MAX_PORT}")
 
 
 def generate_secret_key() -> str:

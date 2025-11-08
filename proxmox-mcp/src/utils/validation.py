@@ -5,6 +5,21 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ValidationError, field_validator
 
+# Proxmox VMID limits per documentation
+MIN_VMID = 100  # Proxmox reserves 0-99 for system use
+MAX_VMID = 999999  # Proxmox VMID upper limit
+
+# CPU and Memory limits for VMs/Containers
+MIN_CPU_CORES = 1  # Minimum CPU cores
+MAX_CPU_CORES = 128  # Proxmox maximum CPU cores per VM
+MIN_MEMORY_MB = 64  # Minimum usable memory for VM
+MAX_MEMORY_MB = 1048576  # 1TB - Proxmox maximum memory per VM
+
+# Name length limits
+MAX_NAME_LENGTH = 128  # Maximum length for VM/container/node names
+MIN_NAME_LENGTH = 1  # Minimum name length
+MAX_SNAPSHOT_NAME_LENGTH = 128  # Maximum length for snapshot names
+
 
 class VMConfig(BaseModel):
     """Validation model for VM configuration."""
@@ -23,8 +38,8 @@ class VMConfig(BaseModel):
     def validate_name(cls, v):
         if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
             raise ValueError('VM name must contain only alphanumeric characters, hyphens, and underscores')
-        if len(v) > 128:
-            raise ValueError('VM name must not exceed 128 characters')
+        if len(v) > MAX_NAME_LENGTH:
+            raise ValueError(f'VM name must not exceed {MAX_NAME_LENGTH} characters')
         return v
     
     @field_validator('cores')
@@ -37,8 +52,8 @@ class VMConfig(BaseModel):
             except (ValueError, TypeError):
                 raise ValueError('CPU cores must be an integer')
         # Reuse validate_cores_range logic
-        if not (1 <= v <= 128):
-            raise ValueError('CPU cores must be between 1 and 128')
+        if not (MIN_CPU_CORES <= v <= MAX_CPU_CORES):
+            raise ValueError(f'CPU cores must be between {MIN_CPU_CORES} and {MAX_CPU_CORES}')
         return v
     
     @field_validator('memory')
@@ -51,8 +66,8 @@ class VMConfig(BaseModel):
             except (ValueError, TypeError):
                 raise ValueError('Memory must be an integer')
         # Reuse validate_memory_range logic
-        if not (64 <= v <= 1048576):
-            raise ValueError('Memory must be between 64MB and 1TB (1048576MB)')
+        if not (MIN_MEMORY_MB <= v <= MAX_MEMORY_MB):
+            raise ValueError(f'Memory must be between {MIN_MEMORY_MB}MB and {MAX_MEMORY_MB}MB (1TB)')
         return v
     
     @field_validator('disk_size')
@@ -140,7 +155,7 @@ def is_valid_vmid(vmid: Union[int, str]) -> bool:
     """
     try:
         vmid_int = int(vmid)
-        return 100 <= vmid_int <= 999999
+        return MIN_VMID <= vmid_int <= MAX_VMID
     except (ValueError, TypeError):
         return False
 
@@ -160,10 +175,10 @@ def validate_vmid(vmid: Union[int, str]) -> int:
     try:
         vmid_int = int(vmid)
     except (ValueError, TypeError):
-        raise ValueError("VMID must be a valid integer between 100 and 999999")
+        raise ValueError(f"VMID must be a valid integer between {MIN_VMID} and {MAX_VMID}")
     
-    if vmid_int < 100 or vmid_int > 999999:
-        raise ValueError("VMID must be between 100 and 999999")
+    if vmid_int < MIN_VMID or vmid_int > MAX_VMID:
+        raise ValueError(f"VMID must be between {MIN_VMID} and {MAX_VMID}")
     
     return vmid_int
 
@@ -179,7 +194,7 @@ def is_valid_node_name(node: str) -> bool:
     """
     if not node or not isinstance(node, str):
         return False
-    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', node)) and len(node) <= 128
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', node)) and len(node) <= MAX_NAME_LENGTH
 
 
 def validate_node_name(node: str) -> str:
@@ -210,7 +225,7 @@ def is_valid_storage_name(storage: str) -> bool:
     """
     if not storage or not isinstance(storage, str):
         return False
-    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', storage)) and len(storage) <= 128
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', storage)) and len(storage) <= MAX_NAME_LENGTH
 
 
 def validate_storage_name(storage: str) -> str:
@@ -251,7 +266,7 @@ def validate_snapshot_name(snapshot: str) -> bool:
         return False
     
     # Reasonable length limit
-    if len(snapshot) < 1 or len(snapshot) > 128:
+    if len(snapshot) < MIN_NAME_LENGTH or len(snapshot) > MAX_SNAPSHOT_NAME_LENGTH:
         return False
     
     return True
@@ -268,7 +283,7 @@ def validate_cores_range(cores: Union[int, str]) -> bool:
     """
     try:
         cores_int = int(cores)
-        return 1 <= cores_int <= 128
+        return MIN_CPU_CORES <= cores_int <= MAX_CPU_CORES
     except (ValueError, TypeError):
         return False
 
@@ -284,7 +299,7 @@ def validate_memory_range(memory: Union[int, str]) -> bool:
     """
     try:
         memory_int = int(memory)
-        return 64 <= memory_int <= 1048576  # 64MB to 1TB
+        return MIN_MEMORY_MB <= memory_int <= MAX_MEMORY_MB
     except (ValueError, TypeError):
         return False
 
