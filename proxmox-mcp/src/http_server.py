@@ -13,7 +13,7 @@ import uvicorn
 
 from .server import ProxmoxMCPServer
 from .auth import AuthManager
-from .utils.logging import get_logger, setup_logging
+from .utils.mcp_logging import get_logger, setup_logging
 
 logger = get_logger(__name__)
 

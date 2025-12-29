@@ -20,7 +20,7 @@ import urllib3
 # Add project root to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
-# Import validation functions and client
+# Import validation functions, logging, and client
 from src.utils.validation import (
     is_valid_vmid,
     is_valid_node_name,
@@ -29,6 +29,7 @@ from src.utils.validation import (
     validate_cores_range,
     validate_memory_range
 )
+from src.utils.mcp_logging import setup_mcp_logging, suppress_noisy_loggers
 from src.exceptions import (
     ProxmoxError,
     ProxmoxConnectionError,
@@ -41,6 +42,12 @@ from src.exceptions import (
 )
 from src.proxmox_client import ProxmoxClient
 from src.secure_config import SecureConfigManager
+
+
+# Initialize logger at module load time to avoid race conditions
+# This ensures logging is available even if WorkingProxmoxMCPServer is instantiated before main()
+logger = setup_mcp_logging("proxmox-mcp")
+suppress_noisy_loggers()
 
 
 def debug_print(message: str) -> None:
@@ -77,29 +84,6 @@ def load_config() -> Dict[str, Any]:
         raise ProxmoxConfigurationError(f"Invalid JSON in config file {config_path}: {e}")
     except OSError as e:
         raise ProxmoxConfigurationError(f"Failed to read config file {config_path}: {e}")
-
-
-def main():
-    """Main entry point for the server."""
-    # Load configuration
-    config = load_config()
-
-    # Note: SSL warnings are now suppressed only in the context of specific requests
-    # where SSL verification is disabled, rather than globally. This allows legitimate
-    # SSL issues to be visible during development and troubleshooting.
-    if not config.get('ssl_verify', True):
-        debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
-
-    debug_print("Server starting...")
-
-    # Completely suppress all output
-    logging.getLogger().handlers.clear()
-    logging.getLogger().addHandler(logging.NullHandler())
-    logging.getLogger().setLevel(logging.CRITICAL)
-
-    # Create and run the server
-    server = WorkingProxmoxMCPServer()
-    server.run()
 
 
 class WorkingProxmoxMCPServer:
@@ -164,10 +148,12 @@ class WorkingProxmoxMCPServer:
             try:
                 self.proxmox_client.close()
             except Exception as e:
-                debug_print(f"Error closing Proxmox client: {e}")
+                if logger:
+                    logger.warning(f"Error closing Proxmox client: {e}")
             finally:
                 self.proxmox_client = None
-            debug_print("Cleanup complete")
+            if logger:
+                logger.debug("Cleanup complete")
 
     def _create_error_response(self, message: str) -> Dict[str, Any]:
         """Create a standardized MCP error response.
@@ -940,10 +926,67 @@ class WorkingProxmoxMCPServer:
                     "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
                     "isError": True
                 }
-        except ProxmoxError as e:
-            debug_print(f"Tool execution failed: {e}")
+        except ProxmoxConnectionError as e:
+            if logger:
+                logger.error(f"Proxmox connection error in tool '{name}': {e}")
             return {
-                "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                "content": [{"type": "text", "text": f"Connection error: {str(e)}"}],
+                "isError": True
+            }
+        except ProxmoxAuthenticationError as e:
+            if logger:
+                logger.error(f"Proxmox authentication error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Authentication error: {str(e)}"}],
+                "isError": True
+            }
+        except ProxmoxTimeoutError as e:
+            if logger:
+                logger.error(f"Proxmox timeout in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Timeout error: {str(e)}"}],
+                "isError": True
+            }
+        except ProxmoxValidationError as e:
+            if logger:
+                logger.error(f"Validation error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Validation error: {str(e)}"}],
+                "isError": True
+            }
+        except ProxmoxResourceNotFoundError as e:
+            if logger:
+                logger.error(f"Resource not found in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Resource not found: {str(e)}"}],
+                "isError": True
+            }
+        except ProxmoxError as e:
+            if logger:
+                logger.error(f"Proxmox API error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Proxmox error: {str(e)}"}],
+                "isError": True
+            }
+        except (ConnectionError, TimeoutError) as e:
+            if logger:
+                logger.error(f"Network error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Network error: {str(e)}"}],
+                "isError": True
+            }
+        except json.JSONDecodeError as e:
+            if logger:
+                logger.error(f"JSON decode error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": "Error: Invalid JSON response from Proxmox"}],
+                "isError": True
+            }
+        except Exception as e:
+            if logger:
+                logger.exception(f"Unexpected error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Unexpected error: {type(e).__name__}"}],
                 "isError": True
             }
 
@@ -1055,28 +1098,33 @@ class WorkingProxmoxMCPServer:
                         self._send_error(request_id, -32601, f"Method not found: {method}")
 
                 except json.JSONDecodeError as e:
-                    debug_print(f"JSON decode error: {e}")
+                    if logger:
+                        logger.error(f"JSON decode error: {e}")
                     if request_id is not None:
                         self._send_error(request_id, -32700, "Parse error")
                     continue
 
                 except ProxmoxError as e:
-                    debug_print(f"Request processing error: {e}")
-                    debug_print(f"Error type: {type(e).__name__}")
-                    import traceback
-                    debug_print(f"Traceback: {traceback.format_exc()}")
+                    if logger:
+                        logger.error(f"Request processing error: {e}")
                     if request_id is not None:
                         self._send_error(request_id, -32603, f"Internal error: {str(e)}")
                     continue
 
+                except Exception as e:
+                    if logger:
+                        logger.exception(f"Unexpected error handling request: {e}")
+                    if request_id is not None:
+                        self._send_error(request_id, -32603, "Internal error")
+                    continue
+
         except KeyboardInterrupt:
-            debug_print("Server interrupted by user")
+            if logger:
+                logger.info("Server interrupted by user")
         except Exception as e:
             # Catch-all for unexpected fatal errors outside of request processing
-            debug_print(f"Fatal server error: {e}")
-            import traceback
-            debug_print(f"Traceback: {traceback.format_exc()}")
-            debug_print("Server exiting due to fatal error")
+            if logger:
+                logger.exception(f"Fatal server error: {e}")
         finally:
             # Always clean up resources on shutdown
             self.cleanup()
@@ -1095,12 +1143,13 @@ def main():
             print("Proxmox MCP Server version 1.0.0")
         sys.exit(0)
 
+    # Logger is already initialized at module load time
     server = None
 
     def signal_handler(signum, frame):
         """Handle shutdown signals gracefully."""
         sig_name = signal.Signals(signum).name
-        debug_print(f"Received signal {sig_name}, initiating graceful shutdown...")
+        logger.info(f"Received signal {sig_name}, initiating graceful shutdown...")
         if server:
             server.cleanup()
         sys.exit(0)
@@ -1110,10 +1159,23 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
+        logger.debug("Server starting...")
         server = WorkingProxmoxMCPServer()
         server.run()
+    except ProxmoxConfigurationError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    except ProxmoxConnectionError as e:
+        logger.error(f"Connection error: {e}")
+        sys.exit(1)
+    except ProxmoxAuthenticationError as e:
+        logger.error(f"Authentication error: {e}")
+        sys.exit(1)
     except ProxmoxError as e:
-        debug_print(f"Failed to start server: {e}")
+        logger.error(f"Failed to start server: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.exception(f"Unexpected error: {e}")
         sys.exit(1)
 
 

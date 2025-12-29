@@ -37,6 +37,7 @@ try:
         validate_backup_name,
         validate_id
     )
+    from .utils.mcp_logging import setup_mcp_logging, suppress_noisy_loggers
     from .version import __version__, __description__
 except ImportError:
     # Fallback for direct execution
@@ -49,78 +50,38 @@ except ImportError:
         validate_backup_name,
         validate_id
     )
+    from utils.mcp_logging import setup_mcp_logging, suppress_noisy_loggers
     from version import __version__, __description__
 
 
-# Create a completely silent stdout that only allows JSON
-class SilentStdout:
+# Create a stdout filter that only allows JSON-RPC messages through
+# This is necessary for MCP protocol compliance - stdout must only contain JSON-RPC
+class MCPStdoutFilter:
+    """Filter stdout to only allow JSON-RPC protocol messages."""
+
     def __init__(self):
         self.original_stdout = sys.stdout
-        self.null_output = open(os.devnull, 'w')
-    
+
     def write(self, text):
-        # Only allow JSON responses to go through
+        # Only allow JSON-RPC responses to go through
         if text.strip().startswith('{"jsonrpc":'):
             self.original_stdout.write(text)
-        # Everything else is silently discarded
-    
+        # Everything else is discarded to keep stdout clean for protocol
+
     def flush(self):
         self.original_stdout.flush()
-    
+
     def fileno(self):
         return self.original_stdout.fileno()
-    
-    def close(self):
-        """Explicitly close the null_output file handle."""
-        if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
-            self.null_output.close()
-    
-    def __del__(self):
-        """Ensure file handle is properly closed on cleanup."""
-        self.close()
 
 
-# Set up the filter
-sys.stdout = SilentStdout()
+# Set up stdout filter for MCP protocol compliance
+sys.stdout = MCPStdoutFilter()
 
-# Completely disable all logging
-logging.getLogger().handlers.clear()
-logging.getLogger().addHandler(logging.NullHandler())
-logging.getLogger().setLevel(logging.CRITICAL)
-
-# Create a completely silent logger
-logger = logging.getLogger("pfsense-mcp")
-logger.addHandler(logging.NullHandler())
-logger.setLevel(logging.CRITICAL)
-
-
-# Also suppress stderr for any remaining output
-class SilentStderr:
-    def __init__(self):
-        self.original_stderr = sys.stderr
-        self.null_output = open(os.devnull, 'w')
-    
-    def write(self, text):
-        # Silently discard all stderr output
-        return 0
-    
-    def flush(self):
-        pass
-    
-    def fileno(self):
-        return self.original_stderr.fileno()
-    
-    def close(self):
-        """Explicitly close the file handle if needed."""
-        if hasattr(self, 'null_output') and self.null_output and not self.null_output.closed:
-            self.null_output.close()
-    
-    def __del__(self):
-        """Ensure file handle is properly closed on cleanup."""
-        self.close()
-
-
-sys.stderr = SilentStderr()
+# Set up MCP-compatible logging (logs to stderr, configurable via MCP_LOG_LEVEL)
+# Default is CRITICAL (quiet), set MCP_LOG_LEVEL=DEBUG for troubleshooting
+logger = setup_mcp_logging("pfsense-mcp")
+suppress_noisy_loggers()
 
 # Global client instance with synchronization lock
 pfsense_client: Optional[HTTPPfSenseClient] = None
@@ -618,13 +579,28 @@ class HTTPPfSenseMCPServer:
             )
             
         except PfSenseAPIError as e:
+            logger.error(f"pfSense API error in tool '{name}': {e}")
             return CallToolResult(
                 content=[TextContent(type="text", text=f"pfSense API error: {str(e)}")],
                 isError=True
             )
-        except Exception as e:
+        except (ConnectionError, TimeoutError) as e:
+            logger.error(f"Network error in tool '{name}': {e}")
             return CallToolResult(
-                content=[TextContent(type="text", text=f"Unexpected error: {str(e)}")],
+                content=[TextContent(type="text", text=f"Network error: {str(e)}")],
+                isError=True
+            )
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in tool '{name}': {e}")
+            return CallToolResult(
+                content=[TextContent(type="text", text="Error: Invalid JSON response from pfSense")],
+                isError=True
+            )
+        except Exception as e:
+            # Log unexpected errors with full traceback for debugging
+            logger.exception(f"Unexpected error in tool '{name}': {e}")
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Unexpected error: {type(e).__name__}")],
                 isError=True
             )
 
@@ -669,8 +645,16 @@ async def initialize_pfsense_client() -> Optional[HTTPPfSenseClient]:
         if await client.test_connection():
             return client
         else:
+            logger.warning("pfSense connection test failed - client not initialized")
             return None
-    except Exception:
+    except (ConnectionError, TimeoutError) as e:
+        logger.error(f"Network error initializing pfSense client: {e}")
+        return None
+    except ValueError as e:
+        logger.error(f"Configuration error initializing pfSense client: {e}")
+        return None
+    except Exception as e:
+        logger.exception(f"Unexpected error initializing pfSense client: {e}")
         return None
 
 
@@ -760,12 +744,15 @@ async def main():
                     original_stdout = sys.stdout.original_stdout
                     sys.stdout = original_stdout
                     print(json.dumps(response))
-                    sys.stdout = SilentStdout()
+                    sys.stdout = MCPStdoutFilter()
                 elif isinstance(request, SessionMessage):
                     # Handle session messages (ignore for now)
                     continue
 
-    except Exception:
+    except KeyboardInterrupt:
+        logger.info("Server interrupted by user")
+    except Exception as e:
+        logger.exception(f"Fatal server error: {e}")
         sys.exit(1)
     finally:
         await cleanup_client()

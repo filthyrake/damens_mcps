@@ -12,7 +12,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
-from .utils.logging import setup_logging, get_logger
+from .utils.mcp_logging import setup_logging, get_logger
 
 logger = get_logger(__name__)
 console = Console()

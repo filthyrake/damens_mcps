@@ -22,7 +22,7 @@ from tenacity import (
 import pybreaker
 
 try:
-    from .logging import get_logger
+    from .mcp_logging import get_logger
     logger = get_logger(__name__)
 except ImportError:
     import logging

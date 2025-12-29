@@ -14,7 +14,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from .utils.logging import setup_logging, get_logger
+from .utils.mcp_logging import setup_logging, get_logger
 
 console = Console()
 logger = get_logger(__name__)

@@ -13,7 +13,7 @@ from aiohttp import ClientSession
 
 try:
     from .auth import PfSenseAuth, PfSenseAuthError
-    from .utils.logging import get_logger
+    from .utils.mcp_logging import get_logger
     from .utils.validation import validate_config, validate_ip_address
     from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
     from .exceptions import (
@@ -25,7 +25,7 @@ try:
 except ImportError:
     # Fallback for direct execution
     from auth import PfSenseAuth, PfSenseAuthError
-    from utils.logging import get_logger
+    from utils.mcp_logging import get_logger
     from utils.validation import validate_config, validate_ip_address
     from utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
     from exceptions import (

@@ -13,7 +13,7 @@ import uvicorn
 try:
     from .server import IDracMCPServer
     from .auth import AuthManager
-    from .utils.logging import setup_logging, get_logger
+    from .utils.mcp_logging import setup_logging, get_logger
 except ImportError:
     # Fallback for direct execution
     import sys
@@ -21,7 +21,7 @@ except ImportError:
     sys.path.append(os.path.dirname(__file__))
     from server import IDracMCPServer
     from auth import AuthManager
-    from utils.logging import setup_logging, get_logger
+    from utils.mcp_logging import setup_logging, get_logger
 
 logger = get_logger(__name__)
 
