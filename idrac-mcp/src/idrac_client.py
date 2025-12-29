@@ -66,7 +66,7 @@ class IDracClient:
 
     Supports two initialization patterns for backwards compatibility:
     1. Config dictionary: IDracClient({"host": ..., "port": ..., ...})
-    2. Positional args: IDracClient(host, port, protocol, username, password, ssl_verify)
+    2. Keyword args: IDracClient(host="...", port=..., protocol="...", username="...", password="...", ssl_verify=...)
 
     Attributes:
         host: iDRAC hostname or IP address
@@ -79,7 +79,7 @@ class IDracClient:
 
     def __init__(
         self,
-        host_or_config: Union[str, Dict[str, Any]],
+        host: Union[str, Dict[str, Any]],
         port: Optional[int] = None,
         protocol: Optional[str] = None,
         username: Optional[str] = None,
@@ -89,18 +89,18 @@ class IDracClient:
         """Initialize the iDRAC client.
 
         Args:
-            host_or_config: Either a config dict with keys (host, port, protocol,
-                username, password, ssl_verify) OR just the host string.
-            port: iDRAC port (usually 443) - required if host_or_config is a string
-            protocol: Protocol to use ('https' recommended) - required if host_or_config is a string
-            username: iDRAC username - required if host_or_config is a string
-            password: iDRAC password - required if host_or_config is a string
+            host: Either a config dict with keys (host, port, protocol,
+                username, password, ssl_verify) OR the hostname/IP string.
+            port: iDRAC port (usually 443) - required if host is a string
+            protocol: Protocol to use ('https' recommended) - required if host is a string
+            username: iDRAC username - required if host is a string
+            password: iDRAC password - required if host is a string
             ssl_verify: Whether to verify SSL certificates (default: False for self-signed)
         """
-        # Support both config dict and positional args for backwards compatibility
-        if isinstance(host_or_config, dict):
+        # Support both config dict and keyword args for backwards compatibility
+        if isinstance(host, dict):
             # Validate config - raises ValueError on invalid config
-            validated = validate_idrac_config(host_or_config)
+            validated = validate_idrac_config(host)
             self.config = validated
             self.host = validated['host']
             self.port = validated['port']
@@ -109,13 +109,13 @@ class IDracClient:
             self.password = validated['password']
             self.ssl_verify = validated.get('ssl_verify', False)
         else:
-            # Positional arguments
+            # Keyword/positional arguments
             if port is None or protocol is None or username is None or password is None:
                 raise ValueError(
-                    "When using positional arguments, host, port, protocol, username, "
+                    "When using keyword arguments, host, port, protocol, username, "
                     "and password are all required"
                 )
-            self.host = host_or_config
+            self.host = host
             self.port = port
             self.protocol = protocol
             self.username = username

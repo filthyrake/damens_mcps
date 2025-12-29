@@ -47,7 +47,7 @@ class TestPowerManagement:
         """Test different power operation types."""
         from src.utils.validation import validate_power_operation
         
-        valid_operations = ["on", "off", "reset", "graceful_shutdown"]
+        valid_operations = ["on", "off", "cycle", "graceful_shutdown", "force_off"]
         
         for op in valid_operations:
             config = {"operation": op, "force": False, "timeout": 60}

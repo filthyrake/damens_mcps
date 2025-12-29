@@ -14,7 +14,12 @@ import sys
 from typing import Any, Dict, List, Optional, TypedDict, Literal
 
 # Import the IDracClient from the separate module
-from src.idrac_client import IDracClient, debug_print, redact_sensitive_headers
+from src.idrac_client import (
+    IDracClient,
+    debug_print,
+    redact_sensitive_headers,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+)
 
 # Check for --version flag before any other imports that might fail
 if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
