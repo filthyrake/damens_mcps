@@ -11,10 +11,10 @@ import aiohttp
 from aiohttp import ClientSession, ClientTimeout
 
 try:
-    from .utils.logging import get_logger
+    from .utils.mcp_logging import get_logger
 except ImportError:
     # Fallback for direct execution
-    from utils.logging import get_logger
+    from utils.mcp_logging import get_logger
 
 logger = get_logger(__name__)
 

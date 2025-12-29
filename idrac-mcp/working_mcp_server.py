@@ -53,17 +53,18 @@ class ExampleConfig(TypedDict):
     default_server: str
     server: ServerSettings
 
-# Import validation utilities
-_validation_path = os.path.join(os.path.dirname(__file__), 'src', 'utils')
-sys.path.insert(0, _validation_path)
+# Import validation and logging utilities
+_utils_path = os.path.join(os.path.dirname(__file__), 'src', 'utils')
+sys.path.insert(0, _utils_path)
 try:
     from validation import validate_server_id
+    from mcp_logging import setup_mcp_logging, suppress_noisy_loggers
 except ImportError as e:
     # Fail immediately - this indicates a deployment problem that must be fixed
-    print(f"CRITICAL: Failed to import validation module: {e}", file=sys.stderr)
+    print(f"CRITICAL: Failed to import utility modules: {e}", file=sys.stderr)
     print("This indicates a deployment or configuration issue.", file=sys.stderr)
-    print(f"Expected validation module at: {os.path.join(_validation_path, 'validation.py')}", file=sys.stderr)
-    print("Ensure the file exists and all dependencies are installed.", file=sys.stderr)
+    print(f"Expected modules at: {_utils_path}", file=sys.stderr)
+    print("Ensure the files exist and all dependencies are installed.", file=sys.stderr)
     sys.exit(1)
 
 def create_example_config(config_path: str = 'config.json') -> None:
@@ -135,11 +136,11 @@ def load_config() -> Dict[str, Any]:
 # where SSL verification is disabled, rather than globally. This allows legitimate
 # SSL issues to be visible during development and troubleshooting.
 
-# Completely suppress all output
+# Set up MCP-compatible logging (logs to stderr, configurable via MCP_LOG_LEVEL)
+# Default is CRITICAL (quiet), set MCP_LOG_LEVEL=DEBUG for troubleshooting
 import logging
-logging.getLogger().handlers.clear()
-logging.getLogger().addHandler(logging.NullHandler())
-logging.getLogger().setLevel(logging.CRITICAL)
+logger = setup_mcp_logging("idrac-mcp")
+suppress_noisy_loggers()
 
 
 # IDracClient is now imported from src.idrac_client
@@ -517,10 +518,29 @@ class WorkingIDracMCPServer:
                 "content": [{"type": "text", "text": result_text}],
                 "isError": False
             }
-        except Exception as e:
-            debug_print(f"Tool error: {e}")
+        except (ConnectionError, TimeoutError) as e:
+            logger.error(f"Network error in tool '{name}': {e}")
             return {
-                "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                "content": [{"type": "text", "text": f"Network error: {str(e)}"}],
+                "isError": True
+            }
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": "Error: Invalid JSON response from iDRAC"}],
+                "isError": True
+            }
+        except ValueError as e:
+            logger.error(f"Validation error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Validation error: {str(e)}"}],
+                "isError": True
+            }
+        except Exception as e:
+            # Log unexpected errors with full traceback for debugging
+            logger.exception(f"Unexpected error in tool '{name}': {e}")
+            return {
+                "content": [{"type": "text", "text": f"Unexpected error: {type(e).__name__}"}],
                 "isError": True
             }
     
@@ -619,24 +639,20 @@ class WorkingIDracMCPServer:
                             self._send_error(request_id, -32601, f"Method not found: {method}")
                         
                 except json.JSONDecodeError as e:
-                    debug_print(f"JSON decode error: {e}")
+                    logger.error(f"JSON decode error: {e}")
                     # Only send error if we have a request ID
                     if request_id is not None:
                         self._send_error(request_id, -32700, "Parse error")
                 except Exception as e:
-                    debug_print(f"Error handling request: {e}")
-                    import traceback
-                    traceback.print_exc(file=sys.stderr)
+                    logger.exception(f"Error handling request: {e}")
                     # Only send error if we have a request ID
                     if request_id is not None:
                         self._send_error(request_id, -32603, "Internal error")
-                    
+
         except KeyboardInterrupt:
-            debug_print("Server interrupted")
+            logger.info("Server interrupted by user")
         except Exception as e:
-            debug_print(f"Server error: {e}")
-            import traceback
-            traceback.print_exc(file=sys.stderr)
+            logger.exception(f"Fatal server error: {e}")
         finally:
             # Always clean up resources on shutdown
             self.cleanup()
@@ -663,6 +679,7 @@ def main():
     try:
         config = load_config()
     except FileNotFoundError as e:
+        logger.error(f"Configuration file not found: {e}")
         print("Configuration file 'config.json' not found!", file=sys.stderr)
         print(f"   Tried: {e}", file=sys.stderr)
         print("\nCreating example configuration file...", file=sys.stderr)
@@ -675,16 +692,19 @@ def main():
             print("   1. Edit 'config.json' with your iDRAC server details", file=sys.stderr)
             print("   2. Update the host, username, and password for each server", file=sys.stderr)
             print("   3. Run the server again", file=sys.stderr)
-        except Exception as create_error:
+        except (IOError, OSError) as create_error:
+            logger.error(f"Failed to create example config: {create_error}")
             print(f"Failed to create example config: {create_error}", file=sys.stderr)
             print("\nPlease create a 'config.json' file manually with your iDRAC server details", file=sys.stderr)
             print("   See README.md for configuration instructions", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:
+        logger.error(f"Configuration error: {e}")
         print(f"Configuration error: {e}", file=sys.stderr)
         print("\nPlease check your config.json file for valid JSON syntax", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
+        logger.exception(f"Unexpected error loading configuration: {e}")
         print(f"Unexpected error loading configuration: {e}", file=sys.stderr)
         sys.exit(1)
 

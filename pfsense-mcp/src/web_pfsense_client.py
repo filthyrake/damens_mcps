@@ -11,11 +11,11 @@ from aiohttp import ClientSession
 
 try:
     from .auth import PfSenseAuth
-    from .utils.logging import get_logger
+    from .utils.mcp_logging import get_logger
 except ImportError:
     # Fallback for direct execution
     from auth import PfSenseAuth
-    from utils.logging import get_logger
+    from utils.mcp_logging import get_logger
 
 logger = get_logger(__name__)
 
