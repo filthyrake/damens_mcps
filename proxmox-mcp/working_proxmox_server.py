@@ -10,64 +10,37 @@ Use this file for all Proxmox MCP server operations.
 import json
 import logging
 import os
+import signal
 import sys
 import threading
 from typing import Any, Dict, List, Optional
 
 import urllib3
 
+# Add project root to path for imports
+sys.path.insert(0, os.path.dirname(__file__))
+
 # Import validation functions and client
-# Use try-except to allow imports to work both when running directly and when imported as a module from tests or other packages
-try:
-    from utils.validation import (
-        is_valid_vmid, 
-        is_valid_node_name, 
-        is_valid_storage_name,
-        validate_snapshot_name,
-        validate_cores_range,
-        validate_memory_range
-    )
-    from exceptions import (
-        ProxmoxError,
-        ProxmoxConnectionError,
-        ProxmoxAuthenticationError,
-        ProxmoxAPIError,
-        ProxmoxTimeoutError,
-        ProxmoxConfigurationError,
-        ProxmoxValidationError,
-        ProxmoxResourceNotFoundError
-    )
-    from src.proxmox_client import ProxmoxClient
-    from src.secure_config import SecureConfigManager
-except ImportError:
-    # Fall back to sys.path modification for direct execution
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-    try:
-        from utils.validation import (
-            is_valid_vmid,
-            is_valid_node_name,
-            is_valid_storage_name,
-            validate_snapshot_name,
-            validate_cores_range,
-            validate_memory_range
-        )
-        from exceptions import (
-            ProxmoxError,
-            ProxmoxConnectionError,
-            ProxmoxAuthenticationError,
-            ProxmoxAPIError,
-            ProxmoxTimeoutError,
-            ProxmoxConfigurationError,
-            ProxmoxValidationError,
-            ProxmoxResourceNotFoundError
-        )
-        from proxmox_client import ProxmoxClient
-        from secure_config import SecureConfigManager
-    except ImportError as e:
-        # Fail fast only if both import strategies fail
-        print(f"CRITICAL ERROR: Failed to import required modules: {e}", file=sys.stderr)
-        print("This suggests a deployment or configuration issue that must be resolved.", file=sys.stderr)
-        sys.exit(1)
+from src.utils.validation import (
+    is_valid_vmid,
+    is_valid_node_name,
+    is_valid_storage_name,
+    validate_snapshot_name,
+    validate_cores_range,
+    validate_memory_range
+)
+from src.exceptions import (
+    ProxmoxError,
+    ProxmoxConnectionError,
+    ProxmoxAuthenticationError,
+    ProxmoxAPIError,
+    ProxmoxTimeoutError,
+    ProxmoxConfigurationError,
+    ProxmoxValidationError,
+    ProxmoxResourceNotFoundError
+)
+from src.proxmox_client import ProxmoxClient
+from src.secure_config import SecureConfigManager
 
 
 def debug_print(message: str) -> None:
@@ -1121,6 +1094,20 @@ def main():
         except ImportError:
             print("Proxmox MCP Server version 1.0.0")
         sys.exit(0)
+
+    server = None
+
+    def signal_handler(signum, frame):
+        """Handle shutdown signals gracefully."""
+        sig_name = signal.Signals(signum).name
+        debug_print(f"Received signal {sig_name}, initiating graceful shutdown...")
+        if server:
+            server.cleanup()
+        sys.exit(0)
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
 
     try:
         server = WorkingProxmoxMCPServer()

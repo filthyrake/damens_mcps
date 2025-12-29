@@ -230,16 +230,19 @@ class TestSecurityImprovements:
     
     def test_key_derivation_iterations(self):
         """Test that key derivation uses recommended iteration count."""
-        # This is more of a documentation test - we verify the code uses 480,000 iterations
-        # We can't easily test the actual iteration count without instrumenting the code
-        # But we can verify the implementation exists
+        # Verify the PBKDF2_ITERATIONS constant has the OWASP recommended value
+        from src.secure_multi_server_manager import PBKDF2_ITERATIONS
         from secure_multi_server_manager import SecureMultiServerManager
         import inspect
-        
+
+        # Check the constant value directly
+        assert PBKDF2_ITERATIONS == 480000, \
+            f"PBKDF2_ITERATIONS should be 480000 (OWASP 2023), got {PBKDF2_ITERATIONS}"
+
         source = inspect.getsource(SecureMultiServerManager._initialize_encryption)
-        
-        # Check that the source mentions the OWASP recommended iteration count
-        assert "480000" in source or "480,000" in source
+
+        # Check that the source uses the constant and PBKDF2HMAC
+        assert "PBKDF2_ITERATIONS" in source, "Should use PBKDF2_ITERATIONS constant"
         assert "PBKDF2HMAC" in source
     
     def test_salt_uniqueness(self):

@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import sys
 from typing import Any, Dict, List, Optional
 
@@ -692,21 +693,50 @@ async def get_client() -> Optional[HTTPPfSenseClient]:
         return pfsense_client
 
 
+async def cleanup_client():
+    """Clean up the pfSense client connection."""
+    global pfsense_client
+    async with _client_lock:
+        if pfsense_client:
+            await pfsense_client.close()
+            pfsense_client = None
+
+
 async def main():
     """Main entry point for the MCP server."""
     global pfsense_client
+
+    # Set up graceful shutdown for asyncio
+    loop = asyncio.get_running_loop()
+    shutdown_event = asyncio.Event()
+
+    def signal_handler(signum):
+        """Handle shutdown signals gracefully."""
+        sig_name = signal.Signals(signum).name
+        # Print to stderr since stdout is used for MCP protocol
+        print(f"DEBUG: Received signal {sig_name}, initiating graceful shutdown...", file=sys.stderr)
+        shutdown_event.set()
+
+    # Register signal handlers for graceful shutdown
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, lambda s=sig: signal_handler(s))
+
     try:
         # Initialize pfSense client with lock protection
         async with _client_lock:
             pfsense_client = await initialize_pfsense_client()
-        
+
         # Create MCP server
         server = HTTPPfSenseMCPServer()
-        
+
         # Create stdio server
         async with stdio_server() as (read_stream, write_stream):
             # Handle requests
             async for request in read_stream:
+                # Check for shutdown signal
+                if shutdown_event.is_set():
+                    break
+
                 if isinstance(request, ListToolsRequest):
                     await mcp.server.stdio.list_tools(write_stream, request, server.tools)
                 elif isinstance(request, CallToolRequest):
@@ -734,13 +764,11 @@ async def main():
                 elif isinstance(request, SessionMessage):
                     # Handle session messages (ignore for now)
                     continue
-                    
+
     except Exception:
         sys.exit(1)
     finally:
-        async with _client_lock:
-            if pfsense_client:
-                await pfsense_client.close()
+        await cleanup_client()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,11 @@
 """Pytest configuration and fixtures for Proxmox MCP tests."""
 
+import os
+import sys
+
+# Add the project root directory to the Python path for CI
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 import pytest
 from unittest.mock import Mock, MagicMock
 

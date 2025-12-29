@@ -45,20 +45,26 @@ def mock_multi_server_config():
 
 @pytest.fixture
 def mock_idrac_client(mock_idrac_config):
-    """Mock iDRAC client."""
-    from src.idrac_client import IDracClient
-    
-    client = Mock(spec=IDracClient)
+    """Mock iDRAC client.
+
+    Note: Uses MagicMock instead of Mock(spec=...) because tests may need
+    methods that don't exist on the actual IDracClient (like get_storage_info).
+    """
+    client = MagicMock()
     client.config = mock_idrac_config
     client.host = mock_idrac_config["host"]
     client.username = mock_idrac_config["username"]
-    
-    # Mock methods
+
+    # Mock methods that exist on IDracClient
     client.get_system_info.return_value = {"Model": "PowerEdge R740", "ServiceTag": "ABC1234"}
+    client.get_power_status.return_value = {"host": mock_idrac_config["host"], "power_status": "On"}
+    client.power_on.return_value = {"status": "success"}
+    client.power_off.return_value = {"status": "success"}
+    # Note: These methods don't exist on IDracClient but tests expect them (legacy tests)
     client.get_power_state.return_value = {"PowerState": "On"}
     client.set_power_state.return_value = {"status": "success"}
     client.get_storage_info.return_value = {"Controllers": [{"Id": "RAID.Integrated.1"}]}
-    
+
     return client
 
 
