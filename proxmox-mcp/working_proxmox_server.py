@@ -42,7 +42,14 @@ except ImportError:
     # Fall back to sys.path modification for direct execution
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
     try:
-        from utils.validation import validate_vmid, validate_node_name
+        from utils.validation import (
+            is_valid_vmid,
+            is_valid_node_name,
+            is_valid_storage_name,
+            validate_snapshot_name,
+            validate_cores_range,
+            validate_memory_range
+        )
         from exceptions import (
             ProxmoxError,
             ProxmoxConnectionError,

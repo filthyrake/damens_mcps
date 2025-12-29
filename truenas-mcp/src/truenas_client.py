@@ -117,10 +117,15 @@ class TrueNASClient:
                 connector=connector,
                 timeout=timeout
             )
-            
-            # Authenticate if needed
+
+            # Authenticate if needed - clean up session on failure to prevent leaks
             if not self.config.api_key:
-                await self._authenticate()
+                try:
+                    await self._authenticate()
+                except Exception:
+                    await self.session.close()
+                    self.session = None
+                    raise
     
     async def disconnect(self) -> None:
         """Close connection to TrueNAS."""

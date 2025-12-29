@@ -198,19 +198,26 @@ class IDracClient:
     def _execute_http_request(self, method: str, url: str, **kwargs) -> requests.Response:
         """
         Execute HTTP request with context-specific warning suppression.
-        
+
         Helper method to eliminate duplication in _make_request.
+        Supports GET, POST, PUT, DELETE, and PATCH methods for Redfish API compatibility.
         """
+        method_map = {
+            'GET': self.session.get,
+            'POST': self.session.post,
+            'PUT': self.session.put,
+            'DELETE': self.session.delete,
+            'PATCH': self.session.patch,
+        }
+
+        handler = method_map.get(method.upper())
+        if not handler:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
         with warnings.catch_warnings():
             if not self.ssl_verify:
                 warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-            
-            if method.upper() == 'GET':
-                return self.session.get(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
-            elif method.upper() == 'POST':
-                return self.session.post(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
-            else:
-                raise ValueError(f"Unsupported method: {method}")
+            return handler(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make a request with proper error handling and debugging."""
