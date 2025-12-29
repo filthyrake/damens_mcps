@@ -69,6 +69,9 @@ class HTTPPfSenseClient:
         # Can be overridden via config if pfSense uses different expiry
         self.jwt_token_lifetime = int(config.get("jwt_token_lifetime", DEFAULT_JWT_TOKEN_LIFETIME))
         self.jwt_token_refresh_buffer = int(config.get("jwt_token_refresh_buffer", DEFAULT_JWT_TOKEN_REFRESH_BUFFER))
+
+        # Lock to prevent concurrent token refresh race conditions
+        self._token_refresh_lock = asyncio.Lock()
         
         # Timeout configuration (seconds, accepts float for sub-second precision)
         self.timeout = aiohttp.ClientTimeout(total=config.get("timeout", 30))
@@ -125,47 +128,55 @@ class HTTPPfSenseClient:
     async def _ensure_valid_token(self) -> None:
         """
         Ensure we have a valid JWT token, refreshing if necessary.
-        
+
         Implements retry logic with exponential backoff for transient failures.
         Falls back to basic authentication if token acquisition fails after all retries.
+
+        Uses double-check locking pattern to prevent race conditions when multiple
+        concurrent requests need to refresh the token simultaneously.
         """
         # If we have API key auth, no need for JWT token
         if self.auth.api_key:
             return
-        
+
         # If we don't have username/password, can't get JWT token
         if not (self.auth.username and self.auth.password):
             return
-        
-        # Check if token is valid and not expired
+
+        # Fast path: Check if token is valid without acquiring lock
         if self.jwt_token and not self._token_expired():
-            # Token is still valid, no need to refresh
             return
-        
-        # Token is missing or expired, clear it for refresh
-        if self.jwt_token:
-            logger.info("JWT token expired, refreshing...")
-        self.jwt_token = None
-        self.jwt_token_expiry = None
-        
-        # Retry logic with exponential backoff
-        max_retries = MAX_JWT_REFRESH_RETRIES
-        for attempt in range(max_retries):
-            try:
-                self.jwt_token = await self.auth.get_jwt_token()
-                self.jwt_token_expiry = time.time() + self.jwt_token_lifetime
-                logger.info(f"JWT token acquired successfully (expires in {self.jwt_token_lifetime}s)")
+
+        # Acquire lock for token refresh to prevent race conditions
+        async with self._token_refresh_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if self.jwt_token and not self._token_expired():
                 return
-            except (PfSenseAuthError, aiohttp.ClientError) as e:
-                if attempt == max_retries - 1:
-                    # Last attempt failed, fall back to basic auth
-                    logger.warning(f"JWT token acquisition failed after {max_retries} attempts, using fallback auth: {e}")
+
+            # Token is missing or expired, clear it for refresh
+            if self.jwt_token:
+                logger.info("JWT token expired, refreshing...")
+            self.jwt_token = None
+            self.jwt_token_expiry = None
+
+            # Retry logic with exponential backoff
+            max_retries = MAX_JWT_REFRESH_RETRIES
+            for attempt in range(max_retries):
+                try:
+                    self.jwt_token = await self.auth.get_jwt_token()
+                    self.jwt_token_expiry = time.time() + self.jwt_token_lifetime
+                    logger.info(f"JWT token acquired successfully (expires in {self.jwt_token_lifetime}s)")
                     return
-                
-                # Calculate backoff delay: 2^attempt seconds
-                backoff_delay = 2 ** attempt
-                logger.warning(f"JWT token acquisition attempt {attempt + 1}/{max_retries} failed: {e}, retrying in {backoff_delay}s...")
-                await asyncio.sleep(backoff_delay)
+                except (PfSenseAuthError, aiohttp.ClientError) as e:
+                    if attempt == max_retries - 1:
+                        # Last attempt failed, fall back to basic auth
+                        logger.warning(f"JWT token acquisition failed after {max_retries} attempts, using fallback auth: {e}")
+                        return
+
+                    # Calculate backoff delay: 2^attempt seconds
+                    backoff_delay = 2 ** attempt
+                    logger.warning(f"JWT token acquisition attempt {attempt + 1}/{max_retries} failed: {e}, retrying in {backoff_delay}s...")
+                    await asyncio.sleep(backoff_delay)
     
     async def _execute_request(
         self, 

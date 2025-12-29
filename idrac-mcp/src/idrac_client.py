@@ -282,30 +282,43 @@ class IDracClient:
     
     async def get_hardware_inventory(self) -> Dict[str, Any]:
         """Get hardware inventory.
-        
+
         Returns:
             Hardware inventory information
+
+        Note:
+            Uses parallel fetching for processor details to avoid N+1 query pattern.
+            Initial collection requests are also parallelized for better performance.
         """
         try:
-            # Get processor information
-            processors_result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Processors')
+            # Parallel fetch of all collection endpoints (processors, memory, storage)
+            processors_task = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Processors')
+            memory_task = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Memory')
+            storage_task = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Storage')
+
+            processors_result, memory_result, storage_result = await asyncio.gather(
+                processors_task, memory_task, storage_task
+            )
+
             processors = processors_result.get('Members', [])
-            
-            # Get memory information
-            memory_result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Memory')
             memory_modules = memory_result.get('Members', [])
-            
-            # Get storage information
-            storage_result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Storage')
             storage_controllers = storage_result.get('Members', [])
-            
-            # Get detailed processor info
-            processor_details = []
+
+            # Extract processor IDs for parallel detail fetching
+            proc_ids = []
             for proc in processors:
+                proc_id = proc.get('@odata.id', '').split('/')[-1]
+                if proc_id:
+                    proc_ids.append(proc_id)
+
+            # Parallel fetch of all processor details to avoid N+1 query pattern
+            async def fetch_processor_detail(proc_id: str) -> Dict[str, Any]:
+                """Fetch details for a single processor."""
                 try:
-                    proc_id = proc.get('@odata.id', '').split('/')[-1]
-                    proc_detail = await self._make_request('GET', f'/redfish/v1/Systems/System.Embedded.1/Processors/{proc_id}')
-                    processor_details.append({
+                    proc_detail = await self._make_request(
+                        'GET', f'/redfish/v1/Systems/System.Embedded.1/Processors/{proc_id}'
+                    )
+                    return {
                         "id": proc_id,
                         "name": proc_detail.get('Name', 'Unknown'),
                         "model": proc_detail.get('Model', 'N/A'),
@@ -315,15 +328,21 @@ class IDracClient:
                         "threads": proc_detail.get('TotalThreads', 'N/A'),
                         "health": proc_detail.get('Status', {}).get('Health', 'N/A'),
                         "state": proc_detail.get('Status', {}).get('State', 'N/A')
-                    })
+                    }
                 except Exception as e:
-                    logger.warning(f"Failed to get processor details for {proc.get('@odata.id', 'unknown')}: {e}")
-                    processor_details.append({"id": proc.get('@odata.id', 'unknown'), "error": str(e)})
-            
+                    logger.warning(f"Failed to get processor details for {proc_id}: {e}")
+                    return {"id": proc_id, "error": str(e)}
+
+            # Fetch all processor details in parallel
+            processor_details = await asyncio.gather(
+                *[fetch_processor_detail(proc_id) for proc_id in proc_ids],
+                return_exceptions=False
+            )
+
             inventory = {
                 "processors": {
                     "count": len(processors),
-                    "details": processor_details
+                    "details": list(processor_details)
                 },
                 "memory_modules": {
                     "count": len(memory_modules),
@@ -334,7 +353,7 @@ class IDracClient:
                     "controllers": storage_controllers
                 }
             }
-            
+
             return {
                 "status": "success",
                 "data": inventory,
