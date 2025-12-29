@@ -223,7 +223,8 @@ def create_app() -> FastAPI:
         settings = get_settings()
         
         # Verify admin token using constant-time comparison to prevent timing attacks
-        if not settings.admin_token or not secrets.compare_digest(
+        # Check for None/empty values before encoding to prevent AttributeError
+        if not settings.admin_token or not request.admin_token or not secrets.compare_digest(
             request.admin_token.encode('utf-8'),
             settings.admin_token.encode('utf-8')
         ):
