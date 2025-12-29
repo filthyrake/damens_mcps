@@ -16,8 +16,9 @@ Example usage:
 
 import json
 import sys
+import time
 import warnings
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 from urllib3.exceptions import InsecureRequestWarning
@@ -116,7 +117,14 @@ class ProxmoxClient:
         
         # Timeout configuration (seconds)
         self.timeout = 30
-        
+
+        # Authentication ticket tracking
+        # Proxmox tickets typically expire after 2 hours (7200 seconds)
+        # We refresh proactively at 90% of the expiry time (6480 seconds)
+        self._ticket_expiry_seconds = 7200
+        self._ticket_refresh_threshold = int(self._ticket_expiry_seconds * 0.9)
+        self._ticket_obtained_at: Optional[float] = None
+
         # Retry configuration
         self.retry_max_attempts = 3
         self.retry_min_wait = 1.0
@@ -163,25 +171,31 @@ class ProxmoxClient:
                 username = f"{self.username}@{self.realm}"
             else:
                 username = self.username
-                
+
             auth_data = {
                 'username': username,
                 'password': self.password
             }
-            
+
             # For authentication, we need to send form data, not JSON
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json'
             }
-            
+
             # Context-specific warning suppression - only suppress when SSL verification is disabled
             with suppress_insecure_request_warning(self.ssl_verify):
-                response = self.session.post(self.auth_url, data=auth_data, headers=headers)
+                response = self.session.post(
+                    self.auth_url,
+                    data=auth_data,
+                    headers=headers,
+                    timeout=self.timeout
+                )
                 response.raise_for_status()
             auth_result = response.json()
             if auth_result['data']:
                 self.session.cookies.set('PVEAuthCookie', auth_result['data']['ticket'])
+                self._ticket_obtained_at = time.time()
                 debug_print("Authentication successful")
             else:
                 raise ProxmoxAuthenticationError("Authentication failed - no ticket received")
@@ -209,6 +223,52 @@ class ProxmoxClient:
         except KeyError as e:
             debug_print(f"Missing expected field in authentication response: {e}")
             raise ProxmoxAPIError(f"Invalid authentication response format: {e}") from e
+
+    def _is_ticket_expired(self) -> bool:
+        """Check if the authentication ticket needs refresh.
+
+        Returns True if the ticket is expired or will expire soon
+        (within the refresh threshold).
+        """
+        if self._ticket_obtained_at is None:
+            return True
+        elapsed = time.time() - self._ticket_obtained_at
+        return elapsed >= self._ticket_refresh_threshold
+
+    def _ensure_valid_ticket(self):
+        """Ensure we have a valid authentication ticket, refreshing if needed.
+
+        This method should be called before making API requests to prevent
+        authentication failures due to expired tickets. Proxmox tickets
+        typically expire after 2 hours.
+        """
+        if self._is_ticket_expired():
+            debug_print("Authentication ticket expired or expiring soon, refreshing...")
+            self._authenticate()
+
+    def close(self):
+        """Close the session and release resources.
+
+        Should be called when the client is no longer needed to prevent
+        resource leaks (file descriptors, TCP connections).
+        """
+        if self.session is not None:
+            try:
+                self.session.close()
+                debug_print(f"Closed Proxmox client session for {self.host}")
+            except Exception as e:
+                debug_print(f"Error closing session for {self.host}: {e}")
+            finally:
+                self.session = None
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures session is closed."""
+        self.close()
+        return False
 
     def _execute_request(self, method: str, url: str, **kwargs) -> requests.Response:
         """
@@ -279,21 +339,24 @@ class ProxmoxClient:
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make a request with retry logic and circuit breaker.
-        
+
         Args:
             method: HTTP method
             endpoint: API endpoint
             **kwargs: Additional arguments to pass to requests
-            
+
         Returns:
             Response object
         """
+        # Ensure we have a valid ticket before making the request
+        self._ensure_valid_ticket()
+
         url = f"{self.base_url}{endpoint}"
         debug_print(f"Making {method} request to: {endpoint}")
-        
+
         # Use pre-decorated request execution (applied once in __init__)
         retried_request = self._retried_execute_request
-        
+
         # Apply circuit breaker if enabled
         if self.circuit_breaker_enabled and self.circuit_breaker:
             result = self.circuit_breaker.call(
@@ -301,7 +364,7 @@ class ProxmoxClient:
             )
         else:
             result = retried_request(method, url, **kwargs)
-        
+
         return result
 
     def test_connection(self) -> Dict[str, Any]:
@@ -579,19 +642,44 @@ class ProxmoxClient:
             }
 
     def _get_next_vmid(self, node: str) -> str:
-        """Get the next available VMID."""
+        """Get the next available VMID using Proxmox cluster API.
+
+        Uses the /cluster/nextid endpoint which atomically allocates
+        the next available VMID, avoiding race conditions that could
+        occur when manually calculating the next ID.
+
+        Args:
+            node: Node name (unused but kept for API compatibility)
+
+        Returns:
+            String representation of the next available VMID
+        """
         try:
+            # Use the cluster-wide nextid endpoint for atomic allocation
+            response = self._make_request("GET", "/cluster/nextid")
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    next_id = data.get("data")
+                    if next_id is not None:
+                        debug_print(f"Allocated VMID {next_id} from cluster API")
+                        return str(next_id)
+                except json.JSONDecodeError as e:
+                    debug_print(f"Failed to parse nextid response: {e}")
+
+            # Fallback: try manual calculation if cluster API fails
+            debug_print("Cluster nextid API failed, falling back to manual calculation")
             response = self._make_request("GET", f"/nodes/{node}/qemu")
             if response.status_code == 200:
-                vms = response.json().get("data", [])
-                if vms:
-                    # Find the highest VMID and add 1
-                    max_vmid = max(int(vm.get("vmid", 0)) for vm in vms)
-                    return str(max_vmid + 1)
-                else:
-                    return "100"  # Default starting VMID
-            else:
-                return "100"  # Fallback
+                try:
+                    vms = response.json().get("data", [])
+                    if vms:
+                        max_vmid = max(int(vm.get("vmid", 0)) for vm in vms)
+                        return str(max_vmid + 1)
+                except (json.JSONDecodeError, ValueError) as e:
+                    debug_print(f"Failed to calculate next VMID: {e}")
+
+            return "100"  # Default starting VMID
         except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
             debug_print(f"Failed to get next VMID: {e}")
             return "100"  # Fallback

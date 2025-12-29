@@ -170,6 +170,21 @@ class WorkingProxmoxMCPServer:
         
         debug_print("Server initialization complete")
 
+    def cleanup(self) -> None:
+        """Clean up the Proxmox client session.
+
+        Should be called during server shutdown to properly release resources
+        (file descriptors, TCP connections).
+        """
+        debug_print("Cleaning up Proxmox client session...")
+        if self.proxmox_client is not None:
+            try:
+                self.proxmox_client.close()
+            except Exception as e:
+                debug_print(f"Error closing Proxmox client: {e}")
+            self.proxmox_client = None
+        debug_print("Cleanup complete")
+
     def _validate_node_and_vmid(self, node: str, vmid: str) -> Dict[str, Any]:
         """
         Validate node and vmid parameters.
@@ -1031,6 +1046,9 @@ class WorkingProxmoxMCPServer:
             import traceback
             debug_print(f"Traceback: {traceback.format_exc()}")
             debug_print("Server exiting due to fatal error")
+        finally:
+            # Always clean up resources on shutdown
+            self.cleanup()
 
 
 def main():
