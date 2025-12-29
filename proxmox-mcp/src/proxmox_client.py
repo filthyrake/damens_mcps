@@ -530,7 +530,11 @@ class ProxmoxClient:
             failed_nodes = []
             nodes = self.list_nodes()
             for node_info in nodes:
-                node_name = node_info.get("node", "unknown")
+                node_name = node_info.get("node")
+                if not node_name or not isinstance(node_name, str):
+                    debug_print(f"Skipping node with invalid/missing name: {node_info}")
+                    failed_nodes.append(("unknown", "Missing or invalid node name in response"))
+                    continue
                 try:
                     response = self._make_request('GET', f'/nodes/{node_name}/qemu')
                     try:
@@ -538,17 +542,22 @@ class ProxmoxClient:
                     except json.JSONDecodeError as e:
                         debug_print(f"Failed to parse VMs response for node {node_name}: {e}")
                         failed_nodes.append((node_name, f"JSON parse error: {e}"))
+                        # Clean up response to prevent resource leak
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
                         continue
                     node_vms = vms_data.get('data', [])
                     for vm in node_vms:
                         vm['node'] = node_name
                     all_vms.extend(node_vms)
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAPIError) as e:
+                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
                     debug_print(f"Failed to get VMs from node {node_name}: {e}")
                     failed_nodes.append((node_name, str(e)))
 
-            # If ALL nodes failed, raise an error
-            if failed_nodes and len(failed_nodes) == len(nodes):
+            # If ALL nodes failed (and we had nodes to query), raise an error
+            if nodes and failed_nodes and len(failed_nodes) == len(nodes):
                 error_details = "; ".join([f"{n}: {e}" for n, e in failed_nodes])
                 raise ProxmoxAPIError(f"Failed to get VMs from all nodes: {error_details}")
 
@@ -625,7 +634,11 @@ class ProxmoxClient:
             failed_nodes = []
             nodes = self.list_nodes()
             for node_info in nodes:
-                node_name = node_info.get("node", "unknown")
+                node_name = node_info.get("node")
+                if not node_name or not isinstance(node_name, str):
+                    debug_print(f"Skipping node with invalid/missing name: {node_info}")
+                    failed_nodes.append(("unknown", "Missing or invalid node name in response"))
+                    continue
                 try:
                     response = self._make_request('GET', f'/nodes/{node_name}/lxc')
                     try:
@@ -633,17 +646,22 @@ class ProxmoxClient:
                     except json.JSONDecodeError as e:
                         debug_print(f"Failed to parse containers response for node {node_name}: {e}")
                         failed_nodes.append((node_name, f"JSON parse error: {e}"))
+                        # Clean up response to prevent resource leak
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
                         continue
                     node_containers = containers_data.get('data', [])
                     for container in node_containers:
                         container['node'] = node_name
                     all_containers.extend(node_containers)
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAPIError) as e:
+                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
                     debug_print(f"Failed to get containers from node {node_name}: {e}")
                     failed_nodes.append((node_name, str(e)))
 
-            # If ALL nodes failed, raise an error
-            if failed_nodes and len(failed_nodes) == len(nodes):
+            # If ALL nodes failed (and we had nodes to query), raise an error
+            if nodes and failed_nodes and len(failed_nodes) == len(nodes):
                 error_details = "; ".join([f"{n}: {e}" for n, e in failed_nodes])
                 raise ProxmoxAPIError(f"Failed to get containers from all nodes: {error_details}")
 
@@ -676,7 +694,11 @@ class ProxmoxClient:
             failed_nodes = []
             nodes = self.list_nodes()
             for node_info in nodes:
-                node_name = node_info.get("node", "unknown")
+                node_name = node_info.get("node")
+                if not node_name or not isinstance(node_name, str):
+                    debug_print(f"Skipping node with invalid/missing name: {node_info}")
+                    failed_nodes.append(("unknown", "Missing or invalid node name in response"))
+                    continue
                 try:
                     response = self._make_request('GET', f'/nodes/{node_name}/storage')
                     try:
@@ -684,17 +706,22 @@ class ProxmoxClient:
                     except json.JSONDecodeError as e:
                         debug_print(f"Failed to parse storage response for node {node_name}: {e}")
                         failed_nodes.append((node_name, f"JSON parse error: {e}"))
+                        # Clean up response to prevent resource leak
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
                         continue
                     node_storage = storage_data.get('data', [])
                     for storage in node_storage:
                         storage['node'] = node_name
                     all_storage.extend(node_storage)
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAPIError) as e:
+                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
                     debug_print(f"Failed to get storage from node {node_name}: {e}")
                     failed_nodes.append((node_name, str(e)))
 
-            # If ALL nodes failed, raise an error
-            if failed_nodes and len(failed_nodes) == len(nodes):
+            # If ALL nodes failed (and we had nodes to query), raise an error
+            if nodes and failed_nodes and len(failed_nodes) == len(nodes):
                 error_details = "; ".join([f"{n}: {e}" for n, e in failed_nodes])
                 raise ProxmoxAPIError(f"Failed to get storage from all nodes: {error_details}")
 
@@ -1049,6 +1076,31 @@ class ProxmoxClient:
             return {
                 "status": "error",
                 "message": f"Exception stopping container: {str(e)}"
+            }
+
+    def delete_container(self, node: str, vmid: int) -> Dict[str, Any]:
+        """Delete a container.
+
+        WARNING: This is a destructive operation. Uses no-retry logic to prevent
+        accidental double-deletion if the request times out after server processing.
+        """
+        try:
+            # Use no-retry method for destructive DELETE operation
+            response = self._make_request_no_retry("DELETE", f"/nodes/{node}/lxc/{vmid}")
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Container {vmid} deleted successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to delete container: {response.status_code}"
+                }
+        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+            return {
+                "status": "error",
+                "message": f"Exception deleting container: {str(e)}"
             }
 
     def get_storage_usage(self, node: str = None) -> Dict[str, Any]:
