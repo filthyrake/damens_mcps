@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from typing import Any, Dict, List, Optional
 
 import urllib3
@@ -135,7 +136,9 @@ class WorkingProxmoxMCPServer:
         """Initialize the server."""
         debug_print("Server starting...")
         self.proxmox_client = None
-        
+        # Lock for thread-safe cleanup (guards against concurrent cleanup calls)
+        self._cleanup_lock = threading.Lock()
+
         # Load configuration
         self.config = load_config()
         
@@ -169,6 +172,29 @@ class WorkingProxmoxMCPServer:
             self.proxmox_client = None
         
         debug_print("Server initialization complete")
+
+    def cleanup(self) -> None:
+        """Clean up the Proxmox client session.
+
+        Should be called during server shutdown to properly release resources
+        (file descriptors, TCP connections).
+
+        Thread-safe: uses a lock to prevent concurrent cleanup attempts
+        (e.g., from signal handlers or multiple shutdown paths).
+        """
+        with self._cleanup_lock:
+            if self.proxmox_client is None:
+                debug_print("Cleanup called but client already None")
+                return
+
+            debug_print("Cleaning up Proxmox client session...")
+            try:
+                self.proxmox_client.close()
+            except Exception as e:
+                debug_print(f"Error closing Proxmox client: {e}")
+            finally:
+                self.proxmox_client = None
+            debug_print("Cleanup complete")
 
     def _validate_node_and_vmid(self, node: str, vmid: str) -> Dict[str, Any]:
         """
@@ -1031,6 +1057,9 @@ class WorkingProxmoxMCPServer:
             import traceback
             debug_print(f"Traceback: {traceback.format_exc()}")
             debug_print("Server exiting due to fatal error")
+        finally:
+            # Always clean up resources on shutdown
+            self.cleanup()
 
 
 def main():
