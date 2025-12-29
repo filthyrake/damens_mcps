@@ -19,7 +19,8 @@ import sys
 import threading
 import time
 import warnings
-from typing import Any, Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -520,15 +521,45 @@ class ProxmoxClient:
             raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
         return nodes_data.get('data', [])
 
+    def _fetch_node_vms(self, node_name: str) -> Tuple[str, List[Dict[str, Any]], Optional[str]]:
+        """Fetch VMs from a single node (for parallel execution).
+
+        Args:
+            node_name: Name of the node to query
+
+        Returns:
+            Tuple of (node_name, vms_list, error_message)
+            - On success: (node_name, [vm_dicts], None)
+            - On failure: (node_name, [], error_message)
+        """
+        try:
+            response = self._make_request('GET', f'/nodes/{node_name}/qemu')
+            try:
+                vms_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse VMs response for node {node_name}: {e}")
+                try:
+                    response.close()
+                except Exception:
+                    pass
+                return (node_name, [], f"JSON parse error: {e}")
+            node_vms = vms_data.get('data', [])
+            for vm in node_vms:
+                vm['node'] = node_name
+            return (node_name, node_vms, None)
+        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+            debug_print(f"Failed to get VMs from node {node_name}: {e}")
+            return (node_name, [], str(e))
+
     def list_vms(self, node: str = None, include_metadata: bool = False) -> Any:
         """List all virtual machines.
 
-        When querying all nodes, partial failures are tracked and logged.
-        If ALL nodes fail, raises ProxmoxAPIError. If some succeed, returns
-        available data with a warning logged about failed nodes.
+        When querying all nodes, uses parallel execution for improved performance.
+        Partial failures are tracked and logged. If ALL nodes fail, raises ProxmoxAPIError.
+        If some succeed, returns available data with a warning logged about failed nodes.
 
         Args:
-            node: Optional node name to query. If None, queries all nodes.
+            node: Optional node name to query. If None, queries all nodes in parallel.
             include_metadata: If True and querying all nodes, returns a dict with
                 'data', 'failed_nodes', 'successful_nodes', and 'partial_failure'.
                 Default False for backward compatibility.
@@ -547,38 +578,35 @@ class ProxmoxClient:
                 raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
             return vms_data.get('data', [])
         else:
-            # Get VMs from all nodes, tracking failures
+            # Get VMs from all nodes in parallel for O(1) time instead of O(n)
             all_vms = []
             failed_nodes = []
             successful_nodes = []
             nodes = self.list_nodes()
+
+            # Validate node names first
+            valid_nodes = []
             for node_info in nodes:
                 node_name = node_info.get("node")
                 if not node_name or not isinstance(node_name, str):
                     debug_print(f"Skipping node with invalid/missing name: {node_info}")
                     failed_nodes.append({"node": "unknown", "error": "Missing or invalid node name in response"})
-                    continue
-                try:
-                    response = self._make_request('GET', f'/nodes/{node_name}/qemu')
-                    try:
-                        vms_data = response.json()
-                    except json.JSONDecodeError as e:
-                        debug_print(f"Failed to parse VMs response for node {node_name}: {e}")
-                        failed_nodes.append({"node": node_name, "error": f"JSON parse error: {e}"})
-                        # Clean up response to prevent resource leak
-                        try:
-                            response.close()
-                        except Exception:
-                            pass
-                        continue
-                    node_vms = vms_data.get('data', [])
-                    for vm in node_vms:
-                        vm['node'] = node_name
-                    all_vms.extend(node_vms)
-                    successful_nodes.append(node_name)
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-                    debug_print(f"Failed to get VMs from node {node_name}: {e}")
-                    failed_nodes.append({"node": node_name, "error": str(e)})
+                else:
+                    valid_nodes.append(node_name)
+
+            # Parallel execution using ThreadPoolExecutor
+            if valid_nodes:
+                # Limit workers to avoid overwhelming the Proxmox cluster
+                max_workers = min(len(valid_nodes), 10)
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(self._fetch_node_vms, n): n for n in valid_nodes}
+                    for future in as_completed(futures):
+                        node_name, vms, error = future.result()
+                        if error:
+                            failed_nodes.append({"node": node_name, "error": error})
+                        else:
+                            all_vms.extend(vms)
+                            successful_nodes.append(node_name)
 
             # If ALL nodes failed (and we had nodes to query), raise an error
             if nodes and failed_nodes and len(failed_nodes) == len(nodes):
@@ -643,15 +671,45 @@ class ProxmoxClient:
                 "message": f"Failed to stop VM {vmid}"
             }
 
+    def _fetch_node_containers(self, node_name: str) -> Tuple[str, List[Dict[str, Any]], Optional[str]]:
+        """Fetch containers from a single node (for parallel execution).
+
+        Args:
+            node_name: Name of the node to query
+
+        Returns:
+            Tuple of (node_name, containers_list, error_message)
+            - On success: (node_name, [container_dicts], None)
+            - On failure: (node_name, [], error_message)
+        """
+        try:
+            response = self._make_request('GET', f'/nodes/{node_name}/lxc')
+            try:
+                containers_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse containers response for node {node_name}: {e}")
+                try:
+                    response.close()
+                except Exception:
+                    pass
+                return (node_name, [], f"JSON parse error: {e}")
+            node_containers = containers_data.get('data', [])
+            for container in node_containers:
+                container['node'] = node_name
+            return (node_name, node_containers, None)
+        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+            debug_print(f"Failed to get containers from node {node_name}: {e}")
+            return (node_name, [], str(e))
+
     def list_containers(self, node: str = None, include_metadata: bool = False) -> Any:
         """List all containers.
 
-        When querying all nodes, partial failures are tracked and logged.
-        If ALL nodes fail, raises ProxmoxAPIError. If some succeed, returns
-        available data with a warning logged about failed nodes.
+        When querying all nodes, uses parallel execution for improved performance.
+        Partial failures are tracked and logged. If ALL nodes fail, raises ProxmoxAPIError.
+        If some succeed, returns available data with a warning logged about failed nodes.
 
         Args:
-            node: Optional node name to query. If None, queries all nodes.
+            node: Optional node name to query. If None, queries all nodes in parallel.
             include_metadata: If True and querying all nodes, returns a dict with
                 'data', 'failed_nodes', 'successful_nodes', and 'partial_failure'.
                 Default False for backward compatibility.
@@ -670,38 +728,34 @@ class ProxmoxClient:
                 raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
             return containers_data.get('data', [])
         else:
-            # Get containers from all nodes, tracking failures
+            # Get containers from all nodes in parallel for O(1) time instead of O(n)
             all_containers = []
             failed_nodes = []
             successful_nodes = []
             nodes = self.list_nodes()
+
+            # Validate node names first
+            valid_nodes = []
             for node_info in nodes:
                 node_name = node_info.get("node")
                 if not node_name or not isinstance(node_name, str):
                     debug_print(f"Skipping node with invalid/missing name: {node_info}")
                     failed_nodes.append({"node": "unknown", "error": "Missing or invalid node name in response"})
-                    continue
-                try:
-                    response = self._make_request('GET', f'/nodes/{node_name}/lxc')
-                    try:
-                        containers_data = response.json()
-                    except json.JSONDecodeError as e:
-                        debug_print(f"Failed to parse containers response for node {node_name}: {e}")
-                        failed_nodes.append({"node": node_name, "error": f"JSON parse error: {e}"})
-                        # Clean up response to prevent resource leak
-                        try:
-                            response.close()
-                        except Exception:
-                            pass
-                        continue
-                    node_containers = containers_data.get('data', [])
-                    for container in node_containers:
-                        container['node'] = node_name
-                    all_containers.extend(node_containers)
-                    successful_nodes.append(node_name)
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-                    debug_print(f"Failed to get containers from node {node_name}: {e}")
-                    failed_nodes.append({"node": node_name, "error": str(e)})
+                else:
+                    valid_nodes.append(node_name)
+
+            # Parallel execution using ThreadPoolExecutor
+            if valid_nodes:
+                max_workers = min(len(valid_nodes), 10)
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(self._fetch_node_containers, n): n for n in valid_nodes}
+                    for future in as_completed(futures):
+                        node_name, containers, error = future.result()
+                        if error:
+                            failed_nodes.append({"node": node_name, "error": error})
+                        else:
+                            all_containers.extend(containers)
+                            successful_nodes.append(node_name)
 
             # If ALL nodes failed (and we had nodes to query), raise an error
             if nodes and failed_nodes and len(failed_nodes) == len(nodes):
@@ -722,15 +776,45 @@ class ProxmoxClient:
                 }
             return all_containers
 
+    def _fetch_node_storage(self, node_name: str) -> Tuple[str, List[Dict[str, Any]], Optional[str]]:
+        """Fetch storage from a single node (for parallel execution).
+
+        Args:
+            node_name: Name of the node to query
+
+        Returns:
+            Tuple of (node_name, storage_list, error_message)
+            - On success: (node_name, [storage_dicts], None)
+            - On failure: (node_name, [], error_message)
+        """
+        try:
+            response = self._make_request('GET', f'/nodes/{node_name}/storage')
+            try:
+                storage_data = response.json()
+            except json.JSONDecodeError as e:
+                debug_print(f"Failed to parse storage response for node {node_name}: {e}")
+                try:
+                    response.close()
+                except Exception:
+                    pass
+                return (node_name, [], f"JSON parse error: {e}")
+            node_storage = storage_data.get('data', [])
+            for storage in node_storage:
+                storage['node'] = node_name
+            return (node_name, node_storage, None)
+        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+            debug_print(f"Failed to get storage from node {node_name}: {e}")
+            return (node_name, [], str(e))
+
     def list_storage(self, node: str = None, include_metadata: bool = False) -> Any:
         """List all storage pools.
 
-        When querying all nodes, partial failures are tracked and logged.
-        If ALL nodes fail, raises ProxmoxAPIError. If some succeed, returns
-        available data with a warning logged about failed nodes.
+        When querying all nodes, uses parallel execution for improved performance.
+        Partial failures are tracked and logged. If ALL nodes fail, raises ProxmoxAPIError.
+        If some succeed, returns available data with a warning logged about failed nodes.
 
         Args:
-            node: Optional node name to query. If None, queries all nodes.
+            node: Optional node name to query. If None, queries all nodes in parallel.
             include_metadata: If True and querying all nodes, returns a dict with
                 'data', 'failed_nodes', 'successful_nodes', and 'partial_failure'.
                 Default False for backward compatibility.
@@ -749,38 +833,34 @@ class ProxmoxClient:
                 raise ProxmoxAPIError(f"Invalid JSON response: {e}") from e
             return storage_data.get('data', [])
         else:
-            # Get storage from all nodes, tracking failures
+            # Get storage from all nodes in parallel for O(1) time instead of O(n)
             all_storage = []
             failed_nodes = []
             successful_nodes = []
             nodes = self.list_nodes()
+
+            # Validate node names first
+            valid_nodes = []
             for node_info in nodes:
                 node_name = node_info.get("node")
                 if not node_name or not isinstance(node_name, str):
                     debug_print(f"Skipping node with invalid/missing name: {node_info}")
                     failed_nodes.append({"node": "unknown", "error": "Missing or invalid node name in response"})
-                    continue
-                try:
-                    response = self._make_request('GET', f'/nodes/{node_name}/storage')
-                    try:
-                        storage_data = response.json()
-                    except json.JSONDecodeError as e:
-                        debug_print(f"Failed to parse storage response for node {node_name}: {e}")
-                        failed_nodes.append({"node": node_name, "error": f"JSON parse error: {e}"})
-                        # Clean up response to prevent resource leak
-                        try:
-                            response.close()
-                        except Exception:
-                            pass
-                        continue
-                    node_storage = storage_data.get('data', [])
-                    for storage in node_storage:
-                        storage['node'] = node_name
-                    all_storage.extend(node_storage)
-                    successful_nodes.append(node_name)
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
-                    debug_print(f"Failed to get storage from node {node_name}: {e}")
-                    failed_nodes.append({"node": node_name, "error": str(e)})
+                else:
+                    valid_nodes.append(node_name)
+
+            # Parallel execution using ThreadPoolExecutor
+            if valid_nodes:
+                max_workers = min(len(valid_nodes), 10)
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(self._fetch_node_storage, n): n for n in valid_nodes}
+                    for future in as_completed(futures):
+                        node_name, storage, error = future.result()
+                        if error:
+                            failed_nodes.append({"node": node_name, "error": error})
+                        else:
+                            all_storage.extend(storage)
+                            successful_nodes.append(node_name)
 
             # If ALL nodes failed (and we had nodes to query), raise an error
             if nodes and failed_nodes and len(failed_nodes) == len(nodes):
@@ -1173,44 +1253,62 @@ class ProxmoxClient:
             }
 
     def get_storage_usage(self, node: str = None) -> Dict[str, Any]:
-        """Get storage usage and capacity information."""
+        """Get storage usage and capacity information.
+
+        When querying all nodes, uses parallel execution for improved performance.
+        """
         try:
             if node:
                 response = self._make_request("GET", f"/nodes/{node}/storage")
+                if response.status_code == 200:
+                    storage_data = response.json()
+                    return {
+                        "status": "success",
+                        "storage": storage_data.get("data", []),
+                        "count": len(storage_data.get("data", [])),
+                        "message": f"Storage usage retrieved for node {node}"
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "message": f"Failed to get storage usage: {response.status_code}"
+                    }
             else:
-                # Get storage from all nodes
+                # Get storage from all nodes in parallel for O(1) time instead of O(n)
                 nodes = self.list_nodes()
                 all_storage = []
+                failed_nodes = []
+
+                # Validate node names first
+                valid_nodes = []
                 for node_info in nodes:
                     node_name = node_info.get("node")
-                    if node_name:
-                        node_response = self._make_request("GET", f"/nodes/{node_name}/storage")
-                        if node_response.status_code == 200:
-                            node_storage = node_response.json().get("data", [])
-                            for storage in node_storage:
-                                storage["node"] = node_name
-                            all_storage.extend(node_storage)
-                
-                return {
+                    if node_name and isinstance(node_name, str):
+                        valid_nodes.append(node_name)
+
+                # Parallel execution using ThreadPoolExecutor
+                if valid_nodes:
+                    max_workers = min(len(valid_nodes), 10)
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        futures = {executor.submit(self._fetch_node_storage, n): n for n in valid_nodes}
+                        for future in as_completed(futures):
+                            node_name, storage, error = future.result()
+                            if error:
+                                failed_nodes.append(node_name)
+                                debug_print(f"Failed to get storage from node {node_name}: {error}")
+                            else:
+                                all_storage.extend(storage)
+
+                result = {
                     "status": "success",
                     "storage": all_storage,
                     "count": len(all_storage),
                     "message": "Storage usage retrieved from all nodes"
                 }
-            
-            if response.status_code == 200:
-                storage_data = response.json()
-                return {
-                    "status": "success",
-                    "storage": storage_data.get("data", []),
-                    "count": len(storage_data.get("data", [])),
-                    "message": f"Storage usage retrieved for node {node}"
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Failed to get storage usage: {response.status_code}"
-                }
+                if failed_nodes:
+                    result["warning"] = f"Failed to query nodes: {failed_nodes}"
+                return result
+
         except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
             return {
                 "status": "error",

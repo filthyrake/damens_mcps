@@ -10,6 +10,7 @@ Use this file for all Proxmox MCP server operations.
 import json
 import logging
 import os
+import signal
 import sys
 import threading
 from typing import Any, Dict, List, Optional
@@ -1121,6 +1122,20 @@ def main():
         except ImportError:
             print("Proxmox MCP Server version 1.0.0")
         sys.exit(0)
+
+    server = None
+
+    def signal_handler(signum, frame):
+        """Handle shutdown signals gracefully."""
+        sig_name = signal.Signals(signum).name
+        debug_print(f"Received signal {sig_name}, initiating graceful shutdown...")
+        if server:
+            server.cleanup()
+        sys.exit(0)
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
 
     try:
         server = WorkingProxmoxMCPServer()

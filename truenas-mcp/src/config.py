@@ -7,7 +7,7 @@ from collections import Counter
 from typing import Optional
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 # Cryptographic constants
@@ -161,10 +161,12 @@ class Settings(BaseSettings):
     log_backup_count: int = Field(5, env="LOG_BACKUP_COUNT")
 
     # CORS Configuration
+    # Security: Default to restrictive CORS settings
+    # allow_credentials=True with allow_origins=["*"] is a security vulnerability (CWE-942)
     cors_origins: list[str] = Field(["*"], env="CORS_ORIGINS")
-    cors_allow_credentials: bool = Field(True, env="CORS_ALLOW_CREDENTIALS")
-    cors_allow_methods: list[str] = Field(["*"], env="CORS_ALLOW_METHODS")
-    cors_allow_headers: list[str] = Field(["*"], env="CORS_ALLOW_HEADERS")
+    cors_allow_credentials: bool = Field(False, env="CORS_ALLOW_CREDENTIALS")
+    cors_allow_methods: list[str] = Field(["GET", "POST", "PUT", "DELETE"], env="CORS_ALLOW_METHODS")
+    cors_allow_headers: list[str] = Field(["Authorization", "Content-Type"], env="CORS_ALLOW_HEADERS")
 
     # Rate Limiting
     rate_limit_requests: int = Field(100, env="RATE_LIMIT_REQUESTS")
@@ -198,6 +200,22 @@ class Settings(BaseSettings):
         if not MIN_PORT <= v <= MAX_PORT:
             raise ValueError(f"Port must be between {MIN_PORT} and {MAX_PORT}")
         return v
+
+    @model_validator(mode="after")
+    def validate_cors_security(self):
+        """Validate CORS configuration for security.
+
+        Prevents the dangerous combination of wildcard origins with credentials,
+        which would allow any website to make authenticated cross-origin requests.
+        See CWE-942: Overly Permissive Cross-domain Whitelist.
+        """
+        if self.cors_allow_credentials and "*" in self.cors_origins:
+            raise ValueError(
+                "SECURITY ERROR: Cannot use 'allow_credentials=True' with wildcard origins ('*'). "
+                "This combination allows any website to make authenticated requests to this server. "
+                "Either set CORS_ALLOW_CREDENTIALS=false or specify explicit allowed origins in CORS_ORIGINS."
+            )
+        return self
 
 
 def load_settings() -> Settings:
@@ -315,10 +333,12 @@ LOG_MAX_SIZE=10485760
 LOG_BACKUP_COUNT=5
 
 # CORS Configuration
+# Security: Default to restrictive CORS. Use specific origins in production.
+# WARNING: Never use CORS_ALLOW_CREDENTIALS=true with CORS_ORIGINS=["*"]
 CORS_ORIGINS=["*"]
-CORS_ALLOW_CREDENTIALS=true
-CORS_ALLOW_METHODS=["*"]
-CORS_ALLOW_HEADERS=["*"]
+CORS_ALLOW_CREDENTIALS=false
+CORS_ALLOW_METHODS=["GET", "POST", "PUT", "DELETE"]
+CORS_ALLOW_HEADERS=["Authorization", "Content-Type"]
 
 # Rate Limiting
 RATE_LIMIT_REQUESTS=100

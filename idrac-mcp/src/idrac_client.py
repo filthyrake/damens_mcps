@@ -1,631 +1,487 @@
-"""iDRAC client for interacting with Dell PowerEdge servers."""
+"""Synchronous iDRAC client for interacting with Dell PowerEdge servers via Redfish API.
 
-import asyncio
-import json
-import ssl
-from typing import Dict, Any, List, Optional
-from urllib.parse import urljoin
+This is the canonical iDRAC client implementation, extracted from working_mcp_server.py.
+It uses the requests library for synchronous HTTP calls and is designed for use in
+the JSON-RPC MCP server implementation.
 
-import aiohttp
+Example usage:
+    client = IDracClient(
+        host="192.168.1.100",
+        port=443,
+        protocol="https",
+        username="root",
+        password="password",
+        ssl_verify=False
+    )
+
+    # Or use as context manager
+    with IDracClient(...) as client:
+        info = client.get_system_info()
+"""
+
+import sys
+import warnings
+from typing import Any, Dict
+
 import requests
 from requests.auth import HTTPBasicAuth
+from urllib3.exceptions import InsecureRequestWarning
 
-# Try relative imports first, fall back to absolute
-try:
-    from .utils.logging import get_logger
-    from .utils.validation import validate_idrac_config, validate_power_operation, validate_user_config
-    from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
-except ImportError:
-    # Fallback for direct execution
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(
-        "Resilience utilities not available - retry logic and circuit breaker disabled. "
-        "Install dependencies: pip install tenacity pybreaker"
-    )
-    
-    def validate_idrac_config(config):
-        """Basic config validation."""
-        required_keys = ['host', 'port', 'protocol', 'username', 'password']
-        for key in required_keys:
-            if key not in config:
-                raise ValueError(f"Missing required config key: {key}")
-        return config
-    
-    def validate_power_operation(operation):
-        """Basic power operation validation."""
-        return operation
-    
-    def validate_user_config(config):
-        """Basic user config validation."""
-        return config
-    
-    def create_circuit_breaker(**kwargs):
-        """Stub for circuit breaker - resilience features disabled."""
-        logger.warning(
-            "create_circuit_breaker called, but resilience features are disabled. "
-            "Install tenacity and pybreaker for full functionality."
-        )
-        return None
-    
-    def create_retry_decorator(**kwargs):
-        """Stub for retry decorator - resilience features disabled."""
-        def decorator(func):
-            logger.warning(
-                "create_retry_decorator called, but resilience features are disabled. "
-                "Install tenacity and pybreaker for full functionality."
-            )
-            return func
-        return decorator
-    
-    async def call_with_circuit_breaker_async(circuit_breaker, func, *args, **kwargs):
-        """Stub for async circuit breaker - resilience features disabled."""
-        logger.warning(
-            "call_with_circuit_breaker_async called, but resilience features are disabled. "
-            "Install tenacity and pybreaker for full functionality."
-        )
-        return await func(*args, **kwargs)
+# Request timeout configuration
+# Balance between responsiveness and reliability for iDRAC API calls
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
 
-# Initialize logger
-try:
-    logger = get_logger(__name__)
-except NameError:
-    logger = logging.getLogger(__name__)
+
+def debug_print(message: str) -> None:
+    """Print debug messages to stderr to avoid interfering with MCP protocol."""
+    print(f"DEBUG: {message}", file=sys.stderr)
+
+
+def redact_sensitive_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
+    """Redact sensitive header values for safe logging."""
+    if not isinstance(headers, dict):
+        return headers
+
+    sensitive_keys = ['authorization', 'cookie', 'x-auth-token', 'set-cookie']
+    redacted = {}
+
+    for key, value in headers.items():
+        if key.lower() in sensitive_keys:
+            redacted[key] = "REDACTED"
+        else:
+            redacted[key] = value
+
+    return redacted
 
 
 class IDracClient:
-    """Client for interacting with iDRAC REST API."""
-    
-    def __init__(self, config: Dict[str, Any]):
+    """Synchronous client for interacting with iDRAC server via Redfish API.
+
+    This client is designed for use with synchronous MCP server implementations.
+    It uses the requests library for HTTP calls.
+
+    Attributes:
+        host: iDRAC hostname or IP address
+        port: iDRAC port (usually 443)
+        protocol: Protocol to use ('https' recommended)
+        ssl_verify: Whether to verify SSL certificates
+        base_url: Full base URL for API calls
+        session: Requests session with auth and headers configured
+    """
+
+    def __init__(self, host: str, port: int, protocol: str, username: str, password: str, ssl_verify: bool = False):
         """Initialize the iDRAC client.
-        
+
         Args:
-            config: iDRAC configuration dictionary
+            host: iDRAC hostname or IP address
+            port: iDRAC port (usually 443)
+            protocol: Protocol to use ('https' recommended)
+            username: iDRAC username
+            password: iDRAC password
+            ssl_verify: Whether to verify SSL certificates (default: False for self-signed)
         """
-        self.config = validate_idrac_config(config)
-        self.base_url = f"{self.config['protocol']}://{self.config['host']}:{self.config['port']}"
-        self.auth = HTTPBasicAuth(self.config['username'], self.config['password'])
-        self.session = None
-        self._headers = {
+        self.host = host
+        self.port = port
+        self.protocol = protocol
+        self.username = username
+        self.password = password
+        self.ssl_verify = ssl_verify
+        self.base_url = f"{protocol}://{host}:{port}"
+        self.session = requests.Session()
+
+        # Use explicit HTTPBasicAuth for better compatibility
+        self.auth = HTTPBasicAuth(username, password)
+        self.session.auth = self.auth
+        self.session.verify = ssl_verify
+
+        # Set headers for iDRAC API
+        self.session.headers.update({
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-        
-        # Timeout configuration (seconds)
-        self.timeout = aiohttp.ClientTimeout(total=config.get('timeout', 30))
-        
-        # Connection pooling configuration
-        self.connector_limit = config.get('connector_limit', 100)
-        self.connector_limit_per_host = config.get('connector_limit_per_host', 30)
-        
-        # Retry configuration
-        self.retry_max_attempts = config.get('retry_max_attempts', 3)
-        self.retry_min_wait = config.get('retry_min_wait', 1)
-        self.retry_max_wait = config.get('retry_max_wait', 10)
-        
-        # Circuit breaker configuration
-        self.circuit_breaker_enabled = config.get('circuit_breaker_enabled', True)
-        self.circuit_breaker = None
-        if self.circuit_breaker_enabled:
-            self.circuit_breaker = create_circuit_breaker(
-                fail_max=config.get('circuit_breaker_fail_max', 5),
-                timeout_duration=config.get('circuit_breaker_timeout', 60),
-                name=f"idrac_{self.config['host']}"
-            )
-        
-        # Create retry decorator
-        retry_decorator = create_retry_decorator(
-            max_attempts=self.retry_max_attempts,
-            min_wait=self.retry_min_wait,
-            max_wait=self.retry_max_wait,
-            retry_exceptions=(
-                ConnectionError,
-                TimeoutError,
-                aiohttp.ClientError,
-                aiohttp.ServerTimeoutError,
-                aiohttp.ClientConnectorError,
-            )
-        )
-        # Apply decorator once during initialization for efficiency
-        self._retried_execute_request = retry_decorator(self._execute_request)
-    
-    async def __aenter__(self):
-        """Async context manager entry."""
-        await self.connect()
+            'Accept': 'application/json',
+            'User-Agent': 'iDRAC-MCP-Server/1.0'
+        })
+
+        # Debug: Print session info (redacted to avoid sensitive details)
+        debug_print("Created iDRAC client (connection details redacted)")
+        if not ssl_verify:
+            debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
+        debug_print(f"SSL Verify: {ssl_verify}")
+        safe_headers = redact_sensitive_headers(dict(self.session.headers))
+        debug_print(f"Session headers: {safe_headers}")
+        debug_print(f"Auth type: {type(self.auth).__name__}")
+
+    def close(self) -> None:
+        """Close the session and release resources.
+
+        Should be called when the client is no longer needed to prevent
+        resource leaks (file descriptors, TCP connections).
+        """
+        if self.session is not None:
+            try:
+                self.session.close()
+                debug_print(f"Closed iDRAC client session for {self.host}")
+            except Exception as e:
+                debug_print(f"Error closing session for {self.host}: {e}")
+            finally:
+                self.session = None
+
+    def __enter__(self):
+        """Context manager entry."""
         return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        await self.disconnect()
-    
-    async def connect(self):
-        """Establish connection to iDRAC."""
-        try:
-            # Create connector with connection pooling
-            connector = aiohttp.TCPConnector(
-                ssl=self.config['ssl_verify'],
-                limit=self.connector_limit,
-                limit_per_host=self.connector_limit_per_host,
-                ttl_dns_cache=300
-            )
-            self.session = aiohttp.ClientSession(
-                connector=connector,
-                auth=aiohttp.BasicAuth(self.config['username'], self.config['password']),
-                headers=self._headers,
-                timeout=self.timeout
-            )
-            logger.info(f"Connected to iDRAC at {self.base_url}")
-        except Exception as e:
-            logger.error(f"Failed to connect to iDRAC: {e}")
-            raise
-    
-    async def disconnect(self):
-        """Close connection to iDRAC."""
-        if self.session:
-            await self.session.close()
-            self.session = None
-            logger.info("Disconnected from iDRAC")
-    
-    async def _execute_request(self, method: str, url: str, data: Optional[Dict] = None) -> Dict[str, Any]:
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures session is closed."""
+        self.close()
+        return False
+
+    def _execute_http_request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Execute HTTP request with context-specific warning suppression.
+
+        Helper method to eliminate duplication in _make_request.
+        Supports GET, POST, PUT, DELETE, and PATCH methods for Redfish API compatibility.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE, PATCH)
+            url: Full URL to request
+            **kwargs: Additional arguments passed to requests
+
+        Returns:
+            Response object from requests
+
+        Raises:
+            ValueError: If unsupported HTTP method is provided
         """
-        Execute the actual HTTP request (internal method with retry logic).
-        
-        This method is decorated with retry logic and should not be called directly.
-        Use _make_request instead.
-        
+        method_map = {
+            'GET': self.session.get,
+            'POST': self.session.post,
+            'PUT': self.session.put,
+            'DELETE': self.session.delete,
+            'PATCH': self.session.patch,
+        }
+
+        handler = method_map.get(method.upper())
+        if not handler:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
+        with warnings.catch_warnings():
+            if not self.ssl_verify:
+                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            return handler(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
+
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """Make a request with proper error handling and debugging.
+
         Args:
             method: HTTP method
-            url: Full URL
-            data: Request data
-            
+            endpoint: API endpoint (e.g., '/redfish/v1/')
+            **kwargs: Additional arguments passed to requests
+
         Returns:
-            Response data
-            
+            Response object from requests
+
         Raises:
             Exception: If request fails
         """
+        url = f"{self.base_url}{endpoint}"
+        debug_print(f"Making {method} request to: {url}")
+        debug_print(f"Session auth configured: {self.session.auth is not None}")
+        debug_print(f"Session has cookies: {len(self.session.cookies)} cookies")
+        safe_headers = redact_sensitive_headers(dict(self.session.headers))
+        debug_print(f"Session headers: {safe_headers}")
+
         try:
-            async with self.session.request(method, url, json=data) as response:
-                response.raise_for_status()
-                return await response.json()
-        except aiohttp.ClientError as e:
-            logger.error(f"iDRAC API request failed: {e}")
-            raise Exception(f"API request failed: {e}")
-    
-    async def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
-        """Make HTTP request to iDRAC API with retry logic and circuit breaker.
-        
-        Args:
-            method: HTTP method
-            endpoint: API endpoint
-            data: Request data
-            
-        Returns:
-            Response data
-            
-        Raises:
-            Exception: If request fails
-        """
-        if not self.session:
-            await self.connect()
-        
-        url = urljoin(self.base_url, endpoint)
-        
-        # Use pre-decorated request execution (applied once in __init__)
-        retried_request = self._retried_execute_request
-        
-        # Apply circuit breaker if enabled
-        if self.circuit_breaker_enabled and self.circuit_breaker:
-            result = await call_with_circuit_breaker_async(
-                self.circuit_breaker, retried_request, method, url, data
-            )
-        else:
-            result = await retried_request(method, url, data)
-        
-        return result
-    
-    async def get_system_info(self) -> Dict[str, Any]:
-        """Get system information.
-        
-        Returns:
-            System information dictionary
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
-            
-            # Extract actual fields from Redfish response
-            system_info = {
-                "model": result.get('Model', 'N/A'),
-                "manufacturer": result.get('Manufacturer', 'N/A'),
-                "serial_number": result.get('SerialNumber', 'N/A'),
-                "part_number": result.get('PartNumber', 'N/A'),
-                "sku": result.get('SKU', 'N/A'),
-                "system_type": result.get('SystemType', 'N/A'),
-                "bios_version": result.get('BiosVersion', 'N/A'),
-                "power_state": result.get('PowerState', 'N/A'),
-                "health": result.get('Status', {}).get('Health', 'N/A'),
-                "state": result.get('Status', {}).get('State', 'N/A'),
-                "hostname": result.get('HostName', 'N/A'),
-                "description": result.get('Description', 'N/A')
-            }
-            
-            return {
-                "status": "success",
-                "data": system_info,
-                "message": "System information retrieved successfully"
-            }
+            response = self._execute_http_request(method, url, **kwargs)
+
+            debug_print(f"Response status: {response.status_code}")
+            safe_response_headers = redact_sensitive_headers(dict(response.headers))
+            debug_print(f"Response headers: {safe_response_headers}")
+            debug_print(f"Response has cookies: {len(response.cookies)} cookies")
+
+            if response.status_code == 401:
+                debug_print("401 Unauthorized - attempting to re-authenticate")
+                # Clear any existing cookies and re-authenticate
+                self.session.cookies.clear()
+                self.session.auth = self.auth
+                debug_print(f"Re-authenticated with auth type: {type(self.auth).__name__}")
+                debug_print(f"Cleared cookies, session now has: {len(self.session.cookies)} cookies")
+
+                # Only retry idempotent methods to avoid double-applying side effects
+                idempotent_methods = {'GET', 'PUT', 'HEAD'}
+                if method.upper() in idempotent_methods:
+                    response = self._execute_http_request(method, url, **kwargs)
+                    debug_print(f"Retry response status: {response.status_code}")
+                    debug_print(f"Retry response has cookies: {len(response.cookies)} cookies")
+                else:
+                    debug_print(f"Not retrying {method} request - non-idempotent method may have side effects")
+
+            return response
+
         except Exception as e:
-            logger.error(f"Failed to get system info: {e}")
+            debug_print(f"Request error: {e}")
             raise
-    
-    async def get_system_health(self) -> Dict[str, Any]:
-        """Get system health status.
-        
-        Returns:
-            System health information
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
-            health = result.get('Status', {})
-            return {
-                "status": "success",
-                "data": {
-                    "health": health.get('Health'),
-                    "state": health.get('State'),
-                    "overall_health": "OK" if health.get('Health') == 'OK' else "Warning"
-                },
-                "message": "System health retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get system health: {e}")
-            raise
-    
-    async def get_hardware_inventory(self) -> Dict[str, Any]:
-        """Get hardware inventory.
+
+    def test_connection(self) -> Dict[str, Any]:
+        """Test connection to iDRAC server.
 
         Returns:
-            Hardware inventory information
-
-        Note:
-            Uses parallel fetching for processor details to avoid N+1 query pattern.
-            Initial collection requests are also parallelized for better performance.
+            Dict with connection status and details
         """
         try:
-            # Parallel fetch of all collection endpoints (processors, memory, storage)
-            processors_task = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Processors')
-            memory_task = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Memory')
-            storage_task = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Storage')
-
-            processors_result, memory_result, storage_result = await asyncio.gather(
-                processors_task, memory_task, storage_task
-            )
-
-            processors = processors_result.get('Members', [])
-            memory_modules = memory_result.get('Members', [])
-            storage_controllers = storage_result.get('Members', [])
-
-            # Extract processor IDs for parallel detail fetching
-            proc_ids = []
-            for proc in processors:
-                proc_id = proc.get('@odata.id', '').split('/')[-1]
-                if proc_id:
-                    proc_ids.append(proc_id)
-
-            # Parallel fetch of all processor details to avoid N+1 query pattern
-            async def fetch_processor_detail(proc_id: str) -> Dict[str, Any]:
-                """Fetch details for a single processor."""
-                try:
-                    proc_detail = await self._make_request(
-                        'GET', f'/redfish/v1/Systems/System.Embedded.1/Processors/{proc_id}'
-                    )
-                    return {
-                        "id": proc_id,
-                        "name": proc_detail.get('Name', 'Unknown'),
-                        "model": proc_detail.get('Model', 'N/A'),
-                        "manufacturer": proc_detail.get('Manufacturer', 'N/A'),
-                        "architecture": proc_detail.get('ProcessorArchitecture', 'N/A'),
-                        "cores": proc_detail.get('TotalCores', 'N/A'),
-                        "threads": proc_detail.get('TotalThreads', 'N/A'),
-                        "health": proc_detail.get('Status', {}).get('Health', 'N/A'),
-                        "state": proc_detail.get('Status', {}).get('State', 'N/A')
-                    }
-                except Exception as e:
-                    logger.warning(f"Failed to get processor details for {proc_id}: {e}")
-                    return {"id": proc_id, "error": str(e)}
-
-            # Fetch all processor details in parallel
-            processor_details = await asyncio.gather(
-                *[fetch_processor_detail(proc_id) for proc_id in proc_ids],
-                return_exceptions=False
-            )
-
-            inventory = {
-                "processors": {
-                    "count": len(processors),
-                    "details": list(processor_details)
-                },
-                "memory_modules": {
-                    "count": len(memory_modules),
-                    "modules": memory_modules
-                },
-                "storage_controllers": {
-                    "count": len(storage_controllers),
-                    "controllers": storage_controllers
+            response = self._make_request('GET', '/redfish/v1/')
+            if response.status_code == 200:
+                return {
+                    "status": "connected",
+                    "host": self.host,
+                    "port": self.port,
+                    "message": f"Successfully connected to iDRAC at {self.host}:{self.port}",
+                    "response_code": response.status_code
                 }
-            }
-
-            return {
-                "status": "success",
-                "data": inventory,
-                "message": "Hardware inventory retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get hardware inventory: {e}")
-            raise
-    
-    async def get_power_status(self) -> Dict[str, Any]:
-        """Get power status.
-        
-        Returns:
-            Power status information
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
-            power_state = result.get('PowerState', 'Unknown')
-            
-            return {
-                "status": "success",
-                "data": {
-                    "power_state": power_state,
-                    "is_on": power_state == 'On',
-                    "is_off": power_state == 'Off'
-                },
-                "message": "Power status retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get power status: {e}")
-            raise
-    
-    async def power_on(self) -> Dict[str, Any]:
-        """Power on the server.
-        
-        Returns:
-            Operation result
-        """
-        try:
-            data = {"ResetType": "On"}
-            result = await self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', data)
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": "Power on command sent successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to power on server: {e}")
-            raise
-    
-    async def power_off(self, force: bool = False) -> Dict[str, Any]:
-        """Power off the server.
-        
-        Args:
-            force: Force power off
-            
-        Returns:
-            Operation result
-        """
-        try:
-            reset_type = "ForceOff" if force else "GracefulShutdown"
-            data = {"ResetType": reset_type}
-            result = await self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', data)
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": f"Power off command ({reset_type}) sent successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to power off server: {e}")
-            raise
-    
-    async def power_cycle(self, force: bool = False) -> Dict[str, Any]:
-        """Power cycle the server.
-        
-        Args:
-            force: Force power cycle
-            
-        Returns:
-            Operation result
-        """
-        try:
-            reset_type = "ForceRestart" if force else "GracefulRestart"
-            data = {"ResetType": reset_type}
-            result = await self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', data)
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": f"Power cycle command ({reset_type}) sent successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to power cycle server: {e}")
-            raise
-    
-    async def get_thermal_status(self) -> Dict[str, Any]:
-        """Get thermal status.
-        
-        Returns:
-            Thermal status information
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Chassis/System.Embedded.1/Thermal')
-            
-            temperatures = result.get('Temperatures', [])
-            fans = result.get('Fans', [])
-            
-            # Extract temperature data
-            temp_data = []
-            for temp in temperatures:
-                temp_data.append({
-                    "name": temp.get('Name', 'Unknown'),
-                    "reading_celsius": temp.get('ReadingCelsius', 'N/A'),
-                    "health": temp.get('Status', {}).get('Health', 'N/A'),
-                    "state": temp.get('Status', {}).get('State', 'N/A'),
-                    "upper_critical": temp.get('UpperThresholdCritical', 'N/A'),
-                    "upper_warning": temp.get('UpperThresholdNonCritical', 'N/A')
-                })
-            
-            # Extract fan data
-            fan_data = []
-            for fan in fans:
-                fan_data.append({
-                    "name": fan.get('Name', 'Unknown'),
-                    "reading_rpm": fan.get('Reading', 'N/A'),
-                    "health": fan.get('Status', {}).get('Health', 'N/A'),
-                    "state": fan.get('Status', {}).get('State', 'N/A'),
-                    "min_rpm": fan.get('MinReadingRange', 'N/A'),
-                    "max_rpm": fan.get('MaxReadingRange', 'N/A')
-                })
-            
-            thermal_info = {
-                "temperatures": {
-                    "count": len(temperatures),
-                    "sensors": temp_data
-                },
-                "fans": {
-                    "count": len(fans),
-                    "fans": fan_data
+            else:
+                return {
+                    "status": "error",
+                    "host": self.host,
+                    "port": self.port,
+                    "message": f"Connection failed with status code: {response.status_code}",
+                    "response_code": response.status_code
                 }
-            }
-            
-            return {
-                "status": "success",
-                "data": thermal_info,
-                "message": "Thermal status retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get thermal status: {e}")
-            raise
-    
-    async def get_users(self) -> Dict[str, Any]:
-        """Get iDRAC users.
-        
-        Returns:
-            List of users
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Managers/iDRAC.Embedded.1/Accounts')
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": "Users retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get users: {e}")
-            raise
-    
-    async def create_user(self, user_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new iDRAC user.
-        
-        Args:
-            user_config: User configuration
-            
-        Returns:
-            Operation result
-        """
-        try:
-            validated_config = validate_user_config(user_config)
-            result = await self._make_request('POST', '/redfish/v1/Managers/iDRAC.Embedded.1/Accounts', validated_config)
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": f"User {validated_config['username']} created successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to create user: {e}")
-            raise
-    
-    async def get_network_config(self) -> Dict[str, Any]:
-        """Get network configuration.
-        
-        Returns:
-            Network configuration
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces')
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": "Network configuration retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get network config: {e}")
-            raise
-    
-    async def get_storage_controllers(self) -> Dict[str, Any]:
-        """Get storage controllers.
-        
-        Returns:
-            Storage controllers information
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1/Storage')
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": "Storage controllers retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get storage controllers: {e}")
-            raise
-    
-    async def get_firmware_versions(self) -> Dict[str, Any]:
-        """Get firmware versions.
-        
-        Returns:
-            Firmware version information
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/UpdateService/FirmwareInventory')
-            
-            return {
-                "status": "success",
-                "data": result,
-                "message": "Firmware versions retrieved successfully"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get firmware versions: {e}")
-            raise
-    
-    async def test_connection(self) -> Dict[str, Any]:
-        """Test connection to iDRAC.
-        
-        Returns:
-            Connection test result
-        """
-        try:
-            result = await self._make_request('GET', '/redfish/v1/')
-            
-            return {
-                "status": "success",
-                "data": {
-                    "connected": True,
-                    "version": result.get('RedfishVersion', 'Unknown'),
-                    "protocol_version": result.get('ProtocolFeaturesSupported', {})
-                },
-                "message": "Connection test successful"
-            }
-        except Exception as e:
-            logger.error(f"Connection test failed: {e}")
+        except requests.exceptions.ConnectionError:
             return {
                 "status": "error",
-                "data": {
-                    "connected": False,
-                    "error": str(e)
-                },
-                "message": "Connection test failed"
+                "host": self.host,
+                "port": self.port,
+                "message": "Connection refused - server may be unreachable or port blocked",
+                "response_code": None
+            }
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "host": self.host,
+                "port": self.port,
+                "message": "Connection timeout - server took too long to respond",
+                "response_code": None
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "host": self.host,
+                "port": self.port,
+                "message": f"Connection error: {str(e)}",
+                "response_code": None
+            }
+
+    def get_system_info(self) -> Dict[str, Any]:
+        """Get system information from iDRAC.
+
+        Returns:
+            Dict with system information or error details
+        """
+        try:
+            response = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "host": self.host,
+                    "protocol": self.protocol,
+                    "ssl_verify": self.ssl_verify,
+                    "system_info": {
+                        "manufacturer": data.get('Manufacturer', 'Unknown'),
+                        "model": data.get('Model', 'Unknown'),
+                        "serial_number": data.get('SerialNumber', 'Unknown'),
+                        "power_state": data.get('PowerState', 'Unknown'),
+                        "health": data.get('Status', {}).get('Health', 'Unknown')
+                    },
+                    "message": "System information retrieved successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "protocol": self.protocol,
+                    "ssl_verify": self.ssl_verify,
+                    "error": f"Failed to get system info: HTTP {response.status_code}",
+                    "message": "Failed to retrieve system information"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "protocol": self.protocol,
+                "ssl_verify": self.ssl_verify,
+                "error": str(e),
+                "message": f"Error retrieving system information: {str(e)}"
+            }
+
+    def get_power_status(self) -> Dict[str, Any]:
+        """Get current power status of the server.
+
+        Returns:
+            Dict with power status information
+        """
+        try:
+            response = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
+            if response.status_code == 200:
+                data = response.json()
+                power_state = data.get('PowerState', 'Unknown')
+
+                # Get additional power information if available
+                power_response = self._make_request('GET', '/redfish/v1/Chassis/System.Embedded.1/Power')
+                power_info = {}
+                if power_response.status_code == 200:
+                    power_data = power_response.json()
+                    power_info = {
+                        "total_consumption": power_data.get('PowerControl', [{}])[0].get('PowerConsumedWatts', 'Unknown'),
+                        "power_supplies": len(power_data.get('PowerSupplies', []))
+                    }
+
+                return {
+                    "host": self.host,
+                    "power_status": power_state,
+                    "power_info": power_info,
+                    "message": f"Power status: {power_state}"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "power_status": "unknown",
+                    "error": f"Failed to get power status: HTTP {response.status_code}",
+                    "message": "Failed to retrieve power status"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "power_status": "unknown",
+                "error": str(e),
+                "message": f"Error retrieving power status: {str(e)}"
+            }
+
+    def power_on(self) -> Dict[str, Any]:
+        """Power on the server.
+
+        Returns:
+            Dict with operation result
+        """
+        try:
+            payload = {"ResetType": "On"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "power_on",
+                    "status": "success",
+                    "message": "Power on command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "power_on",
+                    "status": "error",
+                    "error": f"Failed to power on: HTTP {response.status_code}",
+                    "message": "Failed to send power on command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "power_on",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending power on command: {str(e)}"
+            }
+
+    def power_off(self) -> Dict[str, Any]:
+        """Power off the server gracefully.
+
+        Returns:
+            Dict with operation result
+        """
+        try:
+            payload = {"ResetType": "GracefulShutdown"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "power_off",
+                    "status": "success",
+                    "message": "Power off command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "power_off",
+                    "status": "error",
+                    "error": f"Failed to power off: HTTP {response.status_code}",
+                    "message": "Failed to send power off command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "power_off",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending power off command: {str(e)}"
+            }
+
+    def force_power_off(self) -> Dict[str, Any]:
+        """Force power off the server (immediate shutdown).
+
+        WARNING: This performs an immediate hard shutdown. May cause data loss.
+
+        Returns:
+            Dict with operation result
+        """
+        try:
+            payload = {"ResetType": "ForceOff"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "force_power_off",
+                    "status": "success",
+                    "message": "Force power off command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "force_power_off",
+                    "status": "error",
+                    "error": f"Failed to force power off: HTTP {response.status_code}",
+                    "message": "Failed to send force power off command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "force_power_off",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending force power off command: {str(e)}"
+            }
+
+    def restart(self) -> Dict[str, Any]:
+        """Restart the server gracefully.
+
+        Returns:
+            Dict with operation result
+        """
+        try:
+            payload = {"ResetType": "GracefulRestart"}
+            response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
+            if response.status_code in [200, 202, 204]:
+                return {
+                    "host": self.host,
+                    "action": "restart",
+                    "status": "success",
+                    "message": "Restart command sent successfully"
+                }
+            else:
+                return {
+                    "host": self.host,
+                    "action": "restart",
+                    "status": "error",
+                    "error": f"Failed to restart: HTTP {response.status_code}",
+                    "message": "Failed to send restart command"
+                }
+        except Exception as e:
+            return {
+                "host": self.host,
+                "action": "restart",
+                "status": "error",
+                "error": str(e),
+                "message": f"Error sending restart command: {str(e)}"
             }
