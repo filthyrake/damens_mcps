@@ -71,12 +71,17 @@ def create_retry_decorator(
             aiohttp.ClientConnectorError,
         )
     
+    # Get log level safely - structlog loggers don't have 'level' attribute
+    # Use logging.WARNING as default for retry logging
+    import logging as std_logging
+    log_level = getattr(logger, 'level', None) or std_logging.WARNING
+
     return retry(
         stop=stop_after_attempt(max_attempts),
         wait=wait_exponential(multiplier=multiplier, min=min_wait, max=max_wait),
         retry=retry_if_exception_type(retry_exceptions),
-        before_sleep=before_sleep_log(logger, logger.level),
-        after=after_log(logger, logger.level),
+        before_sleep=before_sleep_log(logger, log_level),
+        after=after_log(logger, log_level),
         reraise=True
     )
 

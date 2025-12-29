@@ -321,3 +321,213 @@ class TestServerMock:
             pytest.fail(f"NameError occurred: {e}. request_id was not initialized before JSON parse error.")
         
         # The test passes if no NameError is raised
+
+
+class TestReliabilityFixes:
+    """Test cases for reliability improvements (Issues #165, #166)."""
+
+    def test_make_request_no_retry_exists(self, mock_proxmox_client):
+        """Test that _make_request_no_retry method exists."""
+        assert hasattr(mock_proxmox_client, '_make_request_no_retry')
+        assert callable(mock_proxmox_client._make_request_no_retry)
+
+    def test_delete_vm_uses_no_retry(self, mock_proxmox_client):
+        """Test that delete_vm uses _make_request_no_retry."""
+        with patch.object(mock_proxmox_client, '_make_request_no_retry') as mock_no_retry:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_no_retry.return_value = mock_response
+
+            result = mock_proxmox_client.delete_vm("node1", 100)
+
+            mock_no_retry.assert_called_once()
+            assert "DELETE" in str(mock_no_retry.call_args)
+            assert result["status"] == "success"
+
+    def test_delete_container_uses_no_retry(self, mock_proxmox_client):
+        """Test that delete_container uses _make_request_no_retry."""
+        with patch.object(mock_proxmox_client, '_make_request_no_retry') as mock_no_retry:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_no_retry.return_value = mock_response
+
+            result = mock_proxmox_client.delete_container("node1", 100)
+
+            mock_no_retry.assert_called_once()
+            assert "DELETE" in str(mock_no_retry.call_args)
+            assert result["status"] == "success"
+
+    def test_delete_container_exists(self, mock_proxmox_client):
+        """Test that delete_container method exists."""
+        assert hasattr(mock_proxmox_client, 'delete_container')
+        assert callable(mock_proxmox_client.delete_container)
+
+    def test_list_vms_partial_failure_tracking(self, mock_proxmox_client):
+        """Test that list_vms tracks partial failures across nodes."""
+        from src.exceptions import ProxmoxConnectionError
+
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes, \
+             patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+
+            # Two nodes: one succeeds, one fails
+            mock_list_nodes.return_value = [
+                {"node": "node1"},
+                {"node": "node2"}
+            ]
+
+            # node1 succeeds, node2 fails
+            def make_request_side_effect(method, endpoint, **kwargs):
+                if "node1" in endpoint:
+                    response = Mock()
+                    response.json.return_value = {"data": [{"vmid": 100, "name": "vm1"}]}
+                    return response
+                else:
+                    raise ProxmoxConnectionError("Connection failed")
+
+            mock_make_request.side_effect = make_request_side_effect
+
+            result = mock_proxmox_client.list_vms()
+
+            # Should return VMs from successful node
+            assert len(result) == 1
+            assert result[0]["vmid"] == 100
+
+    def test_list_vms_all_nodes_fail_raises_error(self, mock_proxmox_client):
+        """Test that list_vms raises error when ALL nodes fail."""
+        from src.exceptions import ProxmoxConnectionError, ProxmoxAPIError
+
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes, \
+             patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+
+            mock_list_nodes.return_value = [
+                {"node": "node1"},
+                {"node": "node2"}
+            ]
+
+            # All nodes fail
+            mock_make_request.side_effect = ProxmoxConnectionError("Connection failed")
+
+            with pytest.raises(ProxmoxAPIError) as exc_info:
+                mock_proxmox_client.list_vms()
+
+            assert "Failed to get VMs from all nodes" in str(exc_info.value)
+
+    def test_list_vms_empty_nodes_returns_empty_list(self, mock_proxmox_client):
+        """Test that list_vms with empty nodes returns empty list (not error)."""
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes:
+            mock_list_nodes.return_value = []
+
+            result = mock_proxmox_client.list_vms()
+
+            # Should return empty list, not raise error
+            assert result == []
+
+    def test_list_vms_skips_invalid_node_names(self, mock_proxmox_client):
+        """Test that list_vms skips nodes with missing/invalid names."""
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes, \
+             patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+
+            # Mix of valid and invalid node entries
+            mock_list_nodes.return_value = [
+                {"node": "valid_node"},
+                {"not_node": "missing_field"},  # Missing 'node' key
+                {"node": None},  # None value
+                {"node": 123},  # Wrong type
+            ]
+
+            mock_response = Mock()
+            mock_response.json.return_value = {"data": [{"vmid": 100}]}
+            mock_make_request.return_value = mock_response
+
+            result = mock_proxmox_client.list_vms()
+
+            # Should only query the valid node
+            assert mock_make_request.call_count == 1
+            assert "valid_node" in str(mock_make_request.call_args)
+
+    def test_list_vms_json_parse_error_cleanup(self, mock_proxmox_client):
+        """Test that JSON parse errors trigger response cleanup."""
+        import json
+
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes, \
+             patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+
+            # Two nodes: one succeeds, one has JSON parse error
+            mock_list_nodes.return_value = [{"node": "node1"}, {"node": "node2"}]
+
+            mock_bad_response = Mock()
+            mock_bad_response.json.side_effect = json.JSONDecodeError("test", "doc", 0)
+            mock_bad_response.close = Mock()
+
+            mock_good_response = Mock()
+            mock_good_response.json.return_value = {"data": [{"vmid": 100}]}
+
+            def make_request_side_effect(method, endpoint, **kwargs):
+                if "node1" in endpoint:
+                    return mock_bad_response
+                else:
+                    return mock_good_response
+
+            mock_make_request.side_effect = make_request_side_effect
+
+            result = mock_proxmox_client.list_vms()
+
+            # Response.close() should have been called for the failed response
+            mock_bad_response.close.assert_called_once()
+            # Should return VMs from the successful node
+            assert len(result) == 1
+            assert result[0]["vmid"] == 100
+
+    def test_list_containers_partial_failure(self, mock_proxmox_client):
+        """Test that list_containers tracks partial failures."""
+        from src.exceptions import ProxmoxTimeoutError
+
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes, \
+             patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+
+            mock_list_nodes.return_value = [
+                {"node": "node1"},
+                {"node": "node2"}
+            ]
+
+            def make_request_side_effect(method, endpoint, **kwargs):
+                if "node1" in endpoint:
+                    response = Mock()
+                    response.json.return_value = {"data": [{"vmid": 200}]}
+                    return response
+                else:
+                    raise ProxmoxTimeoutError("Timeout")
+
+            mock_make_request.side_effect = make_request_side_effect
+
+            result = mock_proxmox_client.list_containers()
+
+            assert len(result) == 1
+            assert result[0]["vmid"] == 200
+
+    def test_list_storage_partial_failure(self, mock_proxmox_client):
+        """Test that list_storage tracks partial failures."""
+        from src.exceptions import ProxmoxAPIError
+
+        with patch.object(mock_proxmox_client, 'list_nodes') as mock_list_nodes, \
+             patch.object(mock_proxmox_client, '_make_request') as mock_make_request:
+
+            mock_list_nodes.return_value = [
+                {"node": "node1"},
+                {"node": "node2"}
+            ]
+
+            def make_request_side_effect(method, endpoint, **kwargs):
+                if "node1" in endpoint:
+                    response = Mock()
+                    response.json.return_value = {"data": [{"storage": "local"}]}
+                    return response
+                else:
+                    raise ProxmoxAPIError("API Error")
+
+            mock_make_request.side_effect = make_request_side_effect
+
+            result = mock_proxmox_client.list_storage()
+
+            assert len(result) == 1
+            assert result[0]["storage"] == "local"
