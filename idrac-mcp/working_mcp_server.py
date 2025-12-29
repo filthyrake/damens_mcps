@@ -808,28 +808,44 @@ class WorkingIDracMCPServer:
         self.idrac_clients.clear()
         debug_print("Cleanup complete")
 
-    def _validate_and_get_server_id(self, arguments: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
-        """Validate and get server ID from arguments.
-        
+    def _create_error_response(self, message: str) -> Dict[str, Any]:
+        """Create a standardized MCP error response.
+
+        Args:
+            message: The error message to include in the response
+
         Returns:
-            Tuple of (server_id, error_response). If error_response is not None, it should be returned.
+            Dict with MCP-formatted error response containing content and isError flag
+        """
+        return {
+            "content": [{"type": "text", "text": message}],
+            "isError": True
+        }
+
+    def _validate_and_get_server_id(self, arguments: Dict[str, Any]) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """Validate and get server ID from arguments.
+
+        Args:
+            arguments: Tool arguments dict that may contain 'server_id'
+
+        Returns:
+            Tuple of (server_id, error_response):
+            - On success: (server_id, None)
+            - On failure: (None, error_response_dict)
+            Callers should check: `if error: return error`
         """
         server_id = arguments.get("server_id", self.default_server)
-        
+
         # Validate server_id format
         if not validate_server_id(server_id):
-            return None, {
-                "content": [{"type": "text", "text": f"Error: Invalid server ID format. Server ID must contain only alphanumeric characters, hyphens, and underscores."}],
-                "isError": True
-            }
-        
+            return None, self._create_error_response(
+                "Error: Invalid server ID format. Server ID must contain only alphanumeric characters, hyphens, and underscores."
+            )
+
         # Check if server exists
         if server_id not in self.idrac_clients:
-            return None, {
-                "content": [{"type": "text", "text": f"Error: Server with ID '{server_id}' not found."}],
-                "isError": True
-            }
-        
+            return None, self._create_error_response(f"Error: Server with ID '{server_id}' not found.")
+
         return server_id, None
     
     def _call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:

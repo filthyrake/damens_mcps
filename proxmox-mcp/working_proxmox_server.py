@@ -196,33 +196,41 @@ class WorkingProxmoxMCPServer:
                 self.proxmox_client = None
             debug_print("Cleanup complete")
 
-    def _validate_node_and_vmid(self, node: str, vmid: str) -> Dict[str, Any]:
-        """
-        Validate node and vmid parameters.
-        
+    def _create_error_response(self, message: str) -> Dict[str, Any]:
+        """Create a standardized MCP error response.
+
         Args:
-            node: Node name to validate
-            vmid: VM/Container ID to validate
-            
+            message: The error message to include in the response
+
         Returns:
-            Error dictionary if validation fails, None if valid
+            Dict with MCP-formatted error response containing content and isError flag
+        """
+        return {
+            "content": [{"type": "text", "text": message}],
+            "isError": True
+        }
+
+    def _validate_node_and_vmid(self, node: str, vmid: str) -> Optional[Dict[str, Any]]:
+        """Validate node and vmid parameters for VM/container operations.
+
+        This method validates that both parameters are present and conform to
+        Proxmox naming requirements.
+
+        Args:
+            node: Node name to validate (alphanumeric with hyphens/underscores)
+            vmid: VM/Container ID to validate (integer 100-999999)
+
+        Returns:
+            None if validation passes, or an MCP error response dict if validation
+            fails. Callers should check: `if error := self._validate_node_and_vmid(...): return error`
         """
         if not node or not vmid:
-            return {
-                "content": [{"type": "text", "text": "Error: Both 'node' and 'vmid' are required"}],
-                "isError": True
-            }
+            return self._create_error_response("Error: Both 'node' and 'vmid' are required")
         if not is_valid_node_name(node):
-            return {
-                "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
-                "isError": True
-            }
+            return self._create_error_response(f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores")
         if not is_valid_vmid(vmid):
-            return {
-                "content": [{"type": "text", "text": f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999"}],
-                "isError": True
-            }
-        return None  # No error
+            return self._create_error_response(f"Error: Invalid VMID '{vmid}'. Must be between 100 and 999999")
+        return None
 
     def _list_tools(self) -> Dict[str, Any]:
         """List all available tools."""
@@ -638,8 +646,21 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
-                vms = self.proxmox_client.list_vms(node)
-                result = {"vms": vms, "count": len(vms)}
+                # Use include_metadata=True when querying all nodes to expose partial failures
+                if node:
+                    vms = self.proxmox_client.list_vms(node)
+                    result = {"vms": vms, "count": len(vms)}
+                else:
+                    vms_result = self.proxmox_client.list_vms(node, include_metadata=True)
+                    result = {
+                        "vms": vms_result["data"],
+                        "count": len(vms_result["data"]),
+                        "successful_nodes": vms_result["successful_nodes"],
+                        "failed_nodes": vms_result["failed_nodes"],
+                        "partial_failure": vms_result["partial_failure"]
+                    }
+                    if vms_result["partial_failure"]:
+                        result["warning"] = f"Data incomplete: failed to query nodes {[n['node'] for n in vms_result['failed_nodes']]}"
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -810,8 +831,21 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
-                containers = self.proxmox_client.list_containers(node)
-                result = {"containers": containers, "count": len(containers)}
+                # Use include_metadata=True when querying all nodes to expose partial failures
+                if node:
+                    containers = self.proxmox_client.list_containers(node)
+                    result = {"containers": containers, "count": len(containers)}
+                else:
+                    containers_result = self.proxmox_client.list_containers(node, include_metadata=True)
+                    result = {
+                        "containers": containers_result["data"],
+                        "count": len(containers_result["data"]),
+                        "successful_nodes": containers_result["successful_nodes"],
+                        "failed_nodes": containers_result["failed_nodes"],
+                        "partial_failure": containers_result["partial_failure"]
+                    }
+                    if containers_result["partial_failure"]:
+                        result["warning"] = f"Data incomplete: failed to query nodes {[n['node'] for n in containers_result['failed_nodes']]}"
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
@@ -849,8 +883,21 @@ class WorkingProxmoxMCPServer:
                         "content": [{"type": "text", "text": f"Error: Invalid node name '{node}'. Must be alphanumeric with hyphens/underscores"}],
                         "isError": True
                     }
-                storage = self.proxmox_client.list_storage(node)
-                result = {"storage": storage, "count": len(storage)}
+                # Use include_metadata=True when querying all nodes to expose partial failures
+                if node:
+                    storage = self.proxmox_client.list_storage(node)
+                    result = {"storage": storage, "count": len(storage)}
+                else:
+                    storage_result = self.proxmox_client.list_storage(node, include_metadata=True)
+                    result = {
+                        "storage": storage_result["data"],
+                        "count": len(storage_result["data"]),
+                        "successful_nodes": storage_result["successful_nodes"],
+                        "failed_nodes": storage_result["failed_nodes"],
+                        "partial_failure": storage_result["partial_failure"]
+                    }
+                    if storage_result["partial_failure"]:
+                        result["warning"] = f"Data incomplete: failed to query nodes {[n['node'] for n in storage_result['failed_nodes']]}"
                 result_text = json.dumps(result, indent=2, default=str)
                 return {
                     "content": [{"type": "text", "text": result_text}],
