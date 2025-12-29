@@ -194,23 +194,54 @@ class IDracClient:
         safe_headers = redact_sensitive_headers(dict(self.session.headers))
         debug_print(f"Session headers: {safe_headers}")
         debug_print(f"Auth type: {type(self.auth).__name__}")
-    
+
+    def close(self) -> None:
+        """Close the session and release resources.
+
+        Should be called when the client is no longer needed to prevent
+        resource leaks (file descriptors, TCP connections).
+        """
+        if self.session is not None:
+            try:
+                self.session.close()
+                debug_print(f"Closed iDRAC client session for {self.host}")
+            except Exception as e:
+                debug_print(f"Error closing session for {self.host}: {e}")
+            finally:
+                self.session = None
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures session is closed."""
+        self.close()
+        return False
+
     def _execute_http_request(self, method: str, url: str, **kwargs) -> requests.Response:
         """
         Execute HTTP request with context-specific warning suppression.
-        
+
         Helper method to eliminate duplication in _make_request.
+        Supports GET, POST, PUT, DELETE, and PATCH methods for Redfish API compatibility.
         """
+        method_map = {
+            'GET': self.session.get,
+            'POST': self.session.post,
+            'PUT': self.session.put,
+            'DELETE': self.session.delete,
+            'PATCH': self.session.patch,
+        }
+
+        handler = method_map.get(method.upper())
+        if not handler:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
         with warnings.catch_warnings():
             if not self.ssl_verify:
                 warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-            
-            if method.upper() == 'GET':
-                return self.session.get(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
-            elif method.upper() == 'POST':
-                return self.session.post(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
-            else:
-                raise ValueError(f"Unsupported method: {method}")
+            return handler(url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, **kwargs)
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make a request with proper error handling and debugging."""
@@ -236,12 +267,18 @@ class IDracClient:
                 self.session.auth = self.auth
                 debug_print(f"Re-authenticated with auth type: {type(self.auth).__name__}")
                 debug_print(f"Cleared cookies, session now has: {len(self.session.cookies)} cookies")
-                
-                # Retry the request
-                response = self._execute_http_request(method, url, **kwargs)
-                
-                debug_print(f"Retry response status: {response.status_code}")
-                debug_print(f"Retry response has cookies: {len(response.cookies)} cookies")
+
+                # Only retry idempotent methods to avoid double-applying side effects
+                # GET and PUT are idempotent, POST/PATCH/DELETE may have already executed
+                idempotent_methods = {'GET', 'PUT', 'HEAD'}
+                if method.upper() in idempotent_methods:
+                    # Retry the request
+                    response = self._execute_http_request(method, url, **kwargs)
+
+                    debug_print(f"Retry response status: {response.status_code}")
+                    debug_print(f"Retry response has cookies: {len(response.cookies)} cookies")
+                else:
+                    debug_print(f"Not retrying {method} request - non-idempotent method may have side effects")
             
             return response
             
@@ -755,7 +792,22 @@ class WorkingIDracMCPServer:
             }
         ]
         debug_print(f"Created {len(self.tools)} tools")
-    
+
+    def cleanup(self) -> None:
+        """Clean up all iDRAC client sessions.
+
+        Should be called during server shutdown to properly release resources
+        (file descriptors, TCP connections) for all managed iDRAC clients.
+        """
+        debug_print("Cleaning up iDRAC client sessions...")
+        for server_id, client in self.idrac_clients.items():
+            try:
+                client.close()
+            except Exception as e:
+                debug_print(f"Error closing client for {server_id}: {e}")
+        self.idrac_clients.clear()
+        debug_print("Cleanup complete")
+
     def _validate_and_get_server_id(self, arguments: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
         """Validate and get server ID from arguments.
         
@@ -950,6 +1002,9 @@ class WorkingIDracMCPServer:
             debug_print(f"Server error: {e}")
             import traceback
             traceback.print_exc(file=sys.stderr)
+        finally:
+            # Always clean up resources on shutdown
+            self.cleanup()
 
 
 def main():
