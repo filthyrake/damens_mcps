@@ -143,7 +143,7 @@ class AuthManager:
         token_data = {
             "sub": username,
             "type": "user",
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         return self.create_access_token(token_data)
@@ -159,7 +159,7 @@ class AuthManager:
         """
         payload = self.verify_token(token)
         if payload and "exp" in payload:
-            return datetime.fromtimestamp(payload["exp"])
+            return datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
         return None
     
     def is_token_expired(self, token: str) -> bool:
@@ -173,5 +173,5 @@ class AuthManager:
         """
         expiration = self.get_token_expiration(token)
         if expiration:
-            return datetime.utcnow() > expiration
+            return datetime.now(timezone.utc) > expiration
         return True
