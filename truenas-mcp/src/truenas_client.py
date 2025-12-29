@@ -104,28 +104,46 @@ class TrueNASClient:
     async def connect(self) -> None:
         """Establish connection to TrueNAS."""
         if self.session is None:
-            # Create connector with connection pooling
-            connector = aiohttp.TCPConnector(
-                verify_ssl=self.config.verify_ssl,
-                limit=self.config.connector_limit,
-                limit_per_host=self.config.connector_limit_per_host,
-                ttl_dns_cache=300
-            )
-            # Create session with timeout
-            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
-            self.session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=timeout
-            )
+            connector = None
+            session = None
+            try:
+                # Create connector with connection pooling
+                connector = aiohttp.TCPConnector(
+                    verify_ssl=self.config.verify_ssl,
+                    limit=self.config.connector_limit,
+                    limit_per_host=self.config.connector_limit_per_host,
+                    ttl_dns_cache=300
+                )
+                # Create session with timeout
+                timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+                session = aiohttp.ClientSession(
+                    connector=connector,
+                    timeout=timeout
+                )
 
-            # Authenticate if needed - clean up session on failure to prevent leaks
-            if not self.config.api_key:
-                try:
+                # Authenticate if needed
+                if not self.config.api_key:
+                    # Store temporarily for _authenticate to use
+                    self.session = session
                     await self._authenticate()
-                except Exception:
-                    await self.session.close()
-                    self.session = None
-                    raise
+
+                # Success - assign to instance
+                self.session = session
+            except Exception:
+                # Clean up on any failure - best effort, don't lose original exception
+                if session is not None:
+                    try:
+                        await session.close()
+                    except Exception:
+                        pass  # Best effort cleanup
+                elif connector is not None:
+                    # Session wasn't created but connector was
+                    try:
+                        await connector.close()
+                    except Exception:
+                        pass  # Best effort cleanup
+                self.session = None
+                raise
     
     async def disconnect(self) -> None:
         """Close connection to TrueNAS."""
