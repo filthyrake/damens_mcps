@@ -192,40 +192,80 @@ def validate_firewall_rule_params(params: Dict[str, Any]) -> List[str]:
         List of validation error messages (empty if valid)
     """
     errors = []
+    valid_actions = ['pass', 'block', 'reject']
+    valid_directions = ['in', 'out']
+    valid_protocols = [
+        'tcp', 'udp', 'icmp', 'esp', 'ah', 'gre', 'ipv6', 'igmp',
+        'pim', 'ospf', 'sctp', 'any', 'icmpv6', 'tcp/udp'
+    ]
 
     # Required fields
     required_fields = ['action', 'interface', 'direction']
     for field in required_fields:
         if field not in params or not params[field]:
-            errors.append(f"Missing required field: {field}")
+            errors.append(
+                f"Missing required field: '{field}'. "
+                f"Required fields for firewall rules: {', '.join(required_fields)}"
+            )
 
     # Validate action
-    if 'action' in params and params['action'] not in ['pass', 'block', 'reject']:
-        errors.append("Invalid action. Must be 'pass', 'block', or 'reject'")
+    if 'action' in params and params['action']:
+        action = params['action']
+        if action not in valid_actions:
+            errors.append(
+                f"Invalid action '{action}'. "
+                f"Valid options: {', '.join(valid_actions)}. "
+                "Use 'pass' to allow traffic, 'block' to silently drop, 'reject' to drop with response"
+            )
 
     # Validate direction
-    if 'direction' in params and params['direction'] not in ['in', 'out']:
-        errors.append("Invalid direction. Must be 'in' or 'out'")
+    if 'direction' in params and params['direction']:
+        direction = params['direction']
+        if direction not in valid_directions:
+            errors.append(
+                f"Invalid direction '{direction}'. "
+                f"Valid options: {', '.join(valid_directions)}. "
+                "Use 'in' for incoming traffic, 'out' for outgoing traffic"
+            )
 
     # Validate protocol if provided
     if 'protocol' in params and params['protocol']:
-        if not validate_protocol(params['protocol']):
-            errors.append("Invalid protocol. Must be a valid protocol (tcp, udp, icmp, etc.)")
+        protocol = params['protocol']
+        if not validate_protocol(protocol):
+            errors.append(
+                f"Invalid protocol '{protocol}'. "
+                f"Valid options: {', '.join(valid_protocols)}. "
+                "Common choices: tcp (web, SSH), udp (DNS, VPN), icmp (ping), any (all protocols)"
+            )
 
     # Validate source/destination if provided (supports both IP and CIDR)
     if 'source' in params and params['source']:
-        if not validate_ip_or_cidr(params['source']) and params['source'] != 'any':
-            errors.append("Invalid source address. Must be a valid IP address or CIDR notation (e.g., 192.168.1.0/24)")
+        source = params['source']
+        if not validate_ip_or_cidr(source) and source != 'any':
+            errors.append(
+                f"Invalid source address '{source}'. "
+                "Must be a valid IPv4/IPv6 address, CIDR notation, or 'any'. "
+                "Examples: 192.168.1.100, 10.0.0.0/8, 2001:db8::1, any"
+            )
 
     if 'destination' in params and params['destination']:
-        if not validate_ip_or_cidr(params['destination']) and params['destination'] != 'any':
-            errors.append("Invalid destination address. Must be a valid IP address or CIDR notation (e.g., 192.168.1.0/24)")
+        destination = params['destination']
+        if not validate_ip_or_cidr(destination) and destination != 'any':
+            errors.append(
+                f"Invalid destination address '{destination}'. "
+                "Must be a valid IPv4/IPv6 address, CIDR notation, or 'any'. "
+                "Examples: 192.168.1.100, 10.0.0.0/8, 2001:db8::1, any"
+            )
 
     # Validate port if provided (supports both single port and ranges)
     if 'port' in params and params['port']:
         port_value = str(params['port'])
         if not validate_port_range(port_value):
-            errors.append(f"Invalid port. Must be a valid port number ({MIN_PORT}-{MAX_PORT}) or port range (e.g., 8000-9000)")
+            errors.append(
+                f"Invalid port '{port_value}'. "
+                f"Must be a port number ({MIN_PORT}-{MAX_PORT}) or range. "
+                "Examples: 80, 443, 8000-9000, 22"
+            )
 
     return errors
 
@@ -244,12 +284,26 @@ def validate_vlan_params(params: Dict[str, Any]) -> List[str]:
 
     # Required fields
     if 'vlan_id' not in params:
-        errors.append("Missing required field: vlan_id")
-    elif not validate_vlan_id(params['vlan_id']):
-        errors.append(f"Invalid VLAN ID. Must be between {MIN_VLAN_ID} and {MAX_VLAN_ID}")
+        errors.append(
+            "Missing required field: 'vlan_id'. "
+            f"VLAN ID must be an integer between {MIN_VLAN_ID} and {MAX_VLAN_ID}. "
+            "Example: 10, 100, 200"
+        )
+    else:
+        vlan_id = params['vlan_id']
+        if not validate_vlan_id(vlan_id):
+            errors.append(
+                f"Invalid VLAN ID '{vlan_id}'. "
+                f"Must be an integer between {MIN_VLAN_ID} and {MAX_VLAN_ID} (IEEE 802.1Q standard). "
+                "Common VLANs: 10 (management), 20 (servers), 100 (users), 200 (guests)"
+            )
 
     if 'interface' not in params or not params['interface']:
-        errors.append("Missing required field: interface")
+        errors.append(
+            "Missing required field: 'interface'. "
+            "Specify the parent interface for this VLAN. "
+            "Example: em0, igb0, ix0"
+        )
 
     return errors
 
