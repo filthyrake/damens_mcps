@@ -19,6 +19,78 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Default allowed directory for token files (can be overridden via environment)
+DEFAULT_TOKEN_DIR = os.environ.get(
+    "TRUENAS_TOKEN_DIR",
+    os.path.join(os.path.expanduser("~"), ".truenas-mcp")
+)
+
+
+def _validate_token_file_path(token_file: str, allowed_base_dir: Optional[str] = None) -> Path:
+    """Validate that a token file path is safe and within allowed boundaries.
+
+    This function prevents path traversal attacks (CWE-22) by ensuring the
+    resolved path stays within an allowed directory.
+
+    Args:
+        token_file: The token file path to validate
+        allowed_base_dir: Base directory that token files must be within.
+                         Defaults to DEFAULT_TOKEN_DIR.
+
+    Returns:
+        Validated Path object
+
+    Raises:
+        TrueNASTokenError: If the path is invalid or outside allowed boundaries
+    """
+    if not token_file or not isinstance(token_file, str):
+        raise TrueNASTokenError("Token file path cannot be empty")
+
+    # Determine allowed base directory
+    base_dir = allowed_base_dir or DEFAULT_TOKEN_DIR
+
+    # Resolve the base directory to absolute path
+    try:
+        base_path = Path(base_dir).resolve()
+    except (OSError, RuntimeError) as e:
+        raise TrueNASTokenError(f"Invalid base directory for token files: {e}")
+
+    # Create base directory if it doesn't exist
+    try:
+        base_path.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise TrueNASTokenError(f"Cannot create token directory {base_path}: {e}")
+
+    # Handle both relative and absolute paths
+    token_path = Path(token_file)
+
+    # If path is relative, resolve it relative to base_dir
+    if not token_path.is_absolute():
+        token_path = base_path / token_path
+
+    # Resolve to canonical path (resolves symlinks and ..)
+    try:
+        resolved_path = token_path.resolve()
+    except (OSError, RuntimeError) as e:
+        raise TrueNASTokenError(f"Cannot resolve token file path: {e}")
+
+    # Security check: ensure resolved path is within allowed base directory
+    try:
+        resolved_path.relative_to(base_path)
+    except ValueError:
+        raise TrueNASTokenError(
+            f"Token file path '{token_file}' resolves outside allowed directory. "
+            f"Token files must be within '{base_path}'. "
+            "This restriction prevents path traversal attacks."
+        )
+
+    # Additional safety checks
+    # Reject paths with null bytes (could cause truncation issues)
+    if '\x00' in str(token_path):
+        raise TrueNASTokenError("Token file path contains invalid null bytes")
+
+    return resolved_path
+
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -71,13 +143,20 @@ class AuthManager:
             self._load_token_from_file()
     
     def _load_token_from_file(self) -> None:
-        """Load authentication token from file."""
+        """Load authentication token from file.
+
+        The token file path is validated to prevent path traversal attacks.
+        Only paths within the allowed token directory are permitted.
+        """
         try:
-            token_path = Path(self.config.token_file)
+            # Validate path to prevent traversal attacks (CWE-22)
+            token_path = _validate_token_file_path(self.config.token_file)
             if token_path.exists():
                 with open(token_path, 'r') as f:
                     self._token = f.read().strip()
                     logger.info("Loaded authentication token from file")
+        except TrueNASTokenError as e:
+            logger.warning(f"Token file path validation failed: {e}")
         except OSError as e:
             logger.warning(f"Failed to load token from file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
@@ -85,17 +164,21 @@ class AuthManager:
     
     def _save_token_to_file(self, token: str) -> None:
         """Save authentication token to file.
-        
+
+        The token file path is validated to prevent path traversal attacks.
+        Only paths within the allowed token directory are permitted.
+
         Args:
             token: Authentication token to save
         """
         if not self.config.token_file:
             return
-        
+
         try:
-            token_path = Path(self.config.token_file)
+            # Validate path to prevent traversal attacks (CWE-22)
+            token_path = _validate_token_file_path(self.config.token_file)
             token_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Use os.open with proper permissions to avoid race condition
             # File is created with 0o600 permissions atomically
             # Note: On Windows, granular Unix permissions are not fully supported
@@ -109,23 +192,32 @@ class AuthManager:
             # If fdopen succeeds, use context manager for writing
             with f:
                 f.write(token)
-            
+
             logger.info("Saved authentication token to file")
+        except TrueNASTokenError as e:
+            logger.warning(f"Token file path validation failed: {e}")
         except OSError as e:
             logger.warning(f"Failed to save token to file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Unexpected error saving token to file {self.config.token_file}: {e}", exc_info=True)
     
     def _clear_token_file(self) -> None:
-        """Clear authentication token from file."""
+        """Clear authentication token from file.
+
+        The token file path is validated to prevent path traversal attacks.
+        Only paths within the allowed token directory are permitted.
+        """
         if not self.config.token_file:
             return
-        
+
         try:
-            token_path = Path(self.config.token_file)
+            # Validate path to prevent traversal attacks (CWE-22)
+            token_path = _validate_token_file_path(self.config.token_file)
             if token_path.exists():
                 token_path.unlink()
                 logger.info("Cleared authentication token from file")
+        except TrueNASTokenError as e:
+            logger.warning(f"Token file path validation failed: {e}")
         except OSError as e:
             logger.warning(f"Failed to clear token file {self.config.token_file}: {e}", exc_info=True)
         except Exception as e:

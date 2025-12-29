@@ -146,10 +146,10 @@ def validate_container_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def is_valid_vmid(vmid: Union[int, str]) -> bool:
     """Check if VM/Container ID is valid (boolean check).
-    
+
     Args:
         vmid: VM/Container ID
-        
+
     Returns:
         True if valid, False otherwise
     """
@@ -162,24 +162,40 @@ def is_valid_vmid(vmid: Union[int, str]) -> bool:
 
 def validate_vmid(vmid: Union[int, str]) -> int:
     """Validate and convert VM/Container ID to integer.
-    
+
     Args:
         vmid: VM/Container ID
-        
+
     Returns:
         Validated VM/Container ID as integer
-        
+
     Raises:
         ValueError: If VMID is invalid
     """
     try:
         vmid_int = int(vmid)
     except (ValueError, TypeError):
-        raise ValueError(f"VMID must be a valid integer between {MIN_VMID} and {MAX_VMID}")
-    
-    if vmid_int < MIN_VMID or vmid_int > MAX_VMID:
-        raise ValueError(f"VMID must be between {MIN_VMID} and {MAX_VMID}")
-    
+        raise ValueError(
+            f"Invalid VMID '{vmid}': must be a valid integer. "
+            f"Valid range: {MIN_VMID}-{MAX_VMID}. "
+            f"Example: 100, 101, 200"
+        )
+
+    if vmid_int < MIN_VMID:
+        raise ValueError(
+            f"Invalid VMID '{vmid_int}': too low. "
+            f"VMIDs 0-99 are reserved by Proxmox for system use. "
+            f"Valid range: {MIN_VMID}-{MAX_VMID}. "
+            f"Example: 100, 101, 200"
+        )
+
+    if vmid_int > MAX_VMID:
+        raise ValueError(
+            f"Invalid VMID '{vmid_int}': too high. "
+            f"Maximum VMID is {MAX_VMID}. "
+            f"Example: 100, 101, 200"
+        )
+
     return vmid_int
 
 
@@ -199,18 +215,33 @@ def is_valid_node_name(node: str) -> bool:
 
 def validate_node_name(node: str) -> str:
     """Validate and return node name.
-    
+
     Args:
         node: Node name
-        
+
     Returns:
         Validated node name
-        
+
     Raises:
         ValueError: If node name is invalid
     """
+    if not node or not isinstance(node, str):
+        raise ValueError(
+            "Invalid node name: cannot be empty. "
+            "Node names must contain only alphanumeric characters, hyphens, and underscores. "
+            "Example: pve, proxmox-node1, node_2"
+        )
+    if len(node) > MAX_NAME_LENGTH:
+        raise ValueError(
+            f"Invalid node name '{node}': too long ({len(node)} characters). "
+            f"Maximum length is {MAX_NAME_LENGTH} characters."
+        )
     if not is_valid_node_name(node):
-        raise ValueError("Node name must contain only alphanumeric characters, hyphens, and underscores")
+        raise ValueError(
+            f"Invalid node name '{node}': contains invalid characters. "
+            "Node names must contain only alphanumeric characters, hyphens, and underscores. "
+            "Example: pve, proxmox-node1, node_2"
+        )
     return node
 
 
@@ -230,18 +261,33 @@ def is_valid_storage_name(storage: str) -> bool:
 
 def validate_storage_name(storage: str) -> str:
     """Validate and return storage name.
-    
+
     Args:
         storage: Storage name
-        
+
     Returns:
         Validated storage name
-        
+
     Raises:
         ValueError: If storage name is invalid
     """
+    if not storage or not isinstance(storage, str):
+        raise ValueError(
+            "Invalid storage name: cannot be empty. "
+            "Storage names must contain only alphanumeric characters, hyphens, and underscores. "
+            "Example: local, local-lvm, nfs_storage"
+        )
+    if len(storage) > MAX_NAME_LENGTH:
+        raise ValueError(
+            f"Invalid storage name '{storage}': too long ({len(storage)} characters). "
+            f"Maximum length is {MAX_NAME_LENGTH} characters."
+        )
     if not is_valid_storage_name(storage):
-        raise ValueError("Storage name must contain only alphanumeric characters, hyphens, and underscores")
+        raise ValueError(
+            f"Invalid storage name '{storage}': contains invalid characters. "
+            "Storage names must contain only alphanumeric characters, hyphens, and underscores. "
+            "Example: local, local-lvm, nfs_storage"
+        )
     return storage
 
 
@@ -306,22 +352,33 @@ def validate_memory_range(memory: Union[int, str]) -> bool:
 
 def validate_network_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate network configuration.
-    
+
     Args:
         config: Network configuration dictionary
-        
+
     Returns:
         Validated configuration dictionary
-        
+
     Raises:
         ValueError: If configuration is invalid
     """
+    valid_network_types = ['bridge', 'bond', 'vlan']
     required_fields = ['name', 'type']
+
     for field in required_fields:
         if field not in config:
-            raise ValueError(f"Network configuration missing required field: {field}")
-    
-    if config['type'] not in ['bridge', 'bond', 'vlan']:
-        raise ValueError("Network type must be one of: bridge, bond, vlan")
-    
+            raise ValueError(
+                f"Network configuration missing required field: '{field}'. "
+                f"Required fields: {', '.join(required_fields)}. "
+                "Example: {'name': 'vmbr1', 'type': 'bridge'}"
+            )
+
+    network_type = config['type']
+    if network_type not in valid_network_types:
+        raise ValueError(
+            f"Invalid network type '{network_type}'. "
+            f"Valid options: {', '.join(valid_network_types)}. "
+            "Example: bridge (for VM networking), bond (for link aggregation), vlan (for VLAN tagging)"
+        )
+
     return config
