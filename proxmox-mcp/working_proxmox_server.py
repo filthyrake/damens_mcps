@@ -887,7 +887,7 @@ class WorkingProxmoxMCPServer:
                     "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
                     "isError": True
                 }
-        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+        except ProxmoxError as e:
             debug_print(f"Tool execution failed: {e}")
             return {
                 "content": [{"type": "text", "text": f"Error: {str(e)}"}],
@@ -1007,7 +1007,7 @@ class WorkingProxmoxMCPServer:
                         self._send_error(request_id, -32700, "Parse error")
                     continue
 
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+                except ProxmoxError as e:
                     debug_print(f"Request processing error: {e}")
                     debug_print(f"Error type: {type(e).__name__}")
                     import traceback

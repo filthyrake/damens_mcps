@@ -181,77 +181,77 @@ def validate_vlan_id(vlan_id: Union[int, str]) -> bool:
         return False
 
 
-def validate_firewall_rule_params(params: Dict[str, Any]) -> bool:
+def validate_firewall_rule_params(params: Dict[str, Any]) -> List[str]:
     """
     Validate firewall rule parameters.
-    
+
     Args:
         params: Dictionary of firewall rule parameters
-        
+
     Returns:
         List of validation error messages (empty if valid)
     """
     errors = []
-    
+
     # Required fields
     required_fields = ['action', 'interface', 'direction']
     for field in required_fields:
         if field not in params or not params[field]:
             errors.append(f"Missing required field: {field}")
-    
+
     # Validate action
     if 'action' in params and params['action'] not in ['pass', 'block', 'reject']:
         errors.append("Invalid action. Must be 'pass', 'block', or 'reject'")
-    
+
     # Validate direction
     if 'direction' in params and params['direction'] not in ['in', 'out']:
         errors.append("Invalid direction. Must be 'in' or 'out'")
-    
+
     # Validate protocol if provided
     if 'protocol' in params and params['protocol']:
         if not validate_protocol(params['protocol']):
             errors.append("Invalid protocol. Must be a valid protocol (tcp, udp, icmp, etc.)")
-    
+
     # Validate source/destination if provided (supports both IP and CIDR)
     if 'source' in params and params['source']:
         if not validate_ip_or_cidr(params['source']) and params['source'] != 'any':
             errors.append("Invalid source address. Must be a valid IP address or CIDR notation (e.g., 192.168.1.0/24)")
-    
+
     if 'destination' in params and params['destination']:
         if not validate_ip_or_cidr(params['destination']) and params['destination'] != 'any':
             errors.append("Invalid destination address. Must be a valid IP address or CIDR notation (e.g., 192.168.1.0/24)")
-    
+
     # Validate port if provided (supports both single port and ranges)
     if 'port' in params and params['port']:
         port_value = str(params['port'])
         if not validate_port_range(port_value):
             errors.append(f"Invalid port. Must be a valid port number ({MIN_PORT}-{MAX_PORT}) or port range (e.g., 8000-9000)")
-    
-    return len(errors) == 0
+
+    return errors
 
 
-def validate_vlan_params(params: Dict[str, Any]) -> bool:
+def validate_vlan_params(params: Dict[str, Any]) -> List[str]:
     """
     Validate VLAN parameters.
-    
+
     Args:
         params: Dictionary of VLAN parameters
-        
+
     Returns:
         List of validation error messages (empty if valid)
     """
     errors = []
-    
+
     # Required fields
     if 'vlan_id' not in params:
         errors.append("Missing required field: vlan_id")
     elif not validate_vlan_id(params['vlan_id']):
         errors.append(f"Invalid VLAN ID. Must be between {MIN_VLAN_ID} and {MAX_VLAN_ID}")
-    
+
     if 'interface' not in params or not params['interface']:
         errors.append("Missing required field: interface")
-    
-    return len(errors) == 0
+
+    return errors
 
 
 def sanitize_string(value: str) -> str:
@@ -370,36 +370,36 @@ def validate_id(id_value: str) -> bool:
     return bool(re.match(pattern, id_value)) and len(id_value) <= MAX_ID_LENGTH
 
 
-def validate_config(config: Dict[str, Any]) -> bool:
+def validate_config(config: Dict[str, Any]) -> List[str]:
     """
     Validate pfSense configuration parameters.
-    
+
     Args:
         config: Configuration dictionary
-        
+
     Returns:
         List of validation error messages (empty if valid)
     """
     errors = []
-    
+
     # Required fields
     if 'host' not in config or not config['host']:
         errors.append("Missing required field: host")
     elif not validate_ip_address(config['host']) and not re.match(r'^[a-zA-Z0-9.-]+$', config['host']):
         errors.append("Invalid host format")
-    
+
     if 'port' in config and not validate_port(config['port']):
         errors.append("Invalid port number")
-    
+
     # Validate authentication
     has_api_key = 'api_key' in config and config['api_key']
-    has_credentials = ('username' in config and config['username'] and 
+    has_credentials = ('username' in config and config['username'] and
                       'password' in config and config['password'])
-    
+
     if not has_api_key and not has_credentials:
         errors.append("Either api_key or username/password must be provided")
-    
-    return len(errors) == 0
+
+    return errors
 
 
 def sanitize_for_api(value: str) -> str:
