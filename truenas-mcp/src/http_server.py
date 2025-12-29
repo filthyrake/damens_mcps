@@ -1,6 +1,7 @@
 """HTTP server for TrueNAS MCP Server."""
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -221,8 +222,11 @@ def create_app() -> FastAPI:
         """Create a JWT token using admin token."""
         settings = get_settings()
         
-        # Verify admin token
-        if not settings.admin_token or request.admin_token != settings.admin_token:
+        # Verify admin token using constant-time comparison to prevent timing attacks
+        if not settings.admin_token or not secrets.compare_digest(
+            request.admin_token.encode('utf-8'),
+            settings.admin_token.encode('utf-8')
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid admin token",
