@@ -152,11 +152,11 @@ class WorkingProxmoxMCPServer:
                 else:
                     debug_print(f"Proxmox connection failed: {connection_result.get('error', 'Unknown error')}")
                     debug_print("Server will continue but Proxmox operations may fail")
-            except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError, ProxmoxError) as conn_e:
+            except ProxmoxError as conn_e:
                 debug_print(f"Connection test failed: {conn_e}")
                 debug_print("Server will continue but Proxmox operations will fail")
                 
-        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+        except ProxmoxError as e:
             debug_print(f"Failed to initialize Proxmox client: {e}")
             debug_print("Server will continue but Proxmox operations will fail")
             self.proxmox_client = None
@@ -887,7 +887,7 @@ class WorkingProxmoxMCPServer:
                     "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
                     "isError": True
                 }
-        except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+        except ProxmoxError as e:
             debug_print(f"Tool execution failed: {e}")
             return {
                 "content": [{"type": "text", "text": f"Error: {str(e)}"}],
@@ -1007,7 +1007,7 @@ class WorkingProxmoxMCPServer:
                         self._send_error(request_id, -32700, "Parse error")
                     continue
 
-                except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+                except ProxmoxError as e:
                     debug_print(f"Request processing error: {e}")
                     debug_print(f"Error type: {type(e).__name__}")
                     import traceback
@@ -1042,7 +1042,7 @@ def main():
     try:
         server = WorkingProxmoxMCPServer()
         server.run()
-    except (ProxmoxConnectionError, ProxmoxTimeoutError, ProxmoxAuthenticationError, ProxmoxAPIError) as e:
+    except ProxmoxError as e:
         debug_print(f"Failed to start server: {e}")
         sys.exit(1)
 
