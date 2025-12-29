@@ -15,7 +15,7 @@ cryptography>=42.0.4,<47.0.0
 
 # HTTP server and client
 fastapi>=0.104.0,<0.129.0
-uvicorn[standard]>=0.24.0,<0.39.0
+uvicorn[standard]>=0.24.0,<0.41.0
 httpx>=0.24.0,<0.29.0
 
 # Logging and utilities
