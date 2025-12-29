@@ -5,27 +5,31 @@ It uses the requests library for synchronous HTTP calls and is designed for use 
 the JSON-RPC MCP server implementation.
 
 Example usage:
-    client = IDracClient(
-        host="192.168.1.100",
-        port=443,
-        protocol="https",
-        username="root",
-        password="password",
-        ssl_verify=False
-    )
+    # Using config dictionary (recommended):
+    config = {
+        "host": "idrac.example.com",
+        "port": 443,
+        "protocol": "https",
+        "username": "admin",
+        "password": "<your-password>",  # Set via environment variable
+        "ssl_verify": False
+    }
+    client = IDracClient(config)
 
-    # Or use as context manager
-    with IDracClient(...) as client:
+    # Or use as context manager:
+    with IDracClient(config) as client:
         info = client.get_system_info()
 """
 
 import sys
 import warnings
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 import requests
 from requests.auth import HTTPBasicAuth
 from urllib3.exceptions import InsecureRequestWarning
+
+from src.utils.validation import validate_idrac_config
 
 # Request timeout configuration
 # Balance between responsiveness and reliability for iDRAC API calls
@@ -60,6 +64,10 @@ class IDracClient:
     This client is designed for use with synchronous MCP server implementations.
     It uses the requests library for HTTP calls.
 
+    Supports two initialization patterns for backwards compatibility:
+    1. Config dictionary: IDracClient({"host": ..., "port": ..., ...})
+    2. Positional args: IDracClient(host, port, protocol, username, password, ssl_verify)
+
     Attributes:
         host: iDRAC hostname or IP address
         port: iDRAC port (usually 443)
@@ -69,30 +77,67 @@ class IDracClient:
         session: Requests session with auth and headers configured
     """
 
-    def __init__(self, host: str, port: int, protocol: str, username: str, password: str, ssl_verify: bool = False):
+    def __init__(
+        self,
+        host_or_config: Union[str, Dict[str, Any]],
+        port: Optional[int] = None,
+        protocol: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ssl_verify: bool = False
+    ):
         """Initialize the iDRAC client.
 
         Args:
-            host: iDRAC hostname or IP address
-            port: iDRAC port (usually 443)
-            protocol: Protocol to use ('https' recommended)
-            username: iDRAC username
-            password: iDRAC password
+            host_or_config: Either a config dict with keys (host, port, protocol,
+                username, password, ssl_verify) OR just the host string.
+            port: iDRAC port (usually 443) - required if host_or_config is a string
+            protocol: Protocol to use ('https' recommended) - required if host_or_config is a string
+            username: iDRAC username - required if host_or_config is a string
+            password: iDRAC password - required if host_or_config is a string
             ssl_verify: Whether to verify SSL certificates (default: False for self-signed)
         """
-        self.host = host
-        self.port = port
-        self.protocol = protocol
-        self.username = username
-        self.password = password
-        self.ssl_verify = ssl_verify
-        self.base_url = f"{protocol}://{host}:{port}"
+        # Support both config dict and positional args for backwards compatibility
+        if isinstance(host_or_config, dict):
+            # Validate config - raises ValueError on invalid config
+            validated = validate_idrac_config(host_or_config)
+            self.config = validated
+            self.host = validated['host']
+            self.port = validated['port']
+            self.protocol = validated['protocol']
+            self.username = validated['username']
+            self.password = validated['password']
+            self.ssl_verify = validated.get('ssl_verify', False)
+        else:
+            # Positional arguments
+            if port is None or protocol is None or username is None or password is None:
+                raise ValueError(
+                    "When using positional arguments, host, port, protocol, username, "
+                    "and password are all required"
+                )
+            self.host = host_or_config
+            self.port = port
+            self.protocol = protocol
+            self.username = username
+            self.password = password
+            self.ssl_verify = ssl_verify
+            # Store config dict for backwards compatibility
+            self.config = {
+                "host": self.host,
+                "port": self.port,
+                "protocol": self.protocol,
+                "username": self.username,
+                "password": self.password,
+                "ssl_verify": self.ssl_verify
+            }
+
+        self.base_url = f"{self.protocol}://{self.host}:{self.port}"
         self.session = requests.Session()
 
         # Use explicit HTTPBasicAuth for better compatibility
-        self.auth = HTTPBasicAuth(username, password)
+        self.auth = HTTPBasicAuth(self.username, self.password)
         self.session.auth = self.auth
-        self.session.verify = ssl_verify
+        self.session.verify = self.ssl_verify
 
         # Set headers for iDRAC API
         self.session.headers.update({
@@ -103,9 +148,9 @@ class IDracClient:
 
         # Debug: Print session info (redacted to avoid sensitive details)
         debug_print("Created iDRAC client (connection details redacted)")
-        if not ssl_verify:
+        if not self.ssl_verify:
             debug_print("WARNING: SSL verification is disabled. This should only be used in development or with trusted self-signed certificates.")
-        debug_print(f"SSL Verify: {ssl_verify}")
+        debug_print(f"SSL Verify: {self.ssl_verify}")
         safe_headers = redact_sensitive_headers(dict(self.session.headers))
         debug_print(f"Session headers: {safe_headers}")
         debug_print(f"Auth type: {type(self.auth).__name__}")
