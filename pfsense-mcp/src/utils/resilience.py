@@ -4,11 +4,15 @@ Resilience utilities for retry logic and circuit breaker patterns.
 This module provides decorators and utilities for implementing retry logic
 with exponential backoff and circuit breaker patterns to handle transient
 failures and prevent cascading failures.
+
+Also includes TTL-based caching for static data like version/system info
+that rarely changes (Issue #173).
 """
 
 import asyncio
 import functools
-from typing import Any, Callable, Optional, Type, Tuple
+import time
+from typing import Any, Callable, Generic, Optional, Type, Tuple, TypeVar
 
 from tenacity import (
     retry,
@@ -27,6 +31,80 @@ try:
 except ImportError:
     import logging
     logger = logging.getLogger(__name__)
+
+
+# Type variable for generic caching
+T = TypeVar('T')
+
+
+class CachedResponse(Generic[T]):
+    """
+    TTL-based cache for API responses.
+    
+    Useful for caching static data like version/system info that rarely changes.
+    This reduces unnecessary API calls and improves performance.
+    
+    Example usage:
+        # In client __init__:
+        self._version_cache: Optional[CachedResponse[Dict[str, Any]]] = None
+        
+        # In get_system_info method:
+        if self._version_cache and self._version_cache.is_valid():
+            return self._version_cache.data
+        
+        result = await self._make_request("GET", "/api/v2/system/version")
+        self._version_cache = CachedResponse(result, ttl_seconds=300)
+        return result
+    
+    Attributes:
+        data: The cached data
+        ttl_seconds: Time-to-live in seconds (default: 300 = 5 minutes)
+        created_at: Timestamp when cache was created
+    """
+    
+    def __init__(self, data: T, ttl_seconds: int = 300):
+        """
+        Initialize cached response.
+        
+        Args:
+            data: Data to cache
+            ttl_seconds: Time-to-live in seconds (default: 300 = 5 minutes)
+        """
+        self.data = data
+        self.ttl_seconds = ttl_seconds
+        self.created_at = time.time()
+    
+    def is_valid(self) -> bool:
+        """
+        Check if cache is still valid (not expired).
+        
+        Returns:
+            True if cache is valid, False if expired
+        """
+        return (time.time() - self.created_at) < self.ttl_seconds
+    
+    def time_remaining(self) -> float:
+        """
+        Get remaining time before cache expires.
+        
+        Returns:
+            Remaining seconds, or 0 if expired
+        """
+        remaining = self.ttl_seconds - (time.time() - self.created_at)
+        return max(0.0, remaining)
+    
+    def invalidate(self) -> None:
+        """
+        Manually invalidate the cache.
+        
+        Useful when you know the underlying data has changed
+        (e.g., after a system update/reboot).
+        """
+        self.created_at = 0  # Set to epoch to make is_valid() return False
+
+
+# Default cache TTL for static data (5 minutes)
+DEFAULT_CACHE_TTL_SECONDS = 300
 
 
 # Default retry configuration
