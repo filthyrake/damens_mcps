@@ -22,7 +22,6 @@ Example usage:
 """
 
 import sys
-import time
 import warnings
 from typing import Any, Dict, Optional, Union
 
@@ -139,7 +138,9 @@ class IDracClient:
         # Response caching for static data (Issue #173)
         # System info rarely changes, cache for 5 minutes by default
         self._system_info_cache: Optional[CachedResponse[Dict[str, Any]]] = None
-        self._cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS
+        self._cache_ttl_seconds: int = int(
+            self.config.get('cache_ttl_seconds', DEFAULT_CACHE_TTL_SECONDS)
+        )
 
         # Use explicit HTTPBasicAuth for better compatibility
         self.auth = HTTPBasicAuth(self.username, self.password)

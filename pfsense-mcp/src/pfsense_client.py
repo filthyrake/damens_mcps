@@ -128,6 +128,8 @@ class HTTPPfSenseClient:
         self._system_info_cache: Optional[CachedResponse[Dict[str, Any]]] = None
         self._system_health_cache: Optional[CachedResponse[Dict[str, Any]]] = None
         self._cache_ttl_seconds: int = int(config.get("cache_ttl_seconds", DEFAULT_CACHE_TTL_SECONDS))
+        # Lock to prevent race conditions when multiple async calls try to refresh cache
+        self._cache_lock = asyncio.Lock()
     
     def _token_expired(self) -> bool:
         """
@@ -350,32 +352,39 @@ class HTTPPfSenseClient:
         Returns:
             System information dictionary
         """
-        # Check cache first if enabled
+        # Fast path: check cache without lock
         if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
             logger.debug("Returning cached system info")
             return self._system_info_cache.data
         
-        # Use working pfSense 2.8.0 API v2 endpoints
-        try:
-            # Get system version and status (we know these work)
-            version_info = await self._make_request("GET", "/api/v2/system/version")
-            status_info = await self._make_request("GET", "/api/v2/status/system")
+        # Slow path: acquire lock to prevent multiple concurrent API calls
+        async with self._cache_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
+                logger.debug("Returning cached system info (after lock)")
+                return self._system_info_cache.data
             
-            # Combine the information
-            result = {
-                "version": version_info.get("data", {}).get("version", "Unknown"),
-                "status": status_info.get("data", {}),
-                "api_status": "Connected"
-            }
-            # Cache the successful response
-            self._system_info_cache = CachedResponse(result, self._cache_ttl_seconds)
-            return result
-        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
-            logger.error(f"Failed to get system info: {e}", exc_info=True)
-            raise
-        except PfSenseAPIError as e:
-            logger.error(f"API error getting system info: {e}", exc_info=True)
-            raise
+            # Use working pfSense 2.8.0 API v2 endpoints
+            try:
+                # Get system version and status (we know these work)
+                version_info = await self._make_request("GET", "/api/v2/system/version")
+                status_info = await self._make_request("GET", "/api/v2/status/system")
+                
+                # Combine the information
+                result = {
+                    "version": version_info.get("data", {}).get("version", "Unknown"),
+                    "status": status_info.get("data", {}),
+                    "api_status": "Connected"
+                }
+                # Cache the successful response
+                self._system_info_cache = CachedResponse(result, self._cache_ttl_seconds)
+                return result
+            except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+                logger.error(f"Failed to get system info: {e}", exc_info=True)
+                raise
+            except PfSenseAPIError as e:
+                logger.error(f"API error getting system info: {e}", exc_info=True)
+                raise
     
     async def get_system_health(self, use_cache: bool = True) -> Dict[str, Any]:
         """Get system health information.
@@ -387,32 +396,39 @@ class HTTPPfSenseClient:
         Returns:
             System health information dictionary
         """
-        # Check cache first if enabled
+        # Fast path: check cache without lock
         if use_cache and self._system_health_cache and self._system_health_cache.is_valid():
             logger.debug("Returning cached system health")
             return self._system_health_cache.data
         
-        # Use working pfSense 2.8.0 API v2 endpoints
-        try:
-            # Get system status and service status (we know these work)
-            system_status = await self._make_request("GET", "/api/v2/status/system")
-            service_status = await self._make_request("GET", "/api/v2/status/services")
+        # Slow path: acquire lock to prevent multiple concurrent API calls
+        async with self._cache_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if use_cache and self._system_health_cache and self._system_health_cache.is_valid():
+                logger.debug("Returning cached system health (after lock)")
+                return self._system_health_cache.data
             
-            result = {
-                "status": "Online",
-                "system": system_status.get("data", {}),
-                "services": service_status.get("data", []),
-                "note": "System is responding to API calls"
-            }
-            # Cache the successful response
-            self._system_health_cache = CachedResponse(result, self._cache_ttl_seconds)
-            return result
-        except (PfSenseConnectionError, PfSenseTimeoutError) as e:
-            logger.error(f"Failed to get system health: {e}", exc_info=True)
-            raise
-        except PfSenseAPIError as e:
-            logger.error(f"API error getting system health: {e}", exc_info=True)
-            raise
+            # Use working pfSense 2.8.0 API v2 endpoints
+            try:
+                # Get system status and service status (we know these work)
+                system_status = await self._make_request("GET", "/api/v2/status/system")
+                service_status = await self._make_request("GET", "/api/v2/status/services")
+                
+                result = {
+                    "status": "Online",
+                    "system": system_status.get("data", {}),
+                    "services": service_status.get("data", []),
+                    "note": "System is responding to API calls"
+                }
+                # Cache the successful response
+                self._system_health_cache = CachedResponse(result, self._cache_ttl_seconds)
+                return result
+            except (PfSenseConnectionError, PfSenseTimeoutError) as e:
+                logger.error(f"Failed to get system health: {e}", exc_info=True)
+                raise
+            except PfSenseAPIError as e:
+                logger.error(f"API error getting system health: {e}", exc_info=True)
+                raise
     
     def invalidate_cache(self) -> None:
         """Invalidate all cached responses.

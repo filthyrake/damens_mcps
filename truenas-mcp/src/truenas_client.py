@@ -76,6 +76,8 @@ class TrueNASClient:
         self._version_cache: Optional[CachedResponse[Dict[str, Any]]] = None
         self._system_info_cache: Optional[CachedResponse[Dict[str, Any]]] = None
         self._cache_ttl_seconds: int = config.get("cache_ttl_seconds", DEFAULT_CACHE_TTL_SECONDS)
+        # Lock to prevent race conditions when multiple async calls try to refresh cache
+        self._cache_lock = asyncio.Lock()
         
         # Create circuit breaker if enabled
         self.circuit_breaker = None
@@ -323,13 +325,21 @@ class TrueNASClient:
         Returns:
             System information dictionary
         """
+        # Fast path: check cache without lock
         if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
             logger.debug("Returning cached system info")
             return self._system_info_cache.data
         
-        result = await self._make_request("GET", "system/info")
-        self._system_info_cache = CachedResponse(result, self._cache_ttl_seconds)
-        return result
+        # Slow path: acquire lock to prevent multiple concurrent API calls
+        async with self._cache_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
+                logger.debug("Returning cached system info (after lock)")
+                return self._system_info_cache.data
+            
+            result = await self._make_request("GET", "system/info")
+            self._system_info_cache = CachedResponse(result, self._cache_ttl_seconds)
+            return result
     
     async def get_version(self, use_cache: bool = True) -> Dict[str, Any]:
         """Get TrueNAS version information.
@@ -341,13 +351,21 @@ class TrueNASClient:
         Returns:
             Version information dictionary
         """
+        # Fast path: check cache without lock
         if use_cache and self._version_cache and self._version_cache.is_valid():
             logger.debug("Returning cached version info")
             return self._version_cache.data
         
-        result = await self._make_request("GET", "system/version")
-        self._version_cache = CachedResponse(result, self._cache_ttl_seconds)
-        return result
+        # Slow path: acquire lock to prevent multiple concurrent API calls
+        async with self._cache_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if use_cache and self._version_cache and self._version_cache.is_valid():
+                logger.debug("Returning cached version info (after lock)")
+                return self._version_cache.data
+            
+            result = await self._make_request("GET", "system/version")
+            self._version_cache = CachedResponse(result, self._cache_ttl_seconds)
+            return result
     
     def invalidate_cache(self) -> None:
         """Invalidate all cached responses.

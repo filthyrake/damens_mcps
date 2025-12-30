@@ -44,6 +44,11 @@ class CachedResponse(Generic[T]):
     Useful for caching static data like version/system info that rarely changes.
     This reduces unnecessary API calls and improves performance.
     
+    Uses time.monotonic() for clock-adjustment resilience (NTP, DST, etc.).
+    
+    Note: This class is NOT thread-safe. For concurrent access, use appropriate
+    locking at the call site to prevent race conditions.
+    
     Example usage:
         # In client __init__:
         self._system_info_cache: Optional[CachedResponse[Dict[str, Any]]] = None
@@ -59,7 +64,7 @@ class CachedResponse(Generic[T]):
     Attributes:
         data: The cached data
         ttl_seconds: Time-to-live in seconds (default: 300 = 5 minutes)
-        created_at: Timestamp when cache was created
+        created_at: Monotonic timestamp when cache was created
     """
     
     def __init__(self, data: T, ttl_seconds: int = 300):
@@ -72,7 +77,7 @@ class CachedResponse(Generic[T]):
         """
         self.data = data
         self.ttl_seconds = ttl_seconds
-        self.created_at = time.time()
+        self.created_at = time.monotonic()
     
     def is_valid(self) -> bool:
         """
@@ -81,7 +86,7 @@ class CachedResponse(Generic[T]):
         Returns:
             True if cache is valid, False if expired
         """
-        return (time.time() - self.created_at) < self.ttl_seconds
+        return (time.monotonic() - self.created_at) < self.ttl_seconds
     
     def time_remaining(self) -> float:
         """
@@ -90,7 +95,7 @@ class CachedResponse(Generic[T]):
         Returns:
             Remaining seconds, or 0 if expired
         """
-        remaining = self.ttl_seconds - (time.time() - self.created_at)
+        remaining = self.ttl_seconds - (time.monotonic() - self.created_at)
         return max(0.0, remaining)
     
     def invalidate(self) -> None:
@@ -100,7 +105,9 @@ class CachedResponse(Generic[T]):
         Useful when you know the underlying data has changed
         (e.g., after a system reboot).
         """
-        self.created_at = 0  # Set to epoch to make is_valid() return False
+        # Set to a value far in the past to make is_valid() return False
+        # Using negative ttl_seconds ensures expiration regardless of current monotonic time
+        self.created_at = time.monotonic() - self.ttl_seconds - 1
 
 
 # Default cache TTL for static data (5 minutes)
