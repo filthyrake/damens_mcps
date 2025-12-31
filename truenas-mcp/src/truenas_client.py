@@ -11,7 +11,13 @@ from pydantic import BaseModel, Field
 
 from .auth import AuthManager
 from .utils.validation import validate_id, validate_dataset_name
-from .utils.resilience import create_circuit_breaker, create_retry_decorator, call_with_circuit_breaker_async
+from .utils.resilience import (
+    create_circuit_breaker,
+    create_retry_decorator,
+    call_with_circuit_breaker_async,
+    CachedResponse,
+    DEFAULT_CACHE_TTL_SECONDS,
+)
 from .exceptions import (
     TrueNASError,
     TrueNASConnectionError,
@@ -64,6 +70,14 @@ class TrueNASClient:
         self.auth_manager = auth_manager
         self.session: Optional[aiohttp.ClientSession] = None
         self._auth_token: Optional[str] = None
+        
+        # Response caching for static data (Issue #173)
+        # Version/system info rarely changes, cache for 5 minutes by default
+        self._version_cache: Optional[CachedResponse[Dict[str, Any]]] = None
+        self._system_info_cache: Optional[CachedResponse[Dict[str, Any]]] = None
+        self._cache_ttl_seconds: int = config.get("cache_ttl_seconds", DEFAULT_CACHE_TTL_SECONDS)
+        # Lock to prevent race conditions when multiple async calls try to refresh cache
+        self._cache_lock = asyncio.Lock()
         
         # Create circuit breaker if enabled
         self.circuit_breaker = None
@@ -301,13 +315,69 @@ class TrueNASClient:
     
     # System Information Methods
     
-    async def get_system_info(self) -> Dict[str, Any]:
-        """Get basic system information."""
-        return await self._make_request("GET", "system/info")
+    async def get_system_info(self, use_cache: bool = True) -> Dict[str, Any]:
+        """Get basic system information.
+        
+        Args:
+            use_cache: If True, return cached data if available and valid.
+                      Set to False to force a fresh API call.
+        
+        Returns:
+            System information dictionary
+        """
+        # Fast path: check cache without lock
+        if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
+            logger.debug("Returning cached system info")
+            return self._system_info_cache.data
+        
+        # Slow path: acquire lock to prevent multiple concurrent API calls
+        async with self._cache_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
+                logger.debug("Returning cached system info (after lock)")
+                return self._system_info_cache.data
+            
+            result = await self._make_request("GET", "system/info")
+            self._system_info_cache = CachedResponse(result, self._cache_ttl_seconds)
+            return result
     
-    async def get_version(self) -> Dict[str, Any]:
-        """Get TrueNAS version information."""
-        return await self._make_request("GET", "system/version")
+    async def get_version(self, use_cache: bool = True) -> Dict[str, Any]:
+        """Get TrueNAS version information.
+        
+        Args:
+            use_cache: If True, return cached data if available and valid.
+                      Set to False to force a fresh API call.
+        
+        Returns:
+            Version information dictionary
+        """
+        # Fast path: check cache without lock
+        if use_cache and self._version_cache and self._version_cache.is_valid():
+            logger.debug("Returning cached version info")
+            return self._version_cache.data
+        
+        # Slow path: acquire lock to prevent multiple concurrent API calls
+        async with self._cache_lock:
+            # Double-check after acquiring lock (another task may have refreshed)
+            if use_cache and self._version_cache and self._version_cache.is_valid():
+                logger.debug("Returning cached version info (after lock)")
+                return self._version_cache.data
+            
+            result = await self._make_request("GET", "system/version")
+            self._version_cache = CachedResponse(result, self._cache_ttl_seconds)
+            return result
+    
+    def invalidate_cache(self) -> None:
+        """Invalidate all cached responses.
+        
+        Call this after operations that might change system info
+        (e.g., system updates, reboots).
+        """
+        if self._version_cache:
+            self._version_cache.invalidate()
+        if self._system_info_cache:
+            self._system_info_cache.invalidate()
+        logger.debug("All caches invalidated")
     
     async def get_health(self) -> Dict[str, Any]:
         """Get system health status."""
@@ -326,6 +396,8 @@ class TrueNASClient:
         Returns:
             API response confirming reboot initiation
         """
+        # Invalidate cache since system state will change after reboot
+        self.invalidate_cache()
         data = {"delay": delay}
         return await self._make_request("POST", "system/reboot", data=data)
     
@@ -338,6 +410,8 @@ class TrueNASClient:
         Returns:
             API response confirming shutdown initiation
         """
+        # Invalidate cache since system state will change after shutdown
+        self.invalidate_cache()
         data = {"delay": delay}
         return await self._make_request("POST", "system/shutdown", data=data)
     

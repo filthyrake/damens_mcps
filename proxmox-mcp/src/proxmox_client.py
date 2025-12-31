@@ -35,7 +35,12 @@ from .exceptions import (
     ProxmoxResourceNotFoundError,
     ProxmoxConfigurationError
 )
-from .utils.resilience import create_circuit_breaker, create_retry_decorator
+from .utils.resilience import (
+    create_circuit_breaker,
+    create_retry_decorator,
+    CachedResponse,
+    DEFAULT_CACHE_TTL_SECONDS,
+)
 
 
 def debug_print(message: str):
@@ -188,6 +193,11 @@ class ProxmoxClient:
         # Apply decorator once during initialization for efficiency
         self._retried_execute_request = retry_decorator(self._execute_request)
 
+        # Response caching for static data (Issue #173)
+        # Version info rarely changes, cache for 5 minutes by default
+        self._version_cache: Optional[CachedResponse[Dict[str, Any]]] = None
+        self._cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS
+        
         # Get authentication ticket - close session on failure to prevent resource leak
         try:
             self._authenticate()
@@ -881,17 +891,33 @@ class ProxmoxClient:
                 }
             return all_storage
 
-    def get_version(self) -> Dict[str, Any]:
-        """Get Proxmox version information."""
+    def get_version(self, use_cache: bool = True) -> Dict[str, Any]:
+        """Get Proxmox version information.
+        
+        Args:
+            use_cache: If True, return cached data if available and valid.
+                      Set to False to force a fresh API call.
+        
+        Returns:
+            Dict with version information or error details
+        """
+        # Check cache first if enabled
+        if use_cache and self._version_cache and self._version_cache.is_valid():
+            debug_print("Returning cached version info")
+            return self._version_cache.data
+        
         try:
             response = self._make_request("GET", "/version")
             if response.status_code == 200:
                 version_data = response.json()
-                return {
+                result = {
                     "status": "success",
                     "version": version_data.get("data", {}),
                     "message": "Version information retrieved successfully"
                 }
+                # Cache the successful response
+                self._version_cache = CachedResponse(result, self._cache_ttl_seconds)
+                return result
             else:
                 return {
                     "status": "error",
@@ -902,6 +928,16 @@ class ProxmoxClient:
                 "status": "error",
                 "message": f"Exception getting version: {str(e)}"
             }
+    
+    def invalidate_cache(self) -> None:
+        """Invalidate all cached responses.
+        
+        Call this after operations that might change system info
+        (e.g., system updates, reboots).
+        """
+        if self._version_cache:
+            self._version_cache.invalidate()
+        debug_print("All caches invalidated")
 
     def get_node_status(self, node: str) -> Dict[str, Any]:
         """Get detailed status and resource usage for a specific node."""

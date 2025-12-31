@@ -30,6 +30,7 @@ from requests.auth import HTTPBasicAuth
 from urllib3.exceptions import InsecureRequestWarning
 
 from src.utils.validation import validate_idrac_config
+from src.utils.resilience import CachedResponse, DEFAULT_CACHE_TTL_SECONDS
 
 # Request timeout configuration
 # Balance between responsiveness and reliability for iDRAC API calls
@@ -133,6 +134,13 @@ class IDracClient:
 
         self.base_url = f"{self.protocol}://{self.host}:{self.port}"
         self.session = requests.Session()
+        
+        # Response caching for static data (Issue #173)
+        # System info rarely changes, cache for 5 minutes by default
+        self._system_info_cache: Optional[CachedResponse[Dict[str, Any]]] = None
+        self._cache_ttl_seconds: int = int(
+            self.config.get('cache_ttl_seconds', DEFAULT_CACHE_TTL_SECONDS)
+        )
 
         # Use explicit HTTPBasicAuth for better compatibility
         self.auth = HTTPBasicAuth(self.username, self.password)
@@ -314,17 +322,26 @@ class IDracClient:
                 "response_code": None
             }
 
-    def get_system_info(self) -> Dict[str, Any]:
+    def get_system_info(self, use_cache: bool = True) -> Dict[str, Any]:
         """Get system information from iDRAC.
+
+        Args:
+            use_cache: If True, return cached data if available and valid.
+                      Set to False to force a fresh API call.
 
         Returns:
             Dict with system information or error details
         """
+        # Check cache first if enabled
+        if use_cache and self._system_info_cache and self._system_info_cache.is_valid():
+            debug_print("Returning cached system info")
+            return self._system_info_cache.data
+        
         try:
             response = self._make_request('GET', '/redfish/v1/Systems/System.Embedded.1')
             if response.status_code == 200:
                 data = response.json()
-                return {
+                result = {
                     "host": self.host,
                     "protocol": self.protocol,
                     "ssl_verify": self.ssl_verify,
@@ -337,6 +354,9 @@ class IDracClient:
                     },
                     "message": "System information retrieved successfully"
                 }
+                # Cache the successful response
+                self._system_info_cache = CachedResponse(result, self._cache_ttl_seconds)
+                return result
             else:
                 return {
                     "host": self.host,
@@ -353,6 +373,16 @@ class IDracClient:
                 "error": str(e),
                 "message": f"Error retrieving system information: {str(e)}"
             }
+    
+    def invalidate_cache(self) -> None:
+        """Invalidate all cached responses.
+        
+        Call this after operations that might change system info
+        (e.g., power operations, reboots).
+        """
+        if self._system_info_cache:
+            self._system_info_cache.invalidate()
+        debug_print("All caches invalidated")
 
     def get_power_status(self) -> Dict[str, Any]:
         """Get current power status of the server.
@@ -403,6 +433,8 @@ class IDracClient:
         Returns:
             Dict with operation result
         """
+        # Invalidate cache since power state will change
+        self.invalidate_cache()
         try:
             payload = {"ResetType": "On"}
             response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
@@ -436,6 +468,8 @@ class IDracClient:
         Returns:
             Dict with operation result
         """
+        # Invalidate cache since power state will change
+        self.invalidate_cache()
         try:
             payload = {"ResetType": "GracefulShutdown"}
             response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
@@ -471,6 +505,8 @@ class IDracClient:
         Returns:
             Dict with operation result
         """
+        # Invalidate cache since power state will change
+        self.invalidate_cache()
         try:
             payload = {"ResetType": "ForceOff"}
             response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
@@ -504,6 +540,8 @@ class IDracClient:
         Returns:
             Dict with operation result
         """
+        # Invalidate cache since system state will change after restart
+        self.invalidate_cache()
         try:
             payload = {"ResetType": "GracefulRestart"}
             response = self._make_request('POST', '/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset', json=payload)
