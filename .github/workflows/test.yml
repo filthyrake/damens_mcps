@@ -31,7 +31,7 @@ jobs:
         pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
     
     - name: Upload coverage
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         file: ./pfsense-mcp/coverage.xml
         flags: pfsense
@@ -61,7 +61,7 @@ jobs:
         pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
     
     - name: Upload coverage
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         file: ./truenas-mcp/coverage.xml
         flags: truenas
@@ -96,7 +96,7 @@ jobs:
         pytest tests/integration/ -v --cov=src --cov-append --cov-report=xml --cov-report=term
     
     - name: Upload coverage
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         file: ./idrac-mcp/coverage.xml
         flags: idrac
@@ -131,7 +131,7 @@ jobs:
         pytest tests/integration/ -v --cov=src --cov-append --cov-report=xml --cov-report=term
     
     - name: Upload coverage
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         file: ./proxmox-mcp/coverage.xml
         flags: proxmox
