@@ -37,7 +37,7 @@ dependencies = [
     "uvicorn[standard]>=0.39.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
-    "python-multipart>=0.0.6",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
