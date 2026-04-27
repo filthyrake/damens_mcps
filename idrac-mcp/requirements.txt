@@ -39,4 +39,4 @@ structlog>=23.0.0,<26.0.0
 
 # Retry logic and circuit breaker
 tenacity>=8.2.0,<10.0.0
-pybreaker>=1.0.0,<2.0.0
+pybreaker>=1.4.1,<2.0.0
