@@ -30,7 +30,7 @@ rich>=15.0.0,<16.0.0
 # Security and authentication - for src/auth.py and src/http_server.py
 cryptography>=47.0.0,<48.0.0
 passlib>=1.7.4,<2.0.0
-python-jose>=3.4.0,<4.0.0
+python-jose>=3.5.0,<4.0.0
 
 # Validation and logging - for src/utils/validation.py and src/utils/logging.py
 # Updated to Pydantic v2 with field_validator syntax
