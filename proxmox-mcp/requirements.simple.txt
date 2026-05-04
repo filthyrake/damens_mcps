@@ -1,5 +1,5 @@
 # Essential dependencies for Proxmox MCP Server
-requests>=2.31.0
+requests>=2.33.1
 urllib3>=2.6.3
 
 # Optional: For development and testing
