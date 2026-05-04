@@ -4,7 +4,7 @@ urllib3>=2.6.3,<3.0.0
 python-dotenv>=1.2.2,<2.0.0
 
 # MCP protocol and server framework
-mcp>=1.0.0,<2.0.0
+mcp>=1.27.0,<2.0.0
 pydantic>=2.13.3,<3.0.0
 pydantic-settings>=2.14.0,<3.0.0
 
