@@ -1,6 +1,6 @@
 # Core dependencies for Proxmox MCP Server
 requests>=2.33.1,<3.0.0
-urllib3>=2.6.3,<3.0.0
+urllib3>=2.7.0,<3.0.0
 python-dotenv>=1.2.2,<2.0.0
 
 # MCP protocol and server framework
