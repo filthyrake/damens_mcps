@@ -20,7 +20,7 @@ httpx>=0.28.1,<0.29.0
 
 # Logging and utilities
 structlog>=25.5.0,<26.0.0
-click>=8.3.3,<9.0.0
+click>=8.4.0,<9.0.0
 rich>=15.0.0,<16.0.0
 
 # Additional utilities
