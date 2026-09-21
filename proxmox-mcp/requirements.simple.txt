@@ -1,6 +1,6 @@
 # Essential dependencies for Proxmox MCP Server
 requests>=2.34.2
-urllib3>=2.7.0
+urllib3>=2.8.0
 
 # Optional: For development and testing
 python-dotenv>=1.2.3
